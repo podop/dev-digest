@@ -6,7 +6,7 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { Icon, Card, Avatar, Markdown } from "@devdigest/ui";
 import type { PrReviewComment } from "@/lib/types";
-import { cs } from "../comments";
+import { cs, visibleBody } from "../comments";
 
 function formatWhen(iso: string): string {
   const d = new Date(iso);
@@ -28,7 +28,7 @@ export function CommentCard({ c }: { c: PrReviewComment }) {
         </a>
       </div>
       <div style={cs.mdBody}>
-        <Markdown>{c.body}</Markdown>
+        <Markdown>{visibleBody(c.body)}</Markdown>
       </div>
     </Card>
   );

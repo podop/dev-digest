@@ -1,6 +1,7 @@
 /* PrDetailView — the PR detail screen: header + tabs (Overview / Agent runs /
-   Files changed) + the run trace drawer. Tab and open trace live in the URL
-   (?tab, ?trace) so they survive reload and can be shared. */
+   Files changed) + the run trace drawer. Tab, open trace and the diff focus of a
+   finding's file:line link live in the URL (?tab, ?trace, ?file/?line) so they
+   survive reload and can be shared. */
 "use client";
 
 import type { ReactNode } from "react";
@@ -13,6 +14,7 @@ import { usePrActiveRuns, usePrReviews } from "@/lib/hooks/reviews";
 import { useActiveRepo, useRepoNotFound } from "@/lib/repo-context";
 import { ApiError } from "@/lib/api";
 import { githubPrUrl } from "@/lib/github-urls";
+import { prDiffHref } from "@/lib/pr-urls";
 import { PrDetailHeader } from "../PrDetailHeader";
 import { PrDetailSkeleton } from "../PrDetailSkeleton";
 import { OverviewTab } from "../OverviewTab";
@@ -38,7 +40,10 @@ export function PrDetailView({ repoId, number }: PrDetailViewProps) {
   const { data: pr, isLoading: detailLoading, isError, error, refetch } = usePullDetail(prId);
   const { data: reviews } = usePrReviews(prId);
   const { data: activeRuns, isPending: activeRunsPending } = usePrActiveRuns(prId);
-  const { tab, traceRunId, setTab, openTrace, closeTrace } = usePrDetailSearch(repoId, number);
+  const { tab, traceRunId, order, diffFocus, setTab, openTrace, closeTrace, setOrder } = usePrDetailSearch(
+    repoId,
+    number,
+  );
 
   // The real "owner/repo" (null until the repo is loaded) — for github.com deep-links.
   const repoFullName = activeRepo?.full_name ?? null;
@@ -83,7 +88,9 @@ export function PrDetailView({ repoId, number }: PrDetailViewProps) {
           onRunStart={() => setTab("findings")}
         />
         <div style={s.body}>
-          {tab === "overview" && <OverviewTab prBody={pr.body} />}
+          {tab === "overview" && (
+            <OverviewTab prId={prId} prBody={pr.body} repoFullName={repoFullName} headSha={pr.head_sha} />
+          )}
           {tab === "findings" && (
             <FindingsTab
               prId={prId}
@@ -91,10 +98,19 @@ export function PrDetailView({ repoId, number }: PrDetailViewProps) {
               repoFullName={repoFullName}
               headSha={pr.head_sha}
               onOpenTrace={openTrace}
+              findingHref={(f) => prDiffHref(repoId, number, f)}
             />
           )}
           {tab === "diff" && (
-            <DiffTab prId={prId} filesCount={pr.files_count} files={pr.files} canComment={pr.status === "open"} />
+            <DiffTab
+              prId={prId}
+              filesCount={pr.files_count}
+              files={pr.files}
+              canComment={pr.status === "open"}
+              order={order}
+              onSetOrder={setOrder}
+              focus={diffFocus}
+            />
           )}
         </div>
         {traceRunId && !activeRunsPending && (

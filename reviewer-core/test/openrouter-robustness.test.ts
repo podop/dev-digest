@@ -45,6 +45,24 @@ describe('OpenRouterProvider — total call budget', () => {
     expect(o.timeout).toBeGreaterThan(0);
   });
 
+  it('a reprompt capped by the remaining budget still gets an integer SDK timeout (fractional clock)', async () => {
+    // Regression: performance.now() is fractional, and the OpenAI SDK throws
+    // "timeout must be an integer" when the budget cap yields e.g. 159999.6.
+    let t = 0.3;
+    const create = vi.fn(async () => {
+      const first = create.mock.calls.length === 1;
+      t += 200_000.7;
+      return first
+        ? { choices: [{ message: { content: 'nope' } }], usage: { prompt_tokens: 1, completion_tokens: 1 } }
+        : ok;
+    });
+    const p = withCreate(create, { timeoutMs: 180_000, totalTimeoutMs: 360_000, now: () => t });
+    await p.completeStructured(req);
+    const second = create.mock.calls[1]![1] as { timeout: number };
+    expect(Number.isInteger(second.timeout)).toBe(true);
+    expect(second.timeout).toBeLessThan(180_000);
+  });
+
   it('the caller signal aborts the in-flight call and surfaces the abort (not a budget error)', async () => {
     const create = hangingCreate();
     const p = withCreate(create, { totalTimeoutMs: 60_000 });

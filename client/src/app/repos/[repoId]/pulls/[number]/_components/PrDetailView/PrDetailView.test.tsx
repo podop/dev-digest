@@ -139,6 +139,14 @@ describe("PrDetailView — states", () => {
     await user.click(screen.getByText("Files changed"));
     expect(nav.replace).toHaveBeenCalledWith("/repos/r1/pulls/7?tab=diff");
   });
+
+  it("leaving Files changed drops the deep-link focus (?file/?line)", async () => {
+    nav.search = new URLSearchParams("tab=diff&file=src%2Fa.ts&line=1&order=original");
+    routes();
+    const { user } = renderView();
+    await user.click(await screen.findByText("Overview"));
+    expect(nav.replace).toHaveBeenCalledWith("/repos/r1/pulls/7?tab=overview&order=original");
+  });
 });
 
 describe("PrDetailView — finding shortcuts", () => {

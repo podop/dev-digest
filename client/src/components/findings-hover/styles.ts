@@ -19,20 +19,25 @@ export const s = {
     borderBottom: `1px dotted ${color}`,
     paddingBottom: 1,
   }),
+  /* Positioned shell: the 8px offset is transparent padding, not margin, so the
+     pointer stays inside the hover target while crossing from the counters to the
+     box — a margin gap fired mouseleave and closed the popover. */
   pop: (up: boolean, width: number): CSSProperties => ({
     position: "absolute",
     left: 0,
-    ...(up ? { bottom: "100%", marginBottom: 8 } : { top: "100%", marginTop: 8 }),
+    ...(up ? { bottom: "100%", paddingBottom: 8 } : { top: "100%", paddingTop: 8 }),
     zIndex: 30,
     width,
+    cursor: "default",
+    textAlign: "left",
+  }),
+  box: {
     background: "var(--bg-elevated)",
     border: "1px solid var(--border-strong)",
     borderRadius: 10,
     boxShadow: "var(--shadow-modal)",
     padding: 12,
-    cursor: "default",
-    textAlign: "left",
-  }),
+  } satisfies CSSProperties,
   popTitle: {
     display: "flex",
     alignItems: "center",
@@ -44,7 +49,15 @@ export const s = {
     textTransform: "uppercase",
     marginBottom: 9,
   } satisfies CSSProperties,
-  list: { display: "flex", flexDirection: "column", gap: 9, maxHeight: 300, overflow: "auto" } satisfies CSSProperties,
+  list: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 9,
+    maxHeight: 300,
+    overflowY: "auto",
+    overflowX: "hidden",
+    overscrollBehavior: "contain",
+  } satisfies CSSProperties,
   item: (last: boolean): CSSProperties => ({
     paddingBottom: last ? 0 : 9,
     borderBottom: last ? "none" : "1px solid var(--border)",
@@ -53,7 +66,18 @@ export const s = {
   itemTitle: { fontSize: 12.5, fontWeight: 600, color: "var(--text-primary)" } satisfies CSSProperties,
   category: { fontSize: 12, color: "var(--text-muted)" } satisfies CSSProperties,
   itemMeta: { display: "flex", alignItems: "center", gap: 10, marginTop: 5 } satisfies CSSProperties,
-  lineRef: { fontSize: 11, color: "var(--accent-text)" } satisfies CSSProperties,
+  /* Long unbroken paths must wrap, or they widen the list and add a horizontal scrollbar. */
+  lineRef: { fontSize: 11, color: "var(--accent-text)", minWidth: 0, overflowWrap: "anywhere" } satisfies CSSProperties,
+  lineLink: {
+    fontSize: 11,
+    color: "var(--accent-text)",
+    minWidth: 0,
+    overflowWrap: "anywhere",
+    textDecoration: "underline",
+    textDecorationStyle: "dotted",
+    textUnderlineOffset: 2,
+  } satisfies CSSProperties,
+  confidence: { flexShrink: 0 } satisfies CSSProperties,
   rationale: {
     fontSize: 11.5,
     color: "var(--text-secondary)",

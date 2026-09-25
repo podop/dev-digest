@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { renderWithProviders, screen, cleanup, waitFor } from "@/test/render";
 import { mockFetch } from "@/test/fetch-mock";
+import { pickOption } from "@/test/select";
 import { makeSkill } from "@/test/skill-fixtures";
 import type { CreateSkillInput, SkillImportPreview } from "@devdigest/shared";
 
@@ -60,7 +61,7 @@ describe("ImportPreviewModal", () => {
     const name = screen.getByRole("textbox", { name: "Name" });
     await user.clear(name);
     await user.type(name, "flaky-hunter");
-    await user.selectOptions(screen.getByRole("combobox"), "rubric");
+    await pickOption(user, screen.getByRole("combobox", { name: "Type" }), "rubric");
     await user.click(screen.getByRole("button", { name: "Confirm import" }));
 
     await waitFor(() => expect(api.requests("POST", "/skills")).toHaveLength(1));

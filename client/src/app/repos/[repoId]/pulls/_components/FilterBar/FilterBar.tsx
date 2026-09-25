@@ -3,12 +3,14 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Chip, Button, TextInput, SelectInput } from "@devdigest/ui";
+import { Chip, Button, TextInput } from "@devdigest/ui";
+import { Select } from "@/components/select";
 import { STATUS_FILTERS } from "../../constants";
 import { s } from "../../styles";
 
 export function FilterBar({
   active,
+  counts,
   onActive,
   query,
   onQuery,
@@ -18,6 +20,8 @@ export function FilterBar({
   refreshing,
 }: {
   active: string;
+  /** PRs per status filter key ("all" included); counts are hidden while undefined. */
+  counts?: Record<string, number>;
   onActive: (k: string) => void;
   query: string;
   onQuery: (v: string) => void;
@@ -39,12 +43,14 @@ export function FilterBar({
         </div>
         {STATUS_FILTERS.map(({ key, labelKey }) => (
           <Chip key={key} active={active === key} onClick={() => onActive(key)}>
-            {t(`list.filter.${labelKey}`)}
+            {counts
+              ? t("list.filterCount", { label: t(`list.filter.${labelKey}`), count: counts[key] ?? 0 })
+              : t(`list.filter.${labelKey}`)}
           </Chip>
         ))}
       </div>
       <div style={s.filterActions}>
-        <SelectInput value={sort} onChange={onSort} options={sortOptions} mono={false} />
+        <Select value={sort} onChange={onSort} options={sortOptions} mono={false} aria-label={t("list.sortLabel")} />
         <Button
           kind="secondary"
           size="sm"

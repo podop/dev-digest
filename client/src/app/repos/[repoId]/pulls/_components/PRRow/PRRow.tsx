@@ -7,9 +7,10 @@ import { useTranslations } from "next-intl";
 import { Icon, Avatar, Badge, CircularScore } from "@devdigest/ui";
 import type { PrMeta } from "@/lib/types";
 import { CostText } from "@/components/cost-text";
+import { prDetailPath } from "@/lib/pr-urls";
 import { PrFindingsCell } from "../PrFindingsCell";
 import { SIZE_COLOR, STATUS_META } from "../../constants";
-import { relativeTime, sizeOf } from "../../helpers";
+import { relativeTime, shortDate, sizeOf } from "../../helpers";
 import { s } from "../../styles";
 
 export function PRRow({
@@ -32,7 +33,7 @@ export function PRRow({
     <div
       onMouseEnter={() => setH(true)}
       onMouseLeave={() => setH(false)}
-      onClick={() => router.push(`/repos/${repoId}/pulls/${pr.number}`)}
+      onClick={() => router.push(prDetailPath(repoId, pr.number))}
       style={s.row(h)}
     >
       <div style={s.rowTitleCell}>
@@ -66,7 +67,7 @@ export function PRRow({
       </div>
       {/* Latest review's findings per severity; hover → read-only preview popover. */}
       <div>
-        <PrFindingsCell pr={pr} up={popoverUp} />
+        <PrFindingsCell repoId={repoId} pr={pr} up={popoverUp} />
       </div>
       <div>
         <Badge dot color={st.c} bg="transparent">
@@ -76,6 +77,12 @@ export function PRRow({
       {/* Total cost of ALL runs of this PR (server-summed); "—" when unknown. */}
       <div style={s.costCell}>
         <CostText usd={pr.cost_usd} />
+      </div>
+      <div
+        style={s.lastReviewCell}
+        title={pr.last_reviewed_at ? t("list.lastReviewTitle", { date: new Date(pr.last_reviewed_at).toLocaleString() }) : undefined}
+      >
+        {pr.last_reviewed_at ? shortDate(pr.last_reviewed_at) : <span style={s.muted}>—</span>}
       </div>
       <div style={s.updatedCell}>{relativeTime(pr.updated_at)}</div>
     </div>

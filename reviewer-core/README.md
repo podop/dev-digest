@@ -20,7 +20,8 @@ flowchart LR
   WRAP --> LLM["LLMProvider (injected)<br/>llm/openrouter.ts"]
   LLM --> STRUCT["structured output<br/>llm/structured.ts<br/>Zod → JSON Schema · parse-with-repair"]
   STRUCT --> GROUND["groundFindings()<br/>grounding.ts<br/>mechanical citation gate vs the diff"]
-  GROUND --> OUT["Review<br/>verdict · score · grounded findings"]
+  GROUND --> SCOPE["applyScopePolicy()<br/>review/scope.ts<br/>normalizes out_of_scope — never drops/downgrades"]
+  SCOPE --> OUT["Review<br/>verdict · score · grounded findings"]
 ```
 
 The grounding step is the mandatory gate: a finding that doesn't cite a real line
@@ -29,18 +30,43 @@ recomputed deterministically from the **surviving** findings, not trusted from t
 model. `review/run.ts` orchestrates the run (single-pass by default).
 
 The engine also accepts optional prompt slots the **course lessons** start
-feeding it — `skills` (L02), `memory` (L07), `specs` (L05), `callers` — plus a
-`reduce()`/map-reduce path and a `toReview()` CI payload helper used from L06.
-In the starter the server passes only the diff, system prompt, and repo map; the
-extra slots are omitted, so `assemblePrompt` simply leaves those sections out.
+feeding it — `skills` (L02), `intent` (L03, `## PR intent`, spec
+`server/specs/05-intent-layer.md`), `memory` (L07), `specs` (L05), `callers` —
+plus a `reduce()`/map-reduce path and a `toReview()` CI payload helper used
+from L06. In the starter the server passes only the diff, system prompt, repo
+map, and (once L03 is enabled) intent; the extra slots are omitted, so
+`assemblePrompt` simply leaves those sections out.
+
+When `ReviewInput.intent` is set, `renderIntent()` turns it into the `## PR
+intent` section's content, preceded by the trusted `INTENT_SCOPE_RULE` (a
+derived-hint framing, never a limiter — `prompt.ts`). After grounding,
+`applyScopePolicy()` normalizes each finding's `out_of_scope` flag: forced
+`null` when no intent was supplied, otherwise coerced to a plain boolean —
+the finding list's length, order and severities are never touched, so the
+score is identical with or without an intent.
+
+`assemblePrompt` also returns `sections: PromptSectionMeta[]` — one entry per
+rendered section (`system`, `injection_guard`, `task`, `pr_description`,
+`intent_rule`, `intent`, `skills`, `memory`, `repo_map`, `specs`, `callers`,
+`diff`), in render order, with its `source`/`role`/`trust` and `chars`/`tokens`
+— **never the section's text**, so a consumer can log what went into a prompt
+without ever logging the prompt itself. `ReviewInput.onPrompt` fires with this
+metadata (plus `chunkIndex`/`chunkCount`/`chunkLabel`/`mode`/`model`) once per
+LLM call — single-pass once, map-reduce once per chunk — right before the
+call; like `onUsage`, a throwing hook never breaks the review (the server
+wires it to `platform/prompt-log.ts`, its structured `prompt_assembled` log
+line).
 
 ## Public API
 
-Exported from `src/index.ts`: `assemblePrompt` / `wrapUntrusted` (prompt),
-`groundFindings` / `groundingSummary` (grounding), `toJsonSchema` / `extractJson`
-/ `parseWithRepair` (structured output), plus the `run` entrypoint and
-`reduce`. Contracts (`Review`, `Finding`, `Verdict`, …) come from
-`@devdigest/shared`.
+Exported from `src/index.ts`: `assemblePrompt` / `wrapUntrusted` /
+`renderIntent` / `INTENT_SCOPE_RULE` / `PromptSectionMeta` / `PromptSectionName`
+/ `PromptSectionSource` (prompt), `groundFindings` /
+`groundingSummary` (grounding), `applyScopePolicy` (out-of-scope policy,
+`review/scope.ts`), `toJsonSchema` / `extractJson` / `parseWithRepair`
+(structured output), plus the `run` entrypoint (incl. `ReviewInput.onPrompt` /
+`PromptAssembledEvent`) and `reduce`. Contracts (`Review`, `Finding`, `Intent`,
+`Verdict`, …) come from `@devdigest/shared`.
 
 Robustness knobs (all optional, sane defaults):
 - `reviewPullRequest`: `concurrency` (map chunks in flight, default 3, result
@@ -49,7 +75,7 @@ Robustness knobs (all optional, sane defaults):
   in-prompt note; both emit a `warning:` info event), `temperature` (default 0,
   `null` = provider default).
 - `OpenRouterProvider`: `totalTimeoutMs` (one wall-clock budget per
-  `completeStructured` shared by SDK retries AND schema reprompts, default 180s;
+  `completeStructured` shared by SDK retries AND schema reprompts, default 360s;
   the caller `signal` aborts it too), `listModelsTimeoutMs`, `onWarning`.
   Reasoning models (o-series, gpt-5*, deepseek-r1/reasoner) never get
   `temperature`. A response without `usage` is estimated (~4 chars/token) and

@@ -23,14 +23,14 @@ import { isTransient, withRetry } from '../../platform/resilience.js';
 import { ExternalServiceError } from '../../platform/errors.js';
 
 /** Per-request (one HTTP attempt) timeout when the caller sets none. */
-export const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
+export const DEFAULT_REQUEST_TIMEOUT_MS = 120_000;
 /** Wall-clock budget of one call, all retries and reprompts included. */
-export const DEFAULT_CALL_BUDGET_MS = 180_000;
+export const DEFAULT_CALL_BUDGET_MS = 360_000;
 const ISSUES_SNIPPET = 600;
 const RAW_SNIPPET = 400;
 
 export interface LlmAdapterOptions {
-  /** Total budget of one complete/completeStructured call (default 180s). */
+  /** Total budget of one complete/completeStructured call (default 360s). */
   totalTimeoutMs?: number;
   /** Non-fatal anomalies (e.g. a response without usage). Defaults to a process warning. */
   onWarning?: (message: string) => void;

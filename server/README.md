@@ -88,6 +88,8 @@ flowchart TB
   end
   subgraph Review["Review & runs"]
     reviews["reviews<br/>/pulls/:id/review · /reviews · /findings/:id/(accept|dismiss)<br/>/runs/:id/(events|trace)"]
+    intent["intent<br/>/pulls/:id/intent · /pulls/:id/intent/refresh"]
+    smartDiff["smart-diff<br/>/pulls/:id/smart-diff"]
   end
   subgraph Agents["Agents & skills"]
     agents["agents<br/>/agents · /agents/:id · /agents/:id/skills"]
@@ -140,6 +142,40 @@ the sample (configs + repo-intel top 12, or a walk of the clone) and checks ever
 cited line against the clone. A rule without verified evidence is dropped and listed in
 `scan.dropped`. `LLM_PROVIDER_OVERRIDE=mock` gives a key-free scan.
 
+### Intent (`modules/intent`, spec [`specs/05-intent-layer.md`](specs/05-intent-layer.md))
+
+| Method | Path | Result |
+|---|---|---|
+| GET | `/pulls/:id/intent` | `PrIntentResponse` = `{intent: PrIntentRecord \| null, stale: boolean}` |
+| POST | `/pulls/:id/intent/refresh` | Forces re-derivation (ignores the cache); rate limited 10/min |
+
+Derivation itself is **not** a route — it runs as shared pre-work of `POST
+/pulls/:id/review` (`reviews/application/intent-prework.ts`), once per
+request, feeding every queued agent's prompt and trace. The model (Settings →
+Feature models → `review_intent`, default `openrouter` /
+`deepseek/deepseek-v4-flash`) only classifies `intent` / `in_scope` /
+`out_of_scope` / `change_type`; confidence and the sources list are code-owned.
+Cached per PR, keyed by a hash of the title/body/branch/head sha/ticket
+refs/doc paths/model (never the ticket/doc bodies — those need a manual
+refresh). `REVIEW_INTENT_ENABLED=false` turns it off entirely (no call, no
+row, byte-identical prompt).
+
+### Smart Diff (`modules/smart-diff`, spec [`specs/06-smart-diff.md`](specs/06-smart-diff.md))
+
+| Method | Path | Result |
+|---|---|---|
+| GET | `/pulls/:id/smart-diff` | `SmartDiff` = files grouped by role (`core → tests → wiring → docs → boilerplate`, always all 5, each sorted by path), the finding lines of each agent's newest review attached, `split_suggestion` |
+
+Pure, model-free: `classifyFile` (fixed glob patterns/order in
+`domain/constants.ts`) sorts every PR file into a role; `finding_lines` come
+from the newest `kind='review'` row **of each agent** (`DISTINCT ON agent_id`,
+`desc(created_at)`, dismissed findings included) — re-running an agent replaces
+its earlier lines, other agents' lines stay. The PR list (`GET /repos/:id/pulls`)
+sums `findings_counts` over the same set (`latest_review_ids`); `score`,
+`latest_review_id` and `last_reviewed_at` come from the newest of them. `classifyFile` is exported from the module's `index.ts` so a future
+pre-filter (L08) can reuse it without an HTTP round-trip. A PR from another
+workspace is a 404, same as every other `/pulls/:id/*` route.
+
 ## Environment
 
 `server/.env` (copied from `.env.example`):
@@ -154,8 +190,10 @@ cited line against the clone. A rule without verified evidence is dropped and li
 | `EMBEDDINGS_ENABLED` | `false` | memory/RAG embeddings (OpenAI); off → **zero** OpenAI calls |
 | `REPO_INTEL_ENABLED` | `true` | repo skeleton + callers in the prompt; `false` → ripgrep-only |
 | `REVIEW_MAP_CONCURRENCY` | reviewer-core default (3) | map-reduce chunks sent to the LLM in parallel (1–16); cancel aborts the in-flight ones |
+| `REVIEW_INTENT_ENABLED` | `true` | intent layer kill switch (spec [`05-intent-layer.md`](specs/05-intent-layer.md)); `false` → no derivation, no `pr_intent` row, byte-identical prompt |
 | `LLM_PROVIDER_OVERRIDE` | — | **dev/e2e only**: `mock` → every provider is the deterministic mock (`src/adapters/llm/mock.ts`, fixed review grounded on the seeded PR #482); refused with `NODE_ENV=production`, loud warning at boot |
 | `LLM_MOCK_DELAY_MS` | `0` | latency of each mock LLM call (abortable), so the live-run UI is observable |
+| `PROMPT_LOG_VERBOSE` | — | **dev only**: adds identifiers (file paths, ticket/doc refs — never prompt content) to the structured `prompt_assembled` log line; refused with `NODE_ENV=production`; silently OFF outside development or when `API_HOST` isn't loopback (boot warns once when that happens) |
 | `DEVDIGEST_CLONE_DIR` | `./clones` | imported-repo checkouts (git-ignored) |
 | `LOG_LEVEL` | `info` (`silent` in test) | pino level |
 | `NODE_ENV` | `development` | `test` → silent logs + global rate-limit disabled |
@@ -193,6 +231,21 @@ What the reviewer actually sends to the model is assembled in
 - **Grounding is mandatory.** Every finding must cite a line that exists in the
   diff or it is dropped (`groundFindings`), and the score is recomputed from the
   surviving findings — the model's self-reported score is ignored.
+- **The intent layer is shared pre-work, billed separately.** One derivation
+  (or cache hit) per `POST /pulls/:id/review` request feeds every queued
+  agent's `## PR intent` section (spec [`05-intent-layer.md`](specs/05-intent-layer.md)).
+  Its usage is stored on `pr_intent` and in each run's `trace.intent`, **never**
+  added to `agent_runs.cost_usd`. A finding the model judges out of that scope
+  gets `out_of_scope: true` — `reviewer-core`'s `applyScopePolicy` guarantees
+  this never drops the finding or changes its severity.
+- **Every prompt sent to a model is logged, without its content.** Reviews
+  (per chunk), intent derivation and conventions extraction each emit one
+  pino `prompt_assembled` line (`platform/prompt-log.ts`, Container-owned
+  `promptLog`): feature, correlation id, provider/model, and per-section
+  name/source/trust/chars/estimated-tokens — the record type has no content
+  field, so the diff, PR body, specs, intent, tickets and docs can never reach
+  it. `PROMPT_LOG_VERBOSE=true` (dev + loopback only) adds identifiers only
+  (a chunk's file path, an intent source's kind/ref/status).
 
 ## Testing
 

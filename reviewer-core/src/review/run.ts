@@ -1,5 +1,6 @@
 import type {
   Finding,
+  Intent,
   LLMProvider,
   LlmUsage,
   PromptAssembly,
@@ -8,12 +9,13 @@ import type {
   UnifiedDiff,
 } from '@devdigest/shared';
 import { Review as ReviewSchema } from '@devdigest/shared';
-import { assemblePrompt } from '../prompt.js';
+import { assemblePrompt, renderIntent, type PromptSectionMeta } from '../prompt.js';
 import { groundFindings, groundingSummary } from '../grounding.js';
 import { reduceReviews, scoreFromFindings, sliceDiff } from './reduce.js';
 import { addCost } from '../llm/usage.js';
 import { splitOversizeDiff } from './split.js';
 import { mapOrdered } from './pool.js';
+import { applyScopePolicy } from './scope.js';
 
 /**
  * reviewPullRequest — the review engine entry point.
@@ -54,6 +56,22 @@ export interface ReviewEvent {
   data?: unknown;
 }
 
+/**
+ * Fired once per LLM call (single-pass: once; map-reduce: once per chunk),
+ * right after `assemblePrompt`. Safe-for-logging metadata only — `sections`
+ * never carries prompt text (see `PromptSectionMeta`).
+ */
+export interface PromptAssembledEvent {
+  /** 0-based position of this call among the review's chunks. */
+  chunkIndex: number;
+  /** Total number of chunks this review makes (1 for single-pass). */
+  chunkCount: number;
+  chunkLabel: string;
+  mode: ReviewMode;
+  model: string;
+  sections: PromptSectionMeta[];
+}
+
 export interface ReviewInput {
   /** Agent system prompt (trusted). */
   systemPrompt: string;
@@ -84,6 +102,15 @@ export interface ReviewInput {
   /** PR author's description/body (untrusted; truncated + delimiter-wrapped in
       the prompt). Empty/undefined → section omitted. */
   prDescription?: string;
+  /**
+   * Derived PR intent (server/specs/05-intent-layer.md). Undefined → the `##
+   * PR intent` section is omitted and the prompt is byte-identical to before
+   * this feature; every finding's `out_of_scope` is then forced to `null`
+   * (applyScopePolicy). Present → rendered untrusted, and the model's own
+   * `out_of_scope` judgment on each finding is kept (never used to drop the
+   * finding or change its severity).
+   */
+  intent?: Intent;
   /** Task framing line, e.g. "Review PR #482 …". */
   task?: string;
   /** Override the structured-output retry budget. */
@@ -113,6 +140,12 @@ export interface ReviewInput {
    * the returned outcome cannot carry.
    */
   onUsage?: (u: LlmUsage) => void;
+  /**
+   * Prompt-assembly sink — fired once per LLM call (map-reduce: once per
+   * chunk), right after `assemblePrompt`, before the call. Observational: a
+   * throwing hook never breaks the review (swallowed, like `onUsage`).
+   */
+  onPrompt?: (e: PromptAssembledEvent) => void;
   /**
    * Cancellation checkpoint, called before each (expensive) chunk LLM call.
    * Supply a function that THROWS to abort mid-run (the caller owns the error
@@ -169,6 +202,7 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
     callers: input.callers,
     repoMap: input.repoMap,
     prDescription: input.prDescription,
+    intent: input.intent ? renderIntent(input.intent) : undefined,
     task: input.task,
   };
 
@@ -192,7 +226,7 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
   const effectiveMode: ReviewMode = chunks.length > 1 ? 'map-reduce' : mode;
   const temperature = input.temperature === undefined ? DEFAULT_REVIEW_TEMPERATURE : input.temperature;
 
-  const results = await mapOrdered(chunks, input.concurrency ?? DEFAULT_MAP_CONCURRENCY, async (chunk) => {
+  const results = await mapOrdered(chunks, input.concurrency ?? DEFAULT_MAP_CONCURRENCY, async (chunk, index) => {
     // Cancellation checkpoint — stop before the next (expensive) LLM call.
     input.checkCancelled?.();
     // 'map:' prefix only for the map-reduce path (one call per chunk). In
@@ -203,6 +237,20 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
       { file: chunk.label },
     );
     const a = assemblePrompt({ ...promptParts, diff: chunk.diffText });
+    if (input.onPrompt) {
+      try {
+        input.onPrompt({
+          chunkIndex: index,
+          chunkCount: chunks.length,
+          chunkLabel: chunk.label,
+          mode: effectiveMode,
+          model: input.model,
+          sections: a.sections,
+        });
+      } catch {
+        // observational — must never break the review (mirrors emitUsage)
+      }
+    }
     const res = await input.llm.completeStructured<Review>({
       model: input.model,
       schema: ReviewSchema,
@@ -244,11 +292,20 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
   }
   emit('result', `Citation grounding: ${grounding}`);
 
+  // Out-of-scope policy (server/specs/05-intent-layer.md): mechanical, like
+  // grounding above — never drops a finding, never changes its severity.
+  const scoped = applyScopePolicy(ground.kept, input.intent);
+  if (input.intent) {
+    emit('info', `scope: ${scoped.outOfScopeCount} out-of-scope finding(s) kept (${scoped.outOfScopeCriticalCount} critical)`);
+  }
+
   // Score is derived from the findings that SURVIVED grounding (not the model's
   // self-reported number, and not the pre-grounding set) so the score, the
-  // findings list, and the deterministic event always agree.
+  // findings list, and the deterministic event always agree. The scope policy
+  // runs after grounding and never touches severity, so the score is identical
+  // with or without an intent.
   return {
-    review: { ...merged, findings: ground.kept, score: scoreFromFindings(ground.kept) },
+    review: { ...merged, findings: scoped.findings, score: scoreFromFindings(scoped.findings) },
     grounding,
     dropped: ground.dropped,
     mode: effectiveMode,

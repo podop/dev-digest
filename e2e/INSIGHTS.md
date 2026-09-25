@@ -8,6 +8,7 @@ Reviewed monthly: stale entries are removed in a dedicated commit.
 
 ## What Works
 <!-- approaches and solutions that worked here -->
+- 2026-09-25 — e2e/flows 10/11/12 (agent-browser 0.27): the PR-list status chips now read 'All · N' / 'Needs review · N' (count varies per run), so find role button --name All --exact no longer matches → click with find role button click --name 'All ·' (no --exact = substring match; verified 12/12 flows green) and match any count in wait --fn with a regex (/● \d/.test(document.body.innerText)) instead of fixed numbers
 - 2026-09-22 — scripts/e2e.sh: the hermetic API runs with LLM_PROVIDER_OVERRIDE=mock (server adapters/llm/mock.ts, LLM_MOCK_DELAY_MS=4000) and exports E2E_MOCK_LLM=1; flows with "requiresEnv": "E2E_MOCK_LLM" run a real review end to end (POST → SSE live → persisted findings) with no key, and are SKIPped by run.ts elsewhere; next dev uses NEXT_DIST_DIR=.next-e2e so the dev server's client/.next is untouched (fixes the 2026-09-21 shared-.next entry) → verified 10/10 twice
 
 ## What Doesn't Work
@@ -19,6 +20,7 @@ Reviewed monthly: stale entries are removed in a dedicated commit.
 
 ## Codebase Patterns
 <!-- conventions and architectural decisions not obvious from the code -->
+- 2026-09-24 — e2e/flows run lexically on ONE seeded DB: flows 09/11 (mock LLM) insert newer reviews for PR #482 whose findings all sit on src/middleware/ratelimit.ts (server adapters/llm/mock.ts), so a later flow asserting anything from the 'latest review' (smart-diff ● counters, flagged files) sees the mock review, not the seed's — flow 12 expected '● 2' and failed until it accepted either outcome (12/12 after) → derive expectations from whichever review can be newest at that point, or place the flow before 09
 - 2026-09-22 — e2e flows 09/10 (mock LLM): in the newest review run the FIRST FindingCard is expanded by default, so 'click the title to expand' collapses it; and after a run the PR is 'reviewed' while the PR list defaults to the 'Needs review' filter, so the PR row disappears → assert the rationale is visible instead of clicking, and click find role button --name All --exact on the list first
 - 2026-09-22 — e2e/flows: section labels, badges and popover titles (SectionLabel, FindingsHover title, severity pills) are CSS text-transform:uppercase and wait --text matches the rendered UPPERCASE text case-sensitively ('Timeline', 'Live review', '2 findings in this run' all time out) → assert a non-uppercased neighbour or wait --fn "document.body.innerText.toLowerCase().includes('…')"
 - 2026-09-21 — server/src/db/seed.ts inserts reviews+findings for PR #482 but NO agent_runs rows, so in the e2e stack the Agent runs → Timeline has no run tiles (only commits) → UI on timeline tiles (severity counters, cost, hover popover) cannot be asserted in flows; cover it in RunHistory.test.tsx or seed runs first

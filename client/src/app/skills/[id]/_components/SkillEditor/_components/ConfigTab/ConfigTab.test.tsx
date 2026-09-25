@@ -5,6 +5,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { renderWithProviders, screen, cleanup, waitFor } from "@/test/render";
 import { mockFetch, jsonResponse } from "@/test/fetch-mock";
+import { pickOption } from "@/test/select";
 import { makeSkill } from "@/test/skill-fixtures";
 import type { Skill, UpdateSkillInput } from "@devdigest/shared";
 import { useSkill } from "@/lib/hooks";
@@ -49,7 +50,7 @@ async function renderConfig() {
 describe("skill ConfigTab", () => {
   it("a type-only change sends just the type (no base_version) and toasts 'Saved'", async () => {
     const { user } = await renderConfig();
-    await user.selectOptions(screen.getByRole("combobox"), "security");
+    await pickOption(user, screen.getByRole("combobox", { name: "Type" }), "security");
     await user.click(screen.getByRole("button", { name: "Save skill" }));
     await waitFor(() => expect(api.requests("PUT", "/skills/sk1")).toHaveLength(1));
     expect(api.requests("PUT", "/skills/sk1")[0]!.body).toEqual({ type: "security" });

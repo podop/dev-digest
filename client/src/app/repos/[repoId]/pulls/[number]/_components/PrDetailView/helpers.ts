@@ -1,5 +1,5 @@
 import type { PrMeta, ReviewRecord } from "@devdigest/shared";
-import { DEFAULT_TAB, PR_TABS, type PrTab } from "./constants";
+import { DEFAULT_ORDER, DEFAULT_TAB, DIFF_ORDERS, PR_TABS, type DiffOrder, type PrTab } from "./constants";
 
 /** The route is keyed by PR number, every PR API by the row's uuid: resolve it from the pulls list. */
 export function findPrId(pulls: readonly Pick<PrMeta, "id" | "number">[] | undefined, number: string): string | null {
@@ -16,6 +16,11 @@ export function parseTab(raw: string | null): PrTab {
   return (PR_TABS as readonly string[]).includes(raw ?? "") ? (raw as PrTab) : DEFAULT_TAB;
 }
 
+/** Unknown / missing ?order values fall back to "smart" (server/specs/06-smart-diff.md). */
+export function parseOrder(raw: string | null): DiffOrder {
+  return (DIFF_ORDERS as readonly string[]).includes(raw ?? "") ? (raw as DiffOrder) : DEFAULT_ORDER;
+}
+
 /** `search` with `key` set (or removed when `value` is null), as "?…" or "" when empty. */
 export function withSearchParam(search: string, key: string, value: string | null): string {
   const sp = new URLSearchParams(search);
@@ -25,6 +30,5 @@ export function withSearchParam(search: string, key: string, value: string | nul
   return qs ? `?${qs}` : "";
 }
 
-export function prDetailPath(repoId: string, number: string): string {
-  return `/repos/${repoId}/pulls/${number}`;
-}
+/** The PR list links here too, so the path builder lives in lib/pr-urls. */
+export { prDetailPath } from "@/lib/pr-urls";

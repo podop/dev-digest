@@ -7,9 +7,10 @@
 import React from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Badge, Button, IconBtn, SelectInput, Textarea } from "@devdigest/ui";
+import { Badge, Button, IconBtn, Textarea } from "@devdigest/ui";
 import type { Convention, ConventionCategory, ConventionEvidence, ConventionStatus } from "@devdigest/shared";
 import { CONVENTION_RULE_MAX } from "@devdigest/shared";
+import { Select } from "@/components/select";
 import { skillHref } from "@/app/skills/helpers";
 import { CONVENTION_CATEGORIES } from "../../constants";
 import { confidenceTone, evidenceLabel, nextStatus } from "../../helpers";
@@ -54,11 +55,12 @@ function EditForm({
   return (
     <div style={s.editForm}>
       <Textarea value={draft.rule} onChange={(v) => setDraft((d) => ({ ...d, rule: v.slice(0, CONVENTION_RULE_MAX) }))} rows={2} />
-      <SelectInput
+      <Select
         value={draft.category}
-        onChange={(v) => setDraft((d) => ({ ...d, category: v as ConventionCategory }))}
+        onChange={(v) => setDraft((d) => ({ ...d, category: v }))}
         options={options}
         mono={false}
+        aria-label={t("card.categoryLabel")}
       />
       <div style={s.editRow}>
         <Button kind="ghost" size="sm" onClick={onCancel}>

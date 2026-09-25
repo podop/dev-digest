@@ -3,8 +3,9 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Button, Modal, FormField, TextInput, SelectInput, Textarea } from "@devdigest/ui";
+import { Button, Modal, FormField, TextInput, Textarea } from "@devdigest/ui";
 import type { Provider } from "@devdigest/shared";
+import { Select } from "@/components/select";
 import { useCreateAgent } from "@/lib/hooks";
 import { ModelSelectField } from "@/app/agents/_components/ModelSelectField";
 import { DEFAULT_AGENT_MODEL, DEFAULT_AGENT_PROVIDER } from "@/lib/model-defaults";
@@ -70,10 +71,11 @@ export function CreateAgentModal({ onClose }: { onClose: () => void }) {
           />
         </FormField>
         <FormField label={t("create.fields.provider")}>
-          <SelectInput
+          <Select
             value={provider}
-            onChange={(v) => changeProvider(v as Provider)}
+            onChange={changeProvider}
             options={[...PROVIDER_OPTIONS]}
+            aria-label={t("create.fields.provider")}
           />
         </FormField>
         <ModelSelectField provider={provider} value={model} onChange={setModel} />

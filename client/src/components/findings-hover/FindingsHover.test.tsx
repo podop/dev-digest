@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { renderWithProviders, screen, cleanup } from "@/test/render";
+import type { FindingRecord } from "@devdigest/shared";
 import { FindingsHover } from "./FindingsHover";
 import { countsFromMap, lineRef, plainText } from "./helpers";
 
@@ -43,4 +44,29 @@ describe("FindingsHover", () => {
     expect(screen.getByRole("tooltip")).toHaveTextContent("3 findings in this run");
     expect(screen.getByRole("tooltip")).toHaveTextContent("Loading findings…");
   });
+
+  // jsdom has no layout (and user-event sends mouseout without relatedTarget), so the
+  // pointer path can't be replayed — pin the fix instead: the offset from the counters is
+  // padding inside the hover target; a margin gap fired mouseleave and closed the popover.
+  it("bridges the counters-to-popover gap with padding, not margin", async () => {
+    const { user } = renderHover(<FindingsHover counts={[{ severity: "WARNING", count: 3 }]} items={undefined} loading />);
+    await user.hover(screen.getByLabelText("3 warning"));
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip).toHaveStyle({ paddingTop: "8px" });
+    expect(tooltip.style.marginTop).toBe("");
+  });
+
+  it("links each finding's file:line when findingHref is given", async () => {
+    const f = {
+      id: "f1", severity: "WARNING", category: "bug", title: "T", file: "src/a.ts", start_line: 3, end_line: 5,
+      rationale: "r", suggestion: null, confidence: 0.9, kind: "finding", trifecta_components: null,
+      evidence: null, review_id: "rv", accepted_at: null, dismissed_at: null,
+    } as FindingRecord;
+    const { user } = renderHover(
+      <FindingsHover counts={[{ severity: "WARNING", count: 1 }]} items={[f]} findingHref={(x) => `/to/${x.id}`} />,
+    );
+    await user.hover(screen.getByLabelText("1 warning"));
+    expect(screen.getByRole("link", { name: "src/a.ts:3-5" })).toHaveAttribute("href", "/to/f1");
+  });
 });
+

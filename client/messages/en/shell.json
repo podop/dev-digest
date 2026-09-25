@@ -41,6 +41,15 @@
     "viewOnGitHub": "View on GitHub",
     "postedToGitHub": "Posts to GitHub immediately",
     "outdatedTitle": "{count} comment(s) on older revisions",
-    "addComment": "Add a comment on this line"
+    "addComment": "Add a comment on this line",
+    "hasFindings": "Has findings",
+    "unmatchedTitle": "Findings not shown inline",
+    "hideFinding": "Hide finding",
+    "showFinding": "Show finding",
+    "severity": {
+      "critical": "blocker",
+      "warning": "warning",
+      "suggestion": "suggestion"
+    }
   }
 }

@@ -15,12 +15,22 @@
 export {
   assemblePrompt,
   wrapUntrusted,
+  renderIntent,
+  INTENT_SCOPE_RULE,
+  PROMPT_SECTION_NAMES,
   type PromptParts,
   type AssembledPrompt,
+  type PromptSectionName,
+  type PromptSectionSource,
+  type PromptSectionMeta,
 } from './prompt.js';
 
 // Citation grounding — the mandatory mechanical gate for diff findings.
 export { groundFindings, groundingSummary, type GroundingResult } from './grounding.js';
+
+// Out-of-scope policy (server/specs/05-intent-layer.md) — the mandatory
+// mechanical gate that normalizes a finding's out_of_scope flag.
+export { applyScopePolicy, type ScopePolicyResult } from './review/scope.js';
 
 // Structured-output helpers (Zod → JSON Schema + parse-with-repair).
 export {
@@ -47,6 +57,7 @@ export {
   type ReviewInput,
   type ReviewOutcome,
   type ReviewEvent,
+  type PromptAssembledEvent,
   type ReviewStrategy,
   type ReviewMode,
 } from './review/run.js';

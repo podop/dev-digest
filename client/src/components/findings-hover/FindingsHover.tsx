@@ -1,7 +1,8 @@
 /* FindingsHover — per-severity counters ("⊘ 2  △ 2  💡 2") with a hover popover
    "N FINDINGS IN THIS RUN" listing that run's findings read-only. Used on the PR
    list (FINDINGS column) and on the PR timeline's run tiles. Counters are not
-   clickable — filtering lives in the Review runs accordion. */
+   clickable — filtering lives in the Review runs accordion; with findingHref, each
+   finding's file:line links into the Files changed tab. */
 "use client";
 
 import React from "react";
@@ -16,6 +17,7 @@ export function FindingsHover({
   items,
   loading,
   onShow,
+  findingHref,
   up,
   width,
 }: {
@@ -25,6 +27,8 @@ export function FindingsHover({
   loading?: boolean;
   /** Fires on first hover — lets the PR list fetch the findings lazily. */
   onShow?: () => void;
+  /** In-app link for a finding's file:line; omitted → the location is plain text. */
+  findingHref?: (f: FindingRecord) => string;
   up?: boolean;
   width?: number;
 }) {
@@ -55,7 +59,16 @@ export function FindingsHover({
           </span>
         );
       })}
-      {show && <FindingsTooltip items={items} total={total} loading={loading} up={up} width={width} />}
+      {show && (
+        <FindingsTooltip
+          items={items}
+          total={total}
+          loading={loading}
+          findingHref={findingHref}
+          up={up}
+          width={width}
+        />
+      )}
     </div>
   );
 }

@@ -106,6 +106,24 @@ export function partitionThreads(
 }
 
 // ---- styles (layout only; cards/inputs/buttons reuse @devdigest/ui) ----
+/** A comment body as GitHub shows it: HTML comments (e.g. the tag DevDigest
+    appends to a posted finding) are hidden there, but our <Markdown> has no raw
+    HTML support and would print them as text. A linear indexOf scan, not a lazy
+    regex: /<!--[\s\S]*?-->/ rescans to the end from every unclosed "<!--",
+    quadratic on a long comment. An unclosed "<!--" is kept as text. */
+export function visibleBody(body: string): string {
+  let out = "";
+  let from = 0;
+  for (;;) {
+    const open = body.indexOf("<!--", from);
+    const close = open < 0 ? -1 : body.indexOf("-->", open + 4);
+    if (close < 0) break;
+    out += body.slice(from, open);
+    from = close + 3;
+  }
+  return (out + body.slice(from)).trim();
+}
+
 export const cs = {
   rowWrap: { position: "relative" } satisfies CSSProperties,
   addBtn: {

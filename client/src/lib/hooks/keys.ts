@@ -35,10 +35,14 @@ export const prKeys = {
   activeRuns: (prId: Id) => [...prKeys.detail(prId), "active-runs"] as const,
   reviews: (prId: Id) => [...prKeys.detail(prId), "reviews"] as const,
   comments: (prId: Id) => [...prKeys.detail(prId), "comments"] as const,
+  /** GET /pulls/:id/intent (server/specs/05-intent-layer.md) — a review may derive/refresh it. */
+  intent: (prId: Id) => [...prKeys.detail(prId), "intent"] as const,
+  /** GET /pulls/:id/smart-diff (server/specs/06-smart-diff.md) — a review changes the newest one's finding lines. */
+  smartDiff: (prId: Id) => [...prKeys.detail(prId), "smart-diff"] as const,
 };
 
 /** PR-scoped children a finished run changes (used when the PR id is unknown). */
-export const RUN_SCOPED_PR_KEYS = ["runs", "active-runs", "reviews"] as const;
+export const RUN_SCOPED_PR_KEYS = ["runs", "active-runs", "reviews", "intent", "smart-diff"] as const;
 
 export const agentKeys = {
   all: ["agents"] as const,

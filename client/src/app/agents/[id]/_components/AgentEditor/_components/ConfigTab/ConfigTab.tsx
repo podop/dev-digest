@@ -2,8 +2,9 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { FormField, TextInput, SelectInput, Textarea, Toggle, Button } from "@devdigest/ui";
-import type { Agent, CiFailOn, Provider, ReviewStrategy } from "@devdigest/shared";
+import { FormField, TextInput, Textarea, Toggle, Button } from "@devdigest/ui";
+import type { Agent } from "@devdigest/shared";
+import { Select } from "@/components/select";
 import { useUpdateAgent } from "@/lib/hooks";
 import { useToast } from "@/lib/toast";
 import { ModelSelectField } from "@/app/agents/_components/ModelSelectField";
@@ -70,25 +71,28 @@ export function ConfigTab({ agent }: { agent: Agent }) {
         <TextInput value={description} onChange={edit("description")} />
       </FormField>
       <FormField label={t("config.provider")}>
-        <SelectInput
+        <Select
           value={provider}
-          onChange={(v) => edit("provider")(v as Provider)}
+          onChange={edit("provider")}
           options={[...PROVIDER_OPTIONS]}
+          aria-label={t("config.provider")}
         />
       </FormField>
       <ModelSelectField provider={provider} value={model} onChange={edit("model")} />
       <FormField label={t("config.strategy")} hint={t("config.strategyHint")}>
-        <SelectInput
+        <Select
           value={strategy}
-          onChange={(v) => edit("strategy")(v as ReviewStrategy)}
+          onChange={edit("strategy")}
           options={strategyOptions}
+          aria-label={t("config.strategy")}
         />
       </FormField>
       <FormField label={t("config.ciFailOn")} hint={t("config.ciFailOnHint")}>
-        <SelectInput
+        <Select
           value={ciFailOn}
-          onChange={(v) => edit("ci_fail_on")(v as CiFailOn)}
+          onChange={edit("ci_fail_on")}
           options={ciFailOnOptions}
+          aria-label={t("config.ciFailOn")}
         />
       </FormField>
       <FormField label={t("config.repoIntel")} hint={t("config.repoIntelHint")}>
@@ -100,7 +104,11 @@ export function ConfigTab({ agent }: { agent: Agent }) {
         <Textarea value={systemPrompt} onChange={edit("system_prompt")} rows={8} mono />
       </FormField>
       <FormField label={t("config.outputSchema")}>
-        <SelectInput value={t("config.outputSchemaOption")} options={[t("config.outputSchemaOption")]} />
+        <Select
+          value={t("config.outputSchemaOption")}
+          options={[t("config.outputSchemaOption")]}
+          aria-label={t("config.outputSchema")}
+        />
       </FormField>
       <div style={s.actions}>
         <Button kind="primary" icon="Check" onClick={save} disabled={update.isPending || Object.keys(draft).length === 0}>

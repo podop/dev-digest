@@ -1,7 +1,7 @@
 /* FindingCard — ported from findings.jsx (createElement → TSX).
    Severity icon+label, category, file:line, confidence, markdown rationale +
    suggestion, accept/dismiss actions. Accept/dismiss reflect persisted
-   timestamps. */
+   timestamps. "Post to PR" shows only where the caller supplies publish. */
 "use client";
 
 import React from "react";
@@ -14,6 +14,7 @@ import {
   ConfidenceNum,
   Button,
   Markdown,
+  Badge,
   type Severity,
   type Category,
 } from "@devdigest/ui";
@@ -23,6 +24,15 @@ import { isFromInteractive, lineLabel } from "./helpers";
 import { githubBlobUrl } from "@/lib/github-urls";
 import { s } from "./styles";
 
+/** State + action of a finding's "Post to PR" button. */
+interface FindingPublish {
+  /** GitHub URL of the comment this finding was already posted as → a link instead of the button. */
+  url: string | null;
+  pending: boolean;
+  /** Omitted → nothing to post (e.g. the line isn't in the diff), no button. */
+  onPost?: () => void;
+}
+
 export function FindingCard({
   f,
   focused,
@@ -31,6 +41,7 @@ export function FindingCard({
   pending,
   repoFullName,
   headSha,
+  publish,
 }: {
   f: FindingRecord;
   focused?: boolean;
@@ -39,6 +50,8 @@ export function FindingCard({
   pending?: boolean;
   repoFullName?: string | null;
   headSha?: string | null;
+  /** "Post to PR" as an inline comment; omitted → no button. */
+  publish?: FindingPublish;
 }) {
   const t = useTranslations("prReview");
   const [expanded, setExpanded] = React.useState(defaultExpanded ?? false);
@@ -73,6 +86,13 @@ export function FindingCard({
               {f.title}
             </button>
             <CategoryTag category={f.category as Category} />
+            {f.out_of_scope && (
+              <span title={f.severity === "CRITICAL" ? t("finding.outOfScopeCriticalHint") : undefined}>
+                <Badge color="var(--text-muted)" icon="Target">
+                  {t("finding.outOfScope")}
+                </Badge>
+              </span>
+            )}
             {accepted && <span style={s.acceptedTag}>{t("finding.accepted")}</span>}
             {dismissed && <span style={s.dismissedTag}>{t("finding.dismissed")}</span>}
           </div>
@@ -93,9 +113,12 @@ export function FindingCard({
           </div>
           {f.suggestion && (
             <div style={s.suggestionWrap}>
-              <div style={s.suggestionLabel}>{t("finding.suggestedFix")}</div>
-              <div style={s.prose}>
-                <Markdown>{f.suggestion}</Markdown>
+              <Icon.Lightbulb size={15} aria-hidden style={s.suggestionIcon} />
+              <div style={s.suggestionMain}>
+                <div style={s.suggestionLabel}>{t("finding.suggestedFix")}</div>
+                <div style={s.suggestionProse}>
+                  <Markdown>{f.suggestion}</Markdown>
+                </div>
               </div>
             </div>
           )}
@@ -121,6 +144,25 @@ export function FindingCard({
             >
               {t("finding.dismiss")}
             </Button>
+            {publish?.url ? (
+              <a href={publish.url} target="_blank" rel="noopener noreferrer" style={s.publishedLink}>
+                <Icon.ExternalLink size={13} aria-hidden />
+                {t("finding.postedToPr")}
+              </a>
+            ) : (
+              publish?.onPost && (
+                <Button
+                  kind="ghost"
+                  size="sm"
+                  icon="MessageSquare"
+                  loading={publish.pending}
+                  title={t("finding.postToPrHint")}
+                  onClick={publish.onPost}
+                >
+                  {t("finding.postToPr")}
+                </Button>
+              )
+            )}
           </div>
         </div>
       )}

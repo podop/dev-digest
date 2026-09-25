@@ -39,6 +39,7 @@ delimiter-wrapped (`prompt.ts:104-122`):
 ```
 <task line, e.g. "Review PR #7 '…'">
 ## PR description        (untrusted, author-controlled, truncated to 4000 chars)
+## PR intent              (server/specs/05-intent-layer.md — see below)
 ## Skills / rules        (the agent's linked, enabled skills — see below)
 ## Relevant memory       (curated memory items)
 ## Repo skeleton         (untrusted, repo-derived)
@@ -50,6 +51,28 @@ delimiter-wrapped (`prompt.ts:104-122`):
 Sections with no content are omitted. Everything repo- or author-derived is wrapped
 in `<untrusted source="…">…</untrusted>` so the model can tell instructions
 (system) from data (user).
+
+## Intent: the `## PR intent` section
+
+When the intent layer resolved an intent for this review (server/specs/
+05-intent-layer.md), the section is prefixed by a **trusted** rule
+(`INTENT_SCOPE_RULE`, `prompt.ts`) that frames it as a derived HINT — never
+authoritative, never a limiter on what may be flagged — followed by the
+**untrusted**, `wrapUntrusted`-delimited rendering of the intent text, its
+change type, its confidence (and an "inferred" note when the confidence is
+`low`), and its in-scope / out-of-scope bullets. No intent resolved → the
+whole section is omitted, and the prompt is byte-for-byte the same as before
+this feature.
+
+**`Finding.out_of_scope`.** The `Finding` schema's `.describe()` asks the model
+to set `out_of_scope: true` on a finding that falls outside the intent's
+stated in-scope changes — but only when `## PR intent` is actually present.
+This is judgment (schema-owned, like `Finding.skill`), not a quota: flagging a
+finding this way **never** means omitting it, downgrading its severity, or
+softening its rationale — `reviewer-core`'s `applyScopePolicy` (`review/
+scope.ts`) enforces that mechanically after the model responds, the same way
+`groundFindings` enforces citation grounding. A CRITICAL out-of-scope finding
+is still a blocker and still counts in the score.
 
 ## Skills: the `## Skills / rules` section
 
@@ -140,6 +163,13 @@ numbers and gates from what the model returns:
    is no minimum or target — zero is a good answer. Models treat "return at most N
    findings" as a quota and pad the list with repeats to hit N, which also corrupts
    the score. State that the count is free and repeats are forbidden.
+
+Output language is not the agent prompt's job: the trusted task line
+(`server/src/modules/reviews/domain/prompt.ts` `taskLine`) already requires the
+summary and every finding in English, with code quoted verbatim. The system LLM
+features pin it the same way (intent classifier, conventions extraction) —
+cheap models answer in another language otherwise (seen: Chinese intent text
+from `deepseek-v4-flash` on a thin PR).
 
 ## How the engine uses the output (why the conventions matter)
 
