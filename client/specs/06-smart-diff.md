@@ -23,8 +23,8 @@ file order.
 1. Files changed shows the 5 role groups in order core → tests → wiring →
    docs → boilerplate, each with a role label and a file count; the server
    always returns all 5, the client hides an empty group. **[B1]**
-2. `docs` and `boilerplate` start collapsed; other groups follow the existing
-   `AUTO_EXPAND_MAX_LINES` rule. A lockfile is in `boilerplate`. Inside a
+2. `docs` and `boilerplate` start collapsed; the other groups start expanded.
+   A lockfile is in `boilerplate`. Inside a
    group, only file cards with a GitHub comment or a current finding start
    expanded; the rest start collapsed (until the user toggles a card, the
    default follows comments/findings as they load). Original order keeps the

@@ -36,9 +36,11 @@ export function InlineFindingCard({
       repoFullName={repoFullName}
       headSha={headSha}
       onAction={(act) => action.mutate({ findingId: f.id, action: act })}
-      publishedUrl={publishedUrl}
-      publishing={publish.isPending}
-      onPublish={canPublish ? () => publish.mutate(findingCommentInput(f)) : undefined}
+      publish={{
+        url: publishedUrl,
+        pending: publish.isPending,
+        onPost: canPublish ? () => publish.mutate(findingCommentInput(f)) : undefined,
+      }}
     />
   );
 }

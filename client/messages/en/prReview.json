@@ -117,6 +117,7 @@
       "newest": "Sort: Newest",
       "oldest": "Sort: Oldest"
     },
+    "sortLabel": "Sort",
     "columns": {
       "pullRequest": "Pull request",
       "author": "Author",

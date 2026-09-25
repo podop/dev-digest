@@ -4,9 +4,10 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { FormField, SelectInput, TextInput } from "@devdigest/ui";
+import { FormField, TextInput } from "@devdigest/ui";
 import type { SkillType } from "@devdigest/shared";
 import { SKILL_DESCRIPTION_MAX, SKILL_NAME_MAX } from "@devdigest/shared/constants/skills";
+import { Select } from "@/components/select";
 import { SKILL_TYPES } from "../../constants";
 import { isValidSkillName } from "../../helpers";
 import { s } from "./styles";
@@ -64,7 +65,13 @@ export function SkillMetaFields({
         />
       </FormField>
       <FormField label={t("fields.type")}>
-        <SelectInput value={value.type} onChange={(v) => onChange("type", v as SkillType)} options={typeOptions} mono={false} />
+        <Select
+          value={value.type}
+          onChange={(v) => onChange("type", v)}
+          options={typeOptions}
+          mono={false}
+          aria-label={t("fields.type")}
+        />
       </FormField>
     </>
   );

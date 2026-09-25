@@ -6,6 +6,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import type { Agent } from "@devdigest/shared";
 import { renderWithProviders, screen, cleanup, within, waitFor } from "@/test/render";
 import { jsonResponse, mockFetch } from "@/test/fetch-mock";
+import { pickOption } from "@/test/select";
 import { makeConvention, makeScan, makeState } from "@/test/convention-fixtures";
 import { makeSkill } from "@/test/skill-fixtures";
 
@@ -144,7 +145,7 @@ describe("ConventionsView", () => {
     const box = within(asyncCard).getByRole("textbox");
     await user.clear(box);
     await user.type(box, "Prefer await over .then()");
-    await user.selectOptions(within(asyncCard).getByRole("combobox"), "style");
+    await pickOption(user, within(asyncCard).getByRole("combobox", { name: "Category" }), "Style");
     await user.click(within(asyncCard).getByRole("button", { name: "Save" }));
     await waitFor(() =>
       expect(api.requests("PATCH", "/conventions/cv1")[0]!.body).toEqual({ rule: "Prefer await over .then()", category: "style" }),

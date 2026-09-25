@@ -1,7 +1,7 @@
 /* FindingCard — ported from findings.jsx (createElement → TSX).
    Severity icon+label, category, file:line, confidence, markdown rationale +
    suggestion, accept/dismiss actions. Accept/dismiss reflect persisted
-   timestamps. "Post to PR" shows only where the caller supplies onPublish. */
+   timestamps. "Post to PR" shows only where the caller supplies publish. */
 "use client";
 
 import React from "react";
@@ -24,6 +24,15 @@ import { isFromInteractive, lineLabel } from "./helpers";
 import { githubBlobUrl } from "@/lib/github-urls";
 import { s } from "./styles";
 
+/** State + action of a finding's "Post to PR" button. */
+interface FindingPublish {
+  /** GitHub URL of the comment this finding was already posted as → a link instead of the button. */
+  url: string | null;
+  pending: boolean;
+  /** Omitted → nothing to post (e.g. the line isn't in the diff), no button. */
+  onPost?: () => void;
+}
+
 export function FindingCard({
   f,
   focused,
@@ -32,9 +41,7 @@ export function FindingCard({
   pending,
   repoFullName,
   headSha,
-  onPublish,
-  publishing,
-  publishedUrl,
+  publish,
 }: {
   f: FindingRecord;
   focused?: boolean;
@@ -43,11 +50,8 @@ export function FindingCard({
   pending?: boolean;
   repoFullName?: string | null;
   headSha?: string | null;
-  /** Post the finding to the PR as an inline comment; omitted → no button. */
-  onPublish?: () => void;
-  publishing?: boolean;
-  /** GitHub URL of the comment this finding was already posted as. */
-  publishedUrl?: string | null;
+  /** "Post to PR" as an inline comment; omitted → no button. */
+  publish?: FindingPublish;
 }) {
   const t = useTranslations("prReview");
   const [expanded, setExpanded] = React.useState(defaultExpanded ?? false);
@@ -140,20 +144,20 @@ export function FindingCard({
             >
               {t("finding.dismiss")}
             </Button>
-            {publishedUrl ? (
-              <a href={publishedUrl} target="_blank" rel="noopener noreferrer" style={s.publishedLink}>
+            {publish?.url ? (
+              <a href={publish.url} target="_blank" rel="noopener noreferrer" style={s.publishedLink}>
                 <Icon.ExternalLink size={13} aria-hidden />
                 {t("finding.postedToPr")}
               </a>
             ) : (
-              onPublish && (
+              publish?.onPost && (
                 <Button
                   kind="ghost"
                   size="sm"
                   icon="MessageSquare"
-                  loading={publishing}
+                  loading={publish.pending}
                   title={t("finding.postToPrHint")}
-                  onClick={onPublish}
+                  onClick={publish.onPost}
                 >
                   {t("finding.postToPr")}
                 </Button>

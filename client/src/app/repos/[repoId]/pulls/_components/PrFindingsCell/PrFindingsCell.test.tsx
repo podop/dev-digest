@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { renderWithProviders, screen, cleanup } from "@/test/render";
+import { renderWithProviders, screen, cleanup, within } from "@/test/render";
 import { mockFetch } from "@/test/fetch-mock";
 import type { PrMeta } from "@/lib/types";
 import { PrFindingsCell } from "./PrFindingsCell";
@@ -52,7 +52,7 @@ describe("PrFindingsCell", () => {
     await user.hover(screen.getByLabelText("1 critical, 1 suggestion"));
     const tooltip = await screen.findByRole("tooltip");
     await screen.findByText("title-c");
-    const titles = [...tooltip.querySelectorAll("span")].map((n) => n.textContent).filter((x) => x?.startsWith("title-"));
+    const titles = within(tooltip).getAllByText(/^title-/).map((n) => n.textContent);
     expect(titles).toEqual(["title-c", "title-s"]);
   });
 });

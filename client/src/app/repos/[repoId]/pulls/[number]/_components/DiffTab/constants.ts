@@ -1,7 +1,7 @@
 /* Constants for the Smart Diff tab (server/specs/06-smart-diff.md). */
 import type { SmartDiffRole } from "@devdigest/shared";
 
-/** Docs and boilerplate start collapsed; the rest follow AUTO_EXPAND_MAX_LINES. */
+/** Groups that start collapsed; the others start expanded. */
 export const DEFAULT_COLLAPSED_ROLES: ReadonlySet<SmartDiffRole> = new Set(["docs", "boilerplate"]);
 
 /** prReview.json `smartDiff.*` label key per role. */
@@ -37,3 +37,9 @@ export const ROLE_CSS_VAR: Record<SmartDiffRole, string> = {
  *  reach into a sibling feature's constants). */
 export const DIFF_ORDERS = ["smart", "original"] as const;
 export type DiffOrder = (typeof DIFF_ORDERS)[number];
+
+/** prReview.json `smartDiff.*` label key per order. */
+export const ORDER_LABEL_KEY: Record<DiffOrder, string> = {
+  smart: "smartDiff.smartOrder",
+  original: "smartDiff.originalOrder",
+};

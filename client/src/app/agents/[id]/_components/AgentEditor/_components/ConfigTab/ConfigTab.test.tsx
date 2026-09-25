@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { renderWithProviders, screen, cleanup, waitFor } from "@/test/render";
 import { mockFetch } from "@/test/fetch-mock";
+import { pickOption } from "@/test/select";
 import type { Agent } from "@devdigest/shared";
 import { ConfigTab } from "./ConfigTab";
 
@@ -66,5 +67,12 @@ describe("ConfigTab save", () => {
     const { rerender } = renderWithProviders(<ConfigTab agent={AGENT} />);
     rerender(<ConfigTab agent={{ ...AGENT, description: "Updated elsewhere" }} />);
     expect(screen.getByDisplayValue("Updated elsewhere")).toBeInTheDocument();
+  });
+
+  it("picking a new provider from the themed Select saves only that field", async () => {
+    const { user } = renderWithProviders(<ConfigTab agent={AGENT} />);
+    await pickOption(user, screen.getByRole("combobox", { name: "Provider" }), "anthropic");
+    await user.click(screen.getByRole("button", { name: "Save agent" }));
+    expect(await savedPatch()).toEqual({ provider: "anthropic" });
   });
 });

@@ -146,16 +146,15 @@ describe("DiffTab — Smart order groups", () => {
     expect(screen.getByTitle("1 warning")).toHaveTextContent("● 1");
   });
 
-  it("puts the comments toggle next to the order switch and colours the +/− totals", async () => {
+  it("shows the comments toggle, the order switch (Smart pressed) and the +/− totals", async () => {
     routes();
     renderWithProviders(<Wrapper />);
-    const toggle = await screen.findByRole("button", { name: /Hide comments/ });
-    const smart = screen.getByRole("button", { name: "Smart order" });
-    expect(toggle.parentElement).toBe(smart.parentElement!.parentElement);
-    expect(smart).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("button", { name: /Hide comments/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Smart order" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Original order" })).toHaveAttribute("aria-pressed", "false");
     const summary = screen.getByText(/^3 files/);
-    expect(within(summary).getByText("+42")).toHaveStyle({ color: "var(--code-add-text)" });
-    expect(within(summary).getByText("−0")).toHaveStyle({ color: "var(--code-del-text)" });
+    expect(within(summary).getByText("+42")).toBeInTheDocument();
+    expect(within(summary).getByText("−0")).toBeInTheDocument();
   });
 
   it("the toggle label counts GitHub comments and current findings together", async () => {

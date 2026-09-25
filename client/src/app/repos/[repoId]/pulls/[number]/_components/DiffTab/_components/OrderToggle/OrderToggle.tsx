@@ -3,13 +3,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { DIFF_ORDERS, type DiffOrder } from "../../constants";
+import { DIFF_ORDERS, ORDER_LABEL_KEY, type DiffOrder } from "../../constants";
 import { s } from "../../styles";
-
-const LABEL_KEY: Record<DiffOrder, string> = {
-  smart: "smartDiff.smartOrder",
-  original: "smartDiff.originalOrder",
-};
 
 export function OrderToggle({ order, onSetOrder }: { order: DiffOrder; onSetOrder: (order: DiffOrder) => void }) {
   const t = useTranslations("prReview");
@@ -17,7 +12,7 @@ export function OrderToggle({ order, onSetOrder }: { order: DiffOrder; onSetOrde
     <div style={s.segmented}>
       {DIFF_ORDERS.map((o) => (
         <button key={o} type="button" aria-pressed={order === o} onClick={() => onSetOrder(o)} style={s.segment(order === o)}>
-          {t(LABEL_KEY[o])}
+          {t(ORDER_LABEL_KEY[o])}
         </button>
       ))}
     </div>
