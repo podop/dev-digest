@@ -1,7 +1,7 @@
 /**
  * A per-call wall-clock budget shared by EVERY request a structured call makes
  * (SDK transport retries AND schema reprompts), so one chunk can no longer
- * spend `(sdkRetries + 1) × (reprompts + 1) × timeout` (≈ 9 × 90s).
+ * spend `(sdkRetries + 1) × (reprompts + 1) × timeout` (≈ 9 × 180s).
  *
  * `signal` fires on the caller's abort OR the deadline; pass it to each SDK
  * request — the OpenAI SDK re-checks it before every retry, so its internal
@@ -11,7 +11,7 @@
 export interface CallBudget {
   readonly signal: AbortSignal;
   readonly totalMs: number;
-  /** ms left before the deadline (≥ 0). */
+  /** Whole ms left before the deadline (≥ 0) — an integer, the SDKs reject fractional timeouts. */
   remaining(): number;
   /** Throw the right error if the call must stop now (caller abort or deadline). */
   throwIfDone(): void;
@@ -36,7 +36,9 @@ export function createCallBudget(opts: {
   const start = now();
   const deadline = AbortSignal.timeout(opts.totalMs);
   const signal = opts.signal ? AbortSignal.any([opts.signal, deadline]) : deadline;
-  const remaining = () => Math.max(0, opts.totalMs - (now() - start));
+  // performance.now() is fractional; the OpenAI SDK throws "timeout must be an
+  // integer" on a non-integer per-request timeout, so floor it here.
+  const remaining = () => Math.max(0, Math.floor(opts.totalMs - (now() - start)));
   const callerAborted = () => opts.signal?.aborted === true;
   const budgetError = (cause?: unknown) =>
     new CallBudgetExceededError(opts.label, opts.totalMs, cause === undefined ? undefined : { cause });

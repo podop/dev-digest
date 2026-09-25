@@ -27,6 +27,7 @@ Reviewed monthly: stale entries are removed in a dedicated commit.
 
 ## Recurring Errors & Fixes
 <!-- error message → cause → fix -->
+- 2026-09-25 — src/llm/budget.ts remaining() + openai SDK core.js validatePositiveInteger: a run failing with 'timeout must be an integer' (seen 2026-09-25, large PR on openrouter deepseek-v4-flash) = a per-request timeout capped by the performance.now()-based budget was fractional; it only shows on a reprompt/second request after more than totalMs−requestTimeoutMs has elapsed, because before that min() picks the integer requestTimeout → remaining() now floors; any new timeout derived from a clock must be Math.floor'ed before it reaches the SDK (regression test in test/openrouter-robustness.test.ts)
 
 ## Session Notes
 <!-- YYYY-MM-DD — one-line summary of a meaningful session -->

@@ -75,7 +75,7 @@ Robustness knobs (all optional, sane defaults):
   in-prompt note; both emit a `warning:` info event), `temperature` (default 0,
   `null` = provider default).
 - `OpenRouterProvider`: `totalTimeoutMs` (one wall-clock budget per
-  `completeStructured` shared by SDK retries AND schema reprompts, default 180s;
+  `completeStructured` shared by SDK retries AND schema reprompts, default 360s;
   the caller `signal` aborts it too), `listModelsTimeoutMs`, `onWarning`.
   Reasoning models (o-series, gpt-5*, deepseek-r1/reasoner) never get
   `temperature`. A response without `usage` is estimated (~4 chars/token) and

@@ -29,9 +29,9 @@ import { temperatureParam } from './model-params.js';
 const NOT_SUPPORTED = 'OpenRouterProvider only implements completeStructured';
 
 /** Default per-request SDK timeout (one HTTP attempt). */
-export const DEFAULT_REQUEST_TIMEOUT_MS = 90_000;
+export const DEFAULT_REQUEST_TIMEOUT_MS = 180_000;
 /** Default wall-clock budget for ONE completeStructured call, all retries included. */
-export const DEFAULT_CALL_BUDGET_MS = 180_000;
+export const DEFAULT_CALL_BUDGET_MS = 360_000;
 /** Default timeout for the `/models` listing fetch. */
 export const DEFAULT_LIST_MODELS_TIMEOUT_MS = 15_000;
 /** Diagnostic snippet sizes for the final schema-failure error. */
@@ -52,7 +52,7 @@ export interface OpenRouterProviderOptions {
   maxRetries?: number;
   /**
    * Total wall-clock budget for one completeStructured call — SDK retries AND
-   * schema reprompts included (default 180s). Exceeding it throws
+   * schema reprompts included (default 360s). Exceeding it throws
    * CallBudgetExceededError.
    */
   totalTimeoutMs?: number;
