@@ -9,7 +9,7 @@ import { commentTargetFor, type CommentThread, type DiffCommentApi, cs } from ".
 import { topSeverity, type DiffFindingApi, type DiffFindingItem } from "../findings";
 import { SEVERITY_LABEL_KEY } from "../constants";
 import { type Line } from "../helpers";
-import { s, lineRowFor, lineSignFor, findingBadgeFor } from "../styles";
+import { s, lineRowFor, lineSignFor, findingBadgeFor, highlightFor } from "../styles";
 import { CommentThreadView } from "../CommentThreadView";
 import { InlineComposer } from "../InlineComposer";
 
@@ -20,6 +20,8 @@ export function CodeLine<T extends DiffFindingItem>({
   commenting,
   findings,
   findingApi,
+  highlighted = false,
+  anchorRef,
 }: {
   ln: Line;
   path: string;
@@ -27,6 +29,10 @@ export function CodeLine<T extends DiffFindingItem>({
   commenting?: DiffCommentApi;
   findings?: T[];
   findingApi?: DiffFindingApi<T>;
+  /** Inside a finding's deep-linked range. */
+  highlighted?: boolean;
+  /** Set on the line the file card scrolls to. */
+  anchorRef?: React.Ref<HTMLDivElement>;
 }) {
   const t = useTranslations("shell");
   const [hover, setHover] = React.useState(false);
@@ -53,11 +59,13 @@ export function CodeLine<T extends DiffFindingItem>({
 
   return (
     <div
+      ref={anchorRef}
       style={cs.rowWrap}
+      data-highlighted={highlighted || undefined}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <div style={lineRowFor(ln.kind, sev)}>
+      <div style={highlightFor(lineRowFor(ln.kind, sev), highlighted)}>
         <span className="mono tnum" style={{ ...s.lineNo, position: "relative" }}>
           {showAdd && target && (
             <button

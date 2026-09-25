@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { Icon, Avatar, Badge, CircularScore } from "@devdigest/ui";
 import type { PrMeta } from "@/lib/types";
 import { CostText } from "@/components/cost-text";
+import { prDetailPath } from "@/lib/pr-urls";
 import { PrFindingsCell } from "../PrFindingsCell";
 import { SIZE_COLOR, STATUS_META } from "../../constants";
 import { relativeTime, shortDate, sizeOf } from "../../helpers";
@@ -32,7 +33,7 @@ export function PRRow({
     <div
       onMouseEnter={() => setH(true)}
       onMouseLeave={() => setH(false)}
-      onClick={() => router.push(`/repos/${repoId}/pulls/${pr.number}`)}
+      onClick={() => router.push(prDetailPath(repoId, pr.number))}
       style={s.row(h)}
     >
       <div style={s.rowTitleCell}>
@@ -66,7 +67,7 @@ export function PRRow({
       </div>
       {/* Latest review's findings per severity; hover → read-only preview popover. */}
       <div>
-        <PrFindingsCell pr={pr} up={popoverUp} />
+        <PrFindingsCell repoId={repoId} pr={pr} up={popoverUp} />
       </div>
       <div>
         <Badge dot color={st.c} bg="transparent">

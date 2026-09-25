@@ -20,6 +20,8 @@ interface RunHistoryProps {
   /** Jump to this run's inline review accordion below (clicking the agent name). */
   onGoToReview?: (runId: string) => void;
   onDelete?: (runId: string) => void;
+  /** In-app link for a finding's file:line in the hover popover. */
+  findingHref?: (f: FindingRecord) => string;
 }
 
 export function RunHistory({
@@ -29,6 +31,7 @@ export function RunHistory({
   onOpenTrace,
   onGoToReview,
   onDelete,
+  findingHref,
 }: RunHistoryProps) {
   if (runs.length === 0 && commits.length === 0) return null;
 
@@ -45,6 +48,7 @@ export function RunHistory({
             onOpenTrace={onOpenTrace}
             onGoToReview={onGoToReview}
             onDelete={onDelete}
+            findingHref={findingHref}
           />
         ),
       )}

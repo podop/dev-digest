@@ -7,11 +7,12 @@
 import React from "react";
 import type { PrMeta } from "@/lib/types";
 import { usePrReviews } from "@/lib/hooks";
+import { prDiffHref } from "@/lib/pr-urls";
 import { FindingsHover, countsFromMap } from "@/components/findings-hover";
 import { currentReviewFindings } from "../../helpers";
 import { s } from "../../styles";
 
-export function PrFindingsCell({ pr, up = false }: { pr: PrMeta; up?: boolean }) {
+export function PrFindingsCell({ repoId, pr, up = false }: { repoId: string; pr: PrMeta; up?: boolean }) {
   const [wanted, setWanted] = React.useState(false);
   const reviews = usePrReviews(pr.id, { enabled: wanted });
   const items = React.useMemo(
@@ -26,6 +27,7 @@ export function PrFindingsCell({ pr, up = false }: { pr: PrMeta; up?: boolean })
       items={items}
       loading={reviews.isLoading}
       onShow={() => setWanted(true)}
+      findingHref={(f) => prDiffHref(repoId, pr.number, f)}
       up={up}
       width={360}
     />

@@ -103,6 +103,16 @@ export function lineRowFor(kind: Line["kind"], severity?: Severity | null): CSSP
   };
 }
 
+/** A deep-linked line: accent tint over the add/ctx background, accent edge unless a finding's severity already marks it. */
+export function highlightFor(row: CSSProperties, highlighted: boolean): CSSProperties {
+  if (!highlighted) return row;
+  return {
+    ...row,
+    backgroundImage: "linear-gradient(var(--accent-bg), var(--accent-bg))",
+    borderLeftColor: row.borderLeftColor === "transparent" ? "var(--accent)" : row.borderLeftColor,
+  };
+}
+
 /** Right-aligned severity badge on a finding's line ("blocker" / "warning" /
  *  "suggestion"): outlined pill in the severity colour, tinted over an opaque
  *  surface so the add/del row tint doesn't bleed through. It is a button that

@@ -30,6 +30,5 @@ export function withSearchParam(search: string, key: string, value: string | nul
   return qs ? `?${qs}` : "";
 }
 
-export function prDetailPath(repoId: string, number: string): string {
-  return `/repos/${repoId}/pulls/${number}`;
-}
+/** The PR list links here too, so the path builder lives in lib/pr-urls. */
+export { prDetailPath } from "@/lib/pr-urls";

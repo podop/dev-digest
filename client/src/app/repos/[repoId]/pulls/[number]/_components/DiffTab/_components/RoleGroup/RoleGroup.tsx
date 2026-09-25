@@ -7,7 +7,13 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Icon, SEV } from "@devdigest/ui";
-import { DiffViewer, type DiffCommentApi, type DiffFindingApi, type DiffFindingItem } from "@/components/diff-viewer";
+import {
+  DiffViewer,
+  type DiffCommentApi,
+  type DiffFindingApi,
+  type DiffFindingItem,
+  type DiffHighlight,
+} from "@/components/diff-viewer";
 import type { PrFile } from "@/lib/types";
 import type { SmartDiffRole } from "@devdigest/shared";
 import type { SeverityCount } from "@/components/findings-hover";
@@ -19,6 +25,8 @@ export function RoleGroup<T extends DiffFindingItem>({
   files,
   counts,
   defaultCollapsed,
+  forceOpen = false,
+  highlight,
   commenting,
   findingApi,
   fileDefaultOpen,
@@ -27,18 +35,24 @@ export function RoleGroup<T extends DiffFindingItem>({
   files: PrFile[];
   counts: SeverityCount[];
   defaultCollapsed: boolean;
+  /** Open even if collapsed by default — the group holds the deep-linked file. */
+  forceOpen?: boolean;
+  highlight?: DiffHighlight | null;
   commenting?: DiffCommentApi;
   findingApi?: DiffFindingApi<T>;
   /** Which of the group's file cards start expanded. */
   fileDefaultOpen?: (file: PrFile) => boolean;
 }) {
   const t = useTranslations("prReview");
-  const [open, setOpen] = React.useState(!defaultCollapsed);
+  // null until the user clicks the header, so a deep-link that arrives (or a
+  // Smart Diff that regroups files) after mount still opens the group.
+  const [openOverride, setOpenOverride] = React.useState<boolean | null>(null);
+  const open = openOverride ?? (forceOpen || !defaultCollapsed);
   const bodyId = React.useId();
 
   return (
     <div style={s.roleGroup}>
-      <button type="button" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen((o) => !o)} style={s.roleHeader}>
+      <button type="button" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpenOverride(!open)} style={s.roleHeader}>
         <Icon.ChevronRight size={13} style={s.chevron(open)} />
         <span aria-hidden style={s.roleDot(role)} />
         <span style={s.roleLabel}>{t(ROLE_LABEL_KEY[role])}</span>
@@ -61,7 +75,13 @@ export function RoleGroup<T extends DiffFindingItem>({
       </button>
       {open && (
         <div id={bodyId} style={s.roleBody}>
-          <DiffViewer files={files} commenting={commenting} findingApi={findingApi} defaultOpen={fileDefaultOpen} />
+          <DiffViewer
+            files={files}
+            commenting={commenting}
+            findingApi={findingApi}
+            defaultOpen={fileDefaultOpen}
+            highlight={highlight}
+          />
         </div>
       )}
     </div>

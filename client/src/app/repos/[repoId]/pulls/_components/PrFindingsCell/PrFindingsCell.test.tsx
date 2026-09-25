@@ -9,7 +9,7 @@ afterEach(cleanup);
 const base = { number: 1, title: "t", author: "a", branch: "b", base: "main", head_sha: "x", additions: 1, deletions: 0, files_count: 1, status: "reviewed" } as PrMeta;
 
 function renderCell(pr: PrMeta) {
-  return renderWithProviders(<PrFindingsCell pr={pr} />);
+  return renderWithProviders(<PrFindingsCell repoId="r1" pr={pr} />);
 }
 
 describe("PrFindingsCell", () => {
@@ -54,5 +54,10 @@ describe("PrFindingsCell", () => {
     await screen.findByText("title-c");
     const titles = within(tooltip).getAllByText(/^title-/).map((n) => n.textContent);
     expect(titles).toEqual(["title-c", "title-s"]);
+    // file:line opens the PR's Files changed tab at that line.
+    expect(within(tooltip).getAllByRole("link", { name: "a.ts:1" })[0]).toHaveAttribute(
+      "href",
+      "/repos/r1/pulls/1?tab=diff&file=a.ts&line=1",
+    );
   });
 });

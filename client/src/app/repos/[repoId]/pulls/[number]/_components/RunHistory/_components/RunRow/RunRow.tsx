@@ -18,9 +18,10 @@ interface RunRowProps {
   onOpenTrace: (runId: string) => void;
   onGoToReview?: (runId: string) => void;
   onDelete?: (runId: string) => void;
+  findingHref?: (f: FindingRecord) => string;
 }
 
-export function RunRow({ run: r, findings, onOpenTrace, onGoToReview, onDelete }: RunRowProps) {
+export function RunRow({ run: r, findings, onOpenTrace, onGoToReview, onDelete, findingHref }: RunRowProps) {
   const t = useTranslations("prReview");
   const key = outcomeKey(r);
   const o = OUTCOME_STYLE[key];
@@ -62,7 +63,7 @@ export function RunRow({ run: r, findings, onOpenTrace, onGoToReview, onDelete }
         {settled &&
           (findings && findings.length > 0 ? (
             <div style={s.counts}>
-              <FindingsHover counts={countBySeverity(findings)} items={findings} />
+              <FindingsHover counts={countBySeverity(findings)} items={findings} findingHref={findingHref} />
               {blockersText}
             </div>
           ) : (

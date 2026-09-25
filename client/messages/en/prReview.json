@@ -34,7 +34,8 @@
   },
   "findingsHover": {
     "title": "{count, plural, one {# finding} other {# findings}} in this run",
-    "loading": "Loading findings…"
+    "loading": "Loading findings…",
+    "openInDiff": "Open in Files changed"
   },
   "panel": {
     "hideLowConfidence": "Hide low confidence",

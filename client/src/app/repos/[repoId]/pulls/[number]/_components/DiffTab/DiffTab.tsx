@@ -3,7 +3,7 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { SectionLabel, Button } from "@devdigest/ui";
-import { DiffViewer, type DiffCommentApi, type DiffFindingApi } from "@/components/diff-viewer";
+import { DiffViewer, type DiffCommentApi, type DiffFindingApi, type DiffHighlight } from "@/components/diff-viewer";
 import { usePrComments, useCreatePrComment, useLiveRunRefresh, usePrReviews, useSmartDiff } from "@/lib/hooks";
 import { notify } from "@/lib/toast";
 import type { FindingRecord } from "@devdigest/shared";
@@ -23,9 +23,11 @@ interface DiffTabProps {
   canComment?: boolean;
   order: DiffOrder;
   onSetOrder: (order: DiffOrder) => void;
+  /** A finding's file:line deep-link (?file/?line): its group and file open, the lines are highlighted and scrolled to. */
+  focus?: DiffHighlight | null;
 }
 
-export function DiffTab({ prId, filesCount, files, canComment, order, onSetOrder }: DiffTabProps) {
+export function DiffTab({ prId, filesCount, files, canComment, order, onSetOrder, focus }: DiffTabProps) {
   const t = useTranslations("prReview");
   const { data: comments } = usePrComments(prId);
   const create = useCreatePrComment(prId);
@@ -121,7 +123,7 @@ export function DiffTab({ prId, filesCount, files, canComment, order, onSetOrder
       </div>
 
       {order === "original" ? (
-        <DiffViewer files={files} commenting={commenting} findingApi={findingApi} />
+        <DiffViewer files={files} commenting={commenting} findingApi={findingApi} highlight={focus} />
       ) : (
         <div style={s.list}>
           {groups.map((g) => (
@@ -131,6 +133,8 @@ export function DiffTab({ prId, filesCount, files, canComment, order, onSetOrder
               files={g.files}
               counts={g.counts}
               defaultCollapsed={DEFAULT_COLLAPSED_ROLES.has(g.role)}
+              forceOpen={!!focus && g.files.some((f) => f.path === focus.path)}
+              highlight={focus}
               commenting={commenting}
               findingApi={findingApi}
               fileDefaultOpen={fileDefaultOpen}

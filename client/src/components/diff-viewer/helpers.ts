@@ -36,3 +36,15 @@ export function parsePatch(patch: string | null | undefined): Line[] {
   }
   return out;
 }
+
+/** A file + new-side line range to open, highlight and scroll to (a finding's file:line deep-link). */
+export interface DiffHighlight {
+  path: string;
+  start: number;
+  end: number;
+}
+
+/** A new-side line (added or context) inside the highlighted range. */
+export function isHighlighted(ln: Line, h: DiffHighlight | undefined): boolean {
+  return !!h && ln.kind !== "del" && ln.kind !== "hunk" && ln.newNo != null && ln.newNo >= h.start && ln.newNo <= h.end;
+}

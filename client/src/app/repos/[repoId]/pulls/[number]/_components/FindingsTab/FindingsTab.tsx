@@ -6,7 +6,7 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Icon, Badge, SectionLabel, EmptyState } from "@devdigest/ui";
-import type { PrCommit } from "@devdigest/shared";
+import type { FindingRecord, PrCommit } from "@devdigest/shared";
 import { useDeleteRun, usePrActiveRuns, usePrReviews, usePrRuns } from "@/lib/hooks/reviews";
 import { RunHistory } from "../RunHistory";
 import { ReviewRunAccordion } from "../ReviewRunAccordion";
@@ -21,9 +21,11 @@ interface FindingsTabProps {
   repoFullName?: string | null;
   headSha?: string | null;
   onOpenTrace: (runId: string) => void;
+  /** In-app link for a finding's file:line (the timeline popover → Files changed). */
+  findingHref?: (f: FindingRecord) => string;
 }
 
-export function FindingsTab({ prId, commits, repoFullName, headSha, onOpenTrace }: FindingsTabProps) {
+export function FindingsTab({ prId, commits, repoFullName, headSha, onOpenTrace, findingHref }: FindingsTabProps) {
   const t = useTranslations("prReview");
   // Live runs are SERVER-SOURCED (agent_runs status='running'): they survive
   // navigation and reload; the run/cancel mutations and SSE refresh them.
@@ -77,6 +79,7 @@ export function FindingsTab({ prId, commits, repoFullName, headSha, onOpenTrace 
             onOpenTrace={onOpenTrace}
             onGoToReview={goToReview}
             onDelete={deleteFromHistory}
+            findingHref={findingHref}
           />
         </div>
       )}

@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import { Icon } from "@devdigest/ui";
 import type { PrFile } from "@/lib/types";
 import { AUTO_EXPAND_MAX_LINES } from "../constants";
-import { parsePatch, type Line } from "../helpers";
+import { isHighlighted, parsePatch, type DiffHighlight, type Line } from "../helpers";
 import {
   buildThreads,
   keysForLine,
@@ -37,20 +37,37 @@ export function FileCard<T extends DiffFindingItem>({
   commenting,
   findingApi,
   defaultOpen,
+  highlight,
 }: {
   file: PrFile;
   commenting?: DiffCommentApi;
   findingApi?: DiffFindingApi<T>;
   /** Overrides the AUTO_EXPAND_MAX_LINES rule; followed live until the user toggles the card. */
   defaultOpen?: boolean;
+  /** This file's lines to highlight; forces the card open and scrolls to them once. */
+  highlight?: DiffHighlight;
 }) {
   const t = useTranslations("shell");
   // null until the user clicks the header, so a caller's default that changes
   // after mount (findings arriving) still opens or closes the card.
   const [openOverride, setOpenOverride] = React.useState<boolean | null>(null);
   const open =
-    openOverride ?? defaultOpen ?? (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES;
+    openOverride ??
+    (highlight ? true : defaultOpen) ??
+    (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES;
   const lines = React.useMemo(() => parsePatch(file.patch), [file.patch]);
+
+  // Scroll to the first highlighted line — or the card itself when the range
+  // isn't in the patch — once per range, so later re-renders don't yank the page.
+  const firstHighlighted = highlight ? lines.findIndex((ln) => isHighlighted(ln, highlight)) : -1;
+  const anchorRef = React.useRef<HTMLDivElement>(null);
+  const scrolledTo = React.useRef<string | null>(null);
+  const highlightKey = highlight ? `${highlight.start}-${highlight.end}` : null;
+  React.useEffect(() => {
+    if (!highlightKey || !open || scrolledTo.current === highlightKey) return;
+    scrolledTo.current = highlightKey;
+    anchorRef.current?.scrollIntoView?.({ block: "center" });
+  }, [highlightKey, open]);
 
   // Group this file's comments into threads, then split into ones we can anchor
   // to a rendered line vs. "outdated" (GitHub dropped the line / it's not here).
@@ -85,7 +102,7 @@ export function FileCard<T extends DiffFindingItem>({
   };
 
   return (
-    <div style={s.fileCard}>
+    <div ref={firstHighlighted < 0 ? anchorRef : undefined} style={s.fileCard}>
       <div onClick={() => setOpenOverride(!open)} style={s.fileHeader}>
         <Icon.ChevronRight size={13} style={chevronFor(open)} />
         <Icon.FileText size={14} style={s.fileIcon} />
@@ -120,6 +137,8 @@ export function FileCard<T extends DiffFindingItem>({
                 commenting={commenting}
                 findings={findingsForLine(ln)}
                 findingApi={findingApi}
+                highlighted={isHighlighted(ln, highlight)}
+                anchorRef={i === firstHighlighted ? anchorRef : undefined}
               />
             ))
           )}

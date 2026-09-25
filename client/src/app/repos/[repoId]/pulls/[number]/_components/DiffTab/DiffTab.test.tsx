@@ -3,7 +3,7 @@
    the comments/findings toggle and the Smart/Original order switch. Real
    TanStack hooks against a stubbed fetch (client/INSIGHTS.md). */
 import React from "react";
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { renderWithProviders, screen, cleanup, waitFor, within } from "@/test/render";
 import { mockFetch, type RouteHandler } from "@/test/fetch-mock";
 import type { FindingRecord, PrFile, ReviewRecord, SmartDiffResponse } from "@devdigest/shared";
@@ -89,9 +89,25 @@ function routes(over: Record<string, RouteHandler> = {}) {
   });
 }
 
-function Wrapper({ initialOrder = "smart" as DiffOrder }: { initialOrder?: DiffOrder }) {
+function Wrapper({
+  initialOrder = "smart" as DiffOrder,
+  focus,
+}: {
+  initialOrder?: DiffOrder;
+  focus?: { path: string; start: number; end: number };
+}) {
   const [order, setOrder] = React.useState<DiffOrder>(initialOrder);
-  return <DiffTab prId="pr1" filesCount={FILES.length} files={FILES} canComment order={order} onSetOrder={setOrder} />;
+  return (
+    <DiffTab
+      prId="pr1"
+      filesCount={FILES.length}
+      files={FILES}
+      canComment
+      order={order}
+      onSetOrder={setOrder}
+      focus={focus}
+    />
+  );
 }
 
 describe("DiffTab — Smart order groups", () => {
@@ -358,3 +374,29 @@ describe("DiffTab — Post a finding to the PR", () => {
     expect(screen.queryByRole("button", { name: "Post to PR" })).not.toBeInTheDocument();
   });
 });
+
+describe("DiffTab — deep-link focus (?file/?line)", () => {
+  it("opens a collapsed-by-default group holding the focused file", async () => {
+    routes();
+    renderWithProviders(<Wrapper focus={{ path: "pnpm-lock.yaml", start: 1, end: 1 }} />);
+    expect(await screen.findByText("Boilerplate")).toBeInTheDocument();
+    expect(screen.getByText("pnpm-lock.yaml")).toBeInTheDocument();
+    // Docs has no focused file — still collapsed.
+    expect(screen.queryByText("README.md")).not.toBeInTheDocument();
+  });
+
+  it("highlights the focused lines and scrolls to them", async () => {
+    const scroll = vi.fn();
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scroll;
+    try {
+      routes();
+      renderWithProviders(<Wrapper initialOrder="original" focus={{ path: "src/config.ts", start: 2, end: 2 }} />);
+      await waitFor(() => expect(document.querySelector("[data-highlighted]")).toHaveTextContent("added line"));
+      expect(scroll).toHaveBeenCalled();
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+});
+
