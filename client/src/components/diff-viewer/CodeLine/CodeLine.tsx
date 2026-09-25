@@ -105,7 +105,7 @@ export function CodeLine<T extends DiffFindingItem>({
         ))}
 
       {findingApi && cardsShown && cardsOpen && (
-        <div style={cs.thread}>{lineFindings.map((item) => <React.Fragment key={item.id}>{findingApi.renderCard(item)}</React.Fragment>)}</div>
+        <div style={cs.thread}>{lineFindings.map((item) => <React.Fragment key={item.id}>{findingApi.renderCard(item, "line")}</React.Fragment>)}</div>
       )}
 
       {commenting && composing && target && (

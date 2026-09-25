@@ -11,7 +11,10 @@
     "sendReply": "Send reply",
     "cancel": "Cancel",
     "outOfScope": "Out of scope",
-    "outOfScopeCriticalHint": "Reported regardless of scope"
+    "outOfScopeCriticalHint": "Reported regardless of scope",
+    "postToPr": "Post to PR",
+    "postToPrHint": "Post this finding as an inline review comment on GitHub",
+    "postedToPr": "Posted on GitHub"
   },
   "trifecta": {
     "lethal": "LETHAL TRIFECTA — ALL 3 PRESENT",

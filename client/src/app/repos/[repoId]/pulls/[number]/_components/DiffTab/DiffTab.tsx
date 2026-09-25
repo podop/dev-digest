@@ -77,7 +77,10 @@ export function DiffTab({ prId, filesCount, files, canComment, order, onSetOrder
     items: findings,
     flagged,
     show,
-    renderCard: (f) => <InlineFindingCard f={f} prId={prId} />,
+    // GitHub anchors comments only on diff lines of an open PR.
+    renderCard: (f, placement) => (
+      <InlineFindingCard f={f} prId={prId} canPublish={!!canComment && placement === "line"} />
+    ),
   };
 
   const groups = React.useMemo(() => groupFiles(files, smartDiff, findings), [files, smartDiff, findings]);

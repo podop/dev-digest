@@ -39,6 +39,7 @@ Reviewed monthly: stale entries are removed in a dedicated commit.
 
 ## Tool & Library Notes
 <!-- dependency quirks, versions, flags -->
+- 2026-09-25 — src/vendor/ui/primitives/Markdown.tsx (react-markdown, no rehype-raw): raw HTML is NOT dropped but printed as escaped text, so an HTML comment in a GitHub comment body (e.g. the <!-- devdigest-finding:<id> --> tag that 'Post to PR' appends to link a comment back to its finding) showed up literally in the diff's CommentCard (verified by DiffTab.test.tsx) → pass GitHub-authored bodies through diff-viewer/comments.ts visibleBody() before <Markdown>; never assume HTML comments are invisible in our renderer
 - 2026-09-23 — vitest hooks: a function returned from beforeEach is run as its teardown, and mock.mockClear() returns the mock, so beforeEach(() => redirect.mockClear()) calls the mocked fn after every test (seen: page.test.tsx failing with 'NEXT_REDIRECT undefined') → use a block body: beforeEach(() => { m.mockClear(); })
 - 2026-09-23 — client/tsconfig.json: next build with a new NEXT_DIST_DIR (e.g. .next-verify) appends '<dir>/types/**/*.ts' to include and reorders it, besides the next-env.d.ts rewrite → git checkout -- client/tsconfig.json client/next-env.d.ts after a side build
 - 2026-09-22 — next-intl useFormatter().dateTime without a configured timeZone logs ENVIRONMENT_FALLBACK errors in tests and dev → format dates with toLocaleString like the rest of the codebase

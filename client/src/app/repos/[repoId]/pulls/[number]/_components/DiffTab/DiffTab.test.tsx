@@ -295,3 +295,67 @@ describe("DiffTab — Smart order groups", () => {
     expect(screen.queryByText(/●/)).not.toBeInTheDocument();
   });
 });
+
+describe("DiffTab — Post a finding to the PR", () => {
+  const ghComment = (over: Record<string, unknown> = {}) => ({
+    id: 9,
+    path: "src/config.ts",
+    line: 2,
+    original_line: 2,
+    side: "RIGHT",
+    body: "posted",
+    user: "octo",
+    created_at: "2026-09-01T00:00:00Z",
+    html_url: "https://github.com/acme/api/pull/1#r9",
+    in_reply_to_id: null,
+    is_outdated: false,
+    ...over,
+  });
+
+  it("posts the finding as an inline comment on its line, then links to it", async () => {
+    let comments: unknown[] = [];
+    const api = routes({
+      "GET /pulls/pr1/comments": () => comments,
+      "POST /pulls/pr1/comments": (req) => {
+        comments = [ghComment({ body: (req.body as { body: string }).body })];
+        return comments[0];
+      },
+    });
+    const { user } = renderWithProviders(<Wrapper />);
+
+    await user.click(await screen.findByRole("button", { name: "Post to PR" }));
+    await waitFor(() => expect(api.requests("POST", "/pulls/pr1/comments")).toHaveLength(1));
+    const sent = api.requests("POST", "/pulls/pr1/comments")[0]!.body as Record<string, unknown>;
+    expect(sent).toMatchObject({ path: "src/config.ts", line: 2, side: "RIGHT" });
+    expect(sent.body).toContain("Hardcoded secret");
+    expect(sent.body).toContain("<!-- devdigest-finding:f1 -->");
+
+    const link = await screen.findByRole("link", { name: /Posted on GitHub/ });
+    expect(link).toHaveAttribute("href", "https://github.com/acme/api/pull/1#r9");
+    expect(screen.queryByRole("button", { name: "Post to PR" })).not.toBeInTheDocument();
+  });
+
+  it("an already-posted finding shows the GitHub link instead of the button", async () => {
+    routes({ "GET /pulls/pr1/comments": [ghComment({ body: "x\n\n<!-- devdigest-finding:f1 -->" })] });
+    renderWithProviders(<Wrapper />);
+    expect(await screen.findByRole("link", { name: /Posted on GitHub/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Post to PR" })).not.toBeInTheDocument();
+    // The posted comment renders in the diff too; its marker stays hidden.
+    expect(screen.getByText("x")).toBeInTheDocument();
+    expect(screen.queryByText(/devdigest-finding/)).not.toBeInTheDocument();
+  });
+
+  it("no button on a closed PR (canComment off)", async () => {
+    routes();
+    renderWithProviders(<DiffTab prId="pr1" filesCount={3} files={FILES} order="smart" onSetOrder={() => {}} />);
+    expect(await screen.findByText("Hardcoded secret")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Post to PR" })).not.toBeInTheDocument();
+  });
+
+  it("no button for a finding whose line isn't in the diff (GitHub can't anchor it)", async () => {
+    routes({ "GET /pulls/pr1/reviews": [{ ...REVIEW, findings: [{ ...FINDING, start_line: 40, end_line: 40 }] }] });
+    renderWithProviders(<Wrapper />);
+    expect(await screen.findByText("Hardcoded secret")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Post to PR" })).not.toBeInTheDocument();
+  });
+});

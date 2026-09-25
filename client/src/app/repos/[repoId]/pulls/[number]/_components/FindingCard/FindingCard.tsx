@@ -1,7 +1,7 @@
 /* FindingCard — ported from findings.jsx (createElement → TSX).
    Severity icon+label, category, file:line, confidence, markdown rationale +
    suggestion, accept/dismiss actions. Accept/dismiss reflect persisted
-   timestamps. */
+   timestamps. "Post to PR" shows only where the caller supplies onPublish. */
 "use client";
 
 import React from "react";
@@ -32,6 +32,9 @@ export function FindingCard({
   pending,
   repoFullName,
   headSha,
+  onPublish,
+  publishing,
+  publishedUrl,
 }: {
   f: FindingRecord;
   focused?: boolean;
@@ -40,6 +43,11 @@ export function FindingCard({
   pending?: boolean;
   repoFullName?: string | null;
   headSha?: string | null;
+  /** Post the finding to the PR as an inline comment; omitted → no button. */
+  onPublish?: () => void;
+  publishing?: boolean;
+  /** GitHub URL of the comment this finding was already posted as. */
+  publishedUrl?: string | null;
 }) {
   const t = useTranslations("prReview");
   const [expanded, setExpanded] = React.useState(defaultExpanded ?? false);
@@ -132,6 +140,25 @@ export function FindingCard({
             >
               {t("finding.dismiss")}
             </Button>
+            {publishedUrl ? (
+              <a href={publishedUrl} target="_blank" rel="noopener noreferrer" style={s.publishedLink}>
+                <Icon.ExternalLink size={13} aria-hidden />
+                {t("finding.postedToPr")}
+              </a>
+            ) : (
+              onPublish && (
+                <Button
+                  kind="ghost"
+                  size="sm"
+                  icon="MessageSquare"
+                  loading={publishing}
+                  title={t("finding.postToPrHint")}
+                  onClick={onPublish}
+                >
+                  {t("finding.postToPr")}
+                </Button>
+              )
+            )}
           </div>
         </div>
       )}

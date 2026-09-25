@@ -21,7 +21,7 @@ export function UnmatchedFindings<T extends DiffFindingItem>({
     <div style={cs.outdatedWrap}>
       <span style={cs.outdatedTitle}>{t("diffViewer.unmatchedTitle")}</span>
       {items.map((item) => (
-        <React.Fragment key={item.id}>{findingApi.renderCard(item)}</React.Fragment>
+        <React.Fragment key={item.id}>{findingApi.renderCard(item, "unmatched")}</React.Fragment>
       ))}
     </div>
   );

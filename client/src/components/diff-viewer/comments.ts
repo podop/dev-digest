@@ -106,6 +106,13 @@ export function partitionThreads(
 }
 
 // ---- styles (layout only; cards/inputs/buttons reuse @devdigest/ui) ----
+/** A comment body as GitHub shows it: HTML comments (e.g. the tag DevDigest
+    appends to a posted finding) are hidden there, but our <Markdown> has no raw
+    HTML support and would print them as text. */
+export function visibleBody(body: string): string {
+  return body.replace(/<!--[\s\S]*?-->/g, "").trim();
+}
+
 export const cs = {
   rowWrap: { position: "relative" } satisfies CSSProperties,
   addBtn: {

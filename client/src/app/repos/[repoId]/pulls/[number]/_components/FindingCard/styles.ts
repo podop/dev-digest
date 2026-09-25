@@ -101,9 +101,18 @@ export const s = {
   } satisfies CSSProperties,
   actions: {
     display: "flex",
+    alignItems: "center",
     gap: 8,
     marginTop: 14,
     flexWrap: "wrap",
+  } satisfies CSSProperties,
+  publishedLink: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 5,
+    fontSize: 12.5,
+    color: "var(--accent-text)",
+    textDecoration: "none",
   } satisfies CSSProperties,
   composer: {
     marginTop: 12,

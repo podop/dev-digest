@@ -15,13 +15,17 @@ export interface DiffFindingItem {
   severity: Severity;
 }
 
+/** Where a card is rendered: under its diff line, or in the file's "unmatched"
+    footer (its line isn't in the patch, so GitHub can't anchor a comment there). */
+export type FindingPlacement = "line" | "unmatched";
+
 /** What FileCard/CodeLine need to render findings — supplied by the caller. */
 export interface DiffFindingApi<T extends DiffFindingItem = DiffFindingItem> {
   items: T[];
   /** File paths that have at least one finding — drives the file-card dot. */
   flagged: Set<string>;
   show: boolean;
-  renderCard: (item: T) => ReactNode;
+  renderCard: (item: T, placement: FindingPlacement) => ReactNode;
 }
 
 /** `RIGHT:${start_line}` — findings only ever anchor to the new (right-hand) line. */
