@@ -1,0 +1,32 @@
+{
+  "name": "@devdigest/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "devdigest-mcp — local stdio MCP server that exposes DevDigest reviewers, runs and findings to MCP clients (Claude Code). A thin client over the local DevDigest API; no DB or secrets access.",
+  "bin": {
+    "devdigest-mcp": "src/index.ts"
+  },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "inspect": "npx -y @modelcontextprotocol/inspector tsx src/index.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "biome lint --error-on-warnings ."
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "npm@10.9.7",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.31.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@types/node": "^22.20.4",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

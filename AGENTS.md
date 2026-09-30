@@ -1,6 +1,6 @@
 # DevDigest — agent map
 
-Local-first AI PR review. 4 independent packages, **no workspace**: each has its
+Local-first AI PR review. 5 independent packages, **no workspace**: each has its
 own `package.json` + lockfile; code is shared via tsconfig path aliases.
 
 | Package | Stack | PM | Port |
@@ -9,12 +9,14 @@ own `package.json` + lockfile; code is shared via tsconfig path aliases.
 | `client/` | Next.js 15 · React 19 · TanStack Query 5 · next-intl | pnpm | 3000 |
 | `reviewer-core/` | pure TS review engine, consumed as source | npm | — |
 | `e2e/` | agent-browser (CDP), no LLM | npm | — |
+| `mcp/` | `devdigest-mcp`: stdio MCP server over the local API (`@modelcontextprotocol/sdk`) | npm | stdio |
 
 Node 22 (`.nvmrc`) · pnpm 10 (exact version in `packageManager`) · Docker (Postgres only;
 API and web run on the host).
 
 ## Commands
 - Boot everything: `./scripts/dev.sh` (`--no-seed` · `--no-client` · `--db-only`)
+- MCP server (not started by dev.sh): `mcp/README.md` → Run.
 - Test / typecheck / lint: run inside the package — see its `AGENTS.md`.
 - Lint = Biome, linter only, one root `biome.jsonc` (must stay `.jsonc`: a
   commented `biome.json` is silently ignored). Never run `biome check --write`

@@ -1,0 +1,56 @@
+# mcp suite — devdigest-mcp, the local stdio MCP server (@devdigest/mcp).
+# A thin client over the DevDigest HTTP API; tests drive the real MCP server
+# through an in-memory client against a fake API (no Postgres, no LLM).
+# Uses npm (package-lock.json).
+#
+# server/src/vendor/shared/** is in the path filter because mcp types the API
+# responses with @devdigest/shared (type-only imports, tsconfig alias).
+name: mcp
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mcp/**'
+      - 'server/src/vendor/shared/**'
+      - 'biome.jsonc'
+      - '.nvmrc'
+      - '.github/workflows/mcp.yml'
+  pull_request:
+    paths:
+      - 'mcp/**'
+      - 'server/src/vendor/shared/**'
+      - 'biome.jsonc'
+      - '.nvmrc'
+      - '.github/workflows/mcp.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: mcp/package-lock.json
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm run lint
+
+      - run: npm test

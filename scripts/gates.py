@@ -28,7 +28,7 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, ".devdigest", "gates")
-PACKAGES = ("reviewer-core", "server", "client", "e2e")
+PACKAGES = ("reviewer-core", "server", "client", "e2e", "mcp")
 NOT_MD = ":(exclude)*.md"
 
 
@@ -63,7 +63,7 @@ def changed_paths(base):
 
 
 def pm(pkg):
-    if pkg in ("reviewer-core", "e2e"):
+    if pkg in ("reviewer-core", "e2e", "mcp"):
         return ["npm", "run"]
     return ["pnpm"] if shutil.which("pnpm") else ["npx", "-y", "pnpm@10"]
 
@@ -81,7 +81,7 @@ def plan_gates(packages, changed, integration):
             gates += [(f"{pkg}:arch", cwd, run + ["arch:check"]), (f"{pkg}:unit", cwd, run + ["test:unit"])]
             if integration:
                 gates.append((f"{pkg}:integration", cwd, run + ["test:integration"]))
-        elif pkg in ("reviewer-core", "client"):
+        elif pkg in ("reviewer-core", "client", "mcp"):
             gates.append((f"{pkg}:test", cwd, run + ["test"]))
     # server consumes reviewer-core as source and pins its prompt format
     if "reviewer-core" in packages and "server" not in packages:
@@ -93,6 +93,9 @@ def plan_gates(packages, changed, integration):
     # a shared-contract change on the server side must still compile on the client
     if any(p.startswith("server/src/vendor/shared/") for p in changed) and "client" not in packages:
         gates.append(("client:typecheck", os.path.join(ROOT, "client"), pm("client") + ["typecheck"]))
+    # mcp types its API responses with the server's shared contracts
+    if any(p.startswith("server/src/vendor/shared/") for p in changed) and "mcp" not in packages:
+        gates.append(("mcp:typecheck", os.path.join(ROOT, "mcp"), pm("mcp") + ["typecheck"]))
     return gates
 
 

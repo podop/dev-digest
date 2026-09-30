@@ -48,7 +48,7 @@ hallucinate, so they run before any model call. Each failure is **CRITICAL**.
 
 | Gate id | Command | Meaning |
 |---|---|---|
-| `<pkg>:typecheck` | `cd <pkg> && pnpm typecheck` (`npm` in `reviewer-core`, `e2e`) | must be clean |
+| `<pkg>:typecheck` | `cd <pkg> && pnpm typecheck` (`npm` in `reviewer-core`, `e2e`, `mcp`) | must be clean |
 | `<pkg>:lint` | `cd <pkg> && pnpm lint` | Biome, linter only — never `--write` |
 | `server:arch:check` | `cd server && pnpm arch:check` | no NEW dependency-cruiser violation |
 | `repo:check-shared-drift` | `./scripts/check-shared-drift.sh` | the two `@devdigest/shared` copies are identical |
