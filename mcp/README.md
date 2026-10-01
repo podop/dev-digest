@@ -12,7 +12,7 @@ scoping, validation, rate limits, the grounding gate) limits what a tool can do.
 ```mermaid
 flowchart LR
   CC["Claude Code<br/>(MCP client)"] -- "stdio · JSON-RPC" --> MCP["devdigest-mcp<br/>mcp/src/index.ts"]
-  MCP -- "HTTP, loopback only<br/>8 fixed calls (src/api.ts)" --> API["DevDigest API :3001<br/>server/"]
+  MCP -- "HTTP, loopback only<br/>9 fixed calls (src/api.ts)" --> API["DevDigest API :3001<br/>server/"]
   API --> PG[("Postgres")]
   API --> ENGINE["reviewer-core → LLM"]
 ```
@@ -25,7 +25,7 @@ flowchart LR
 | `run_agent_on_pr` | **no** (starts a paid LLM run) | Starts a review of `repo` + `pr_number` with `agent` (name or id), **waits up to 120 s** (fixed, from the call's entry — not a tool argument; polls, progress notifications), returns `run_id` + verdict + counts per severity, or `status: "running"` if the run outlives the budget. Client cancel → the run is cancelled | `GET /agents`, `/repos`, `/repos/:id/pulls`, `POST /pulls/:id/review`, `GET /pulls/:id/runs`, `/pulls/:id/reviews`, `POST /runs/:id/cancel` |
 | `get_findings` | yes | Verdict + compact findings (severity, file, lines, rationale, suggestion) of one run (`run_id`) or of the newest review of every agent; `min_severity`, `include_dismissed`, `limit` (max 100, default 20); `omitted` + a `next_step` when the limit or the 24 000-char response budget cuts the set | `GET /repos`, `/repos/:id/pulls`, `/pulls/:id/reviews`, `/pulls/:id/runs` |
 | `get_conventions` | yes | Conventions extracted from the repo (L02), `accepted` by default, first verified evidence location of each; same `limit` / `omitted` / response-budget rules as `get_findings` | `GET /repos`, `/repos/:id/conventions` |
-| `get_blast_radius` | yes | **Stub**: final input/output schema, always returns `not_implemented` (lands with the Blast Radius homework) | none |
+| `get_blast_radius` | yes | What a PR can break, read from DevDigest's repo-intel index (L04): changed symbols, their callers (`name`, `file:line`) grouped per symbol, affected endpoints and crons, `summary`, `degraded` + `reason`. `degraded: true` means the index could not answer fully (**unknown, not "no impact"**) and `next_step` says to Resync in the UI. Nothing is computed here beyond trimming: `max_callers` (1-200, default 50), `changed_symbols` capped at 50 (`omitted_symbols`; `summary` keeps the true totals), endpoints/crons capped at 10 per group (`omitted_endpoints`), and, over the 24 000-char budget, whole lowest-ranked groups dropped before any caller of a top group (`omitted_groups`, `omitted_callers`); a `next_step` says what was cut | `GET /repos`, `/repos/:id/pulls`, `/pulls/:id/blast` |
 
 `list_prs` / `list_repos` are deliberately missing: `gh` or the GitHub MCP already
 do that. `list_agents` stays, because only DevDigest knows the reviewer config.
@@ -40,15 +40,16 @@ do that. `list_agents` stays, because only DevDigest knows the reviewer config.
 - Every output field that can be missing is `.optional()`, never `.nullable()` —
   a JSON Schema `"type": ["x", "null"]` is what `@modelcontextprotocol/inspector
   --strict` flags, and absent keys are one token cheaper than `null` ones.
-- Every tool has an `outputSchema`. Success returns `structuredContent` plus the
-  same JSON as text.
+- Every tool has an `outputSchema`. Success returns `structuredContent` plus a text
+  twin: the same JSON, or — when the tool passes the optional `text` argument of
+  `ok()` — a short rendering (`get_blast_radius`; the structured content stays the
+  source of truth).
 - Every failure is a tool error (`isError: true`) whose text is
   `[code] what happened` followed by `Next step: …`. Examples: `api_unreachable`
   (start the API), `repo_not_imported` (lists the imported repos),
   `pr_not_found` (lists known PR numbers), `agent_not_found` /
   `agent_ambiguous` / `agent_disabled`, `rate_limited`, `run_failed` /
-  `run_cancelled` ("do not report the PR as clean"), `run_in_progress`,
-  `not_implemented`. An unexpected error becomes a generic `internal_error`;
+  `run_cancelled` ("do not report the PR as clean"), `run_in_progress`. An unexpected error becomes a generic `internal_error`;
   the raw message goes to stderr only, never back to the client.
 - Powers are limited in code:
   - `src/api.ts` has no generic request method, so the tools can't delete,

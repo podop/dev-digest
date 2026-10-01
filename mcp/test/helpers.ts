@@ -1,6 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import type { Agent, Convention, ConventionsState, FindingRecord, PrMeta, Repo, ReviewRecord, RunSummary } from '@devdigest/shared';
+import type { Agent, BlastRadius, Convention, ConventionsState, FindingRecord, PrMeta, Repo, ReviewRecord, RunSummary } from '@devdigest/shared';
 import type { DevDigestApi } from '../src/api.js';
 import { createServer } from '../src/server.js';
 import { abortableSleep, type ToolDeps } from '../src/tools/shared.js';
@@ -125,6 +125,26 @@ export function runSummary(over: Partial<RunSummary> = {}): RunSummary {
   };
 }
 
+export function blast(over: Partial<BlastRadius> = {}): BlastRadius {
+  return {
+    changed_symbols: [{ file: 'src/rate-limit.ts', name: 'rateLimit', kind: 'function' }],
+    downstream: [
+      {
+        symbol: 'rateLimit',
+        callers: [
+          { name: 'publicRouter', file: 'src/router.ts', line: 23 },
+          { name: 'webhookRoute', file: 'src/webhooks.ts', line: 8 },
+          { name: 'sweep', file: 'src/cron.ts', line: 5 },
+        ],
+        endpoints_affected: ['GET /public', 'POST /webhooks'],
+        crons_affected: ['nightly-sweep'],
+      },
+    ],
+    summary: '1 changed symbol · 3 callers · 2 endpoints · 1 cron',
+    ...over,
+  };
+}
+
 /** A scriptable fake of the API; override any method per test. */
 export function fakeApi(over: Partial<DevDigestApi> = {}): DevDigestApi {
   const conventions: ConventionsState = { scan: null, conventions: [] };
@@ -137,6 +157,7 @@ export function fakeApi(over: Partial<DevDigestApi> = {}): DevDigestApi {
     cancelRun: async () => undefined,
     listReviews: async () => [review()],
     getConventions: async () => conventions,
+    getBlastRadius: async () => blast(),
     ...over,
   };
 }

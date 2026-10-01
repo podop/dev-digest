@@ -79,6 +79,7 @@ function routes(over: Record<string, RouteHandler> = {}) {
     "GET /pulls/pr-uuid/reviews": [REVIEW],
     "GET /pulls/pr-uuid/runs/active": [],
     "GET /pulls/pr-uuid/runs": [],
+    "GET /pulls/pr-uuid/blast": { changed_symbols: [], downstream: [], summary: "0 changed symbols" },
     "GET /agents": [],
     "POST /findings/:id/:action": (req) => ({ finding: { id: req.params.id } }),
     ...over,

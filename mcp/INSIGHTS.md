@@ -11,6 +11,7 @@ Reviewed monthly: stale entries are removed in a dedicated commit.
 
 ## What Doesn't Work
 <!-- dead ends and anti-patterns — the most valuable section -->
+- 2026-10-01 — src/present.ts trimToBudget: it only pops items from the bins it is given, so when the bulk of a payload sits in OTHER fields it empties every bin and is still over budget — get_blast_radius on a 464-symbol PR returned ~70 KB with every group's callers = [] (verified 2026-10-01 via the Inspector CLI), because changed_symbols and endpoint lists were not bins → cap non-bin arrays first, drop whole low-ranked groups before the top group's rows, and keep headroom (RESERVE_CHARS) for fields added after trimming; measure with compact JSON (Python json.dumps adds spaces)
 - 2026-09-30 — src/exactly.ts (TS 5.9): an exhaustiveness check written as 'const X = [...] as const satisfies ExactTuple<U, readonly U[]>' can't reference the tuple being declared, so Exclude<U, U[number]> is never: it still rejects an extra value (readonly U[]) but silently accepts a MISSING one — verified 2026-09-30 with a probe (missing 'c' compiled clean, extra 'd' failed TS2322); 'exactly<U>()([...])' with a <const T extends readonly U[]> parameter typed T & (missing-check) rejects both (TS2345 { missing: 'c' } / TS2322) → prove a type-level guard with a throwaway failing probe before trusting it; an explicit return type on the inner generic arrow needs a named type alias (inline, tsc reports TS2719 'two different types with this name')
 
 ## Codebase Patterns

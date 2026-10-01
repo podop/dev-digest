@@ -1,5 +1,6 @@
 import type {
   Agent,
+  BlastRadius,
   ConventionsState,
   PrMeta,
   Repo,
@@ -26,6 +27,7 @@ export interface DevDigestApi {
   cancelRun(runId: string): Promise<void>;
   listReviews(prId: string, signal?: AbortSignal): Promise<ReviewRecord[]>;
   getConventions(repoId: string, signal?: AbortSignal): Promise<ConventionsState>;
+  getBlastRadius(prId: string, signal?: AbortSignal): Promise<BlastRadius>;
 }
 
 export interface HttpApiOptions {
@@ -81,6 +83,11 @@ export function createHttpApi(opts: HttpApiOptions): DevDigestApi {
       list<ReviewRecord>('reviews', REVIEW_KEYS, await call('GET', `/pulls/${enc(prId)}/reviews`, undefined, signal)),
     getConventions: async (repoId, signal) =>
       object<ConventionsState>('conventions', CONVENTIONS_KEYS, await call('GET', `/repos/${enc(repoId)}/conventions`, undefined, signal)),
+    getBlastRadius: async (prId, signal) => {
+      const blast = object<BlastRadius>('blast radius', BLAST_KEYS, await call('GET', `/pulls/${enc(prId)}/blast`, undefined, signal));
+      if (!Array.isArray(blast.changed_symbols) || !Array.isArray(blast.downstream)) throw contractError('blast radius');
+      return blast;
+    },
   };
 }
 
@@ -98,6 +105,7 @@ const RUN_START_KEYS = ['runs'] as const;
 const RUN_KEYS = ['run_id', 'status'] as const;
 const REVIEW_KEYS = ['run_id', 'agent_id', 'kind', 'findings', 'created_at'] as const;
 const CONVENTIONS_KEYS = ['scan', 'conventions'] as const;
+const BLAST_KEYS = ['changed_symbols', 'downstream', 'summary'] as const;
 
 function hasKeys(value: unknown, keys: readonly string[]): boolean {
   return typeof value === 'object' && value !== null && keys.every((k) => k in value);

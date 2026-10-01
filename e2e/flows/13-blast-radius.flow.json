@@ -1,0 +1,18 @@
+{
+  "name": "PR Overview shows the Blast radius card (stats, or a degraded notice with Resync)",
+  "description": "PR #482 → Overview tab (the default): the Blast radius card renders its stat row read from GET /pulls/:id/blast. Whether the seeded repo has a repo-intel index depends on the stack (flag, indexing), so the flow asserts what both outcomes share: the card and its stat labels ('cron/jobs' only exists in the card's stat row). A degraded read additionally shows the 'Degraded' notice with Resync; that is not asserted because it is stack-dependent. Read-only (no model call). The PR list defaults to 'Needs review', which flows 09/11 make it fail (PR now 'reviewed'), so this flow clicks 'All' first, like flows 10/11/12.",
+  "steps": [
+    { "cmd": ["set", "viewport", "1280", "2000"], "label": "tall viewport: the PR page scrolls inside <main>, which agent-browser's click does not scroll" },
+    { "cmd": ["open", "{BASE}/"], "label": "load the app root" },
+    { "cmd": ["wait", "--url", "/pulls"], "label": "land on the PR list" },
+    { "cmd": ["find", "role", "button", "click", "--name", "All ·"], "label": "PR list: show All (chip reads 'All · N')" },
+    { "cmd": ["find", "text", "Add rate limiting to public API endpoints", "click"], "label": "open the PR row" },
+    { "cmd": ["wait", "--url", "/pulls/482"], "label": "navigate to the PR detail route" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "PR detail data settles (Overview is the default tab)" },
+    {
+      "cmd": ["wait", "--fn", "document.body.innerText.toLowerCase().includes('blast radius')"],
+      "label": "the Blast radius card header renders (CSS-uppercased, so compare lowercased)"
+    },
+    { "cmd": ["wait", "--text", "cron/jobs"], "label": "the stat row renders (symbols · callers · endpoints · cron/jobs), whether the read is degraded or not" }
+  ]
+}

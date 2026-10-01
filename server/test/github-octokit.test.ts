@@ -123,3 +123,41 @@ describe('mergeSamePath (file ↔ symlink type change)', () => {
     ]);
   });
 });
+
+describe('OctokitGitHubClient.listMergedPullRequests', () => {
+  function clientWith(closed: unknown[], filesByPr: Record<number, string[]>) {
+    const client = new OctokitGitHubClient('test-token', { warn: vi.fn() });
+    const list = vi.fn(async () => ({ data: closed }));
+    const listFiles = vi.fn(async (p: { pull_number: number }) => ({
+      data: (filesByPr[p.pull_number] ?? []).map((filename) => ({ filename })),
+    }));
+    (client as unknown as { octokit: { rest: { pulls: unknown } } }).octokit = { rest: { pulls: { list, listFiles } } };
+    return { client, list, listFiles };
+  }
+
+  it('lists closed PRs by update, keeps only merged ones and reads each one\'s first page of files (paths deduped)', async () => {
+    const { client, list, listFiles } = clientWith(
+      [
+        { number: 3, title: 'merged', user: { login: 'ann' }, merged_at: '2026-01-03T00:00:00Z' },
+        { number: 2, title: 'closed unmerged', user: { login: 'bob' }, merged_at: null },
+        { number: 1, title: 'merged ghost', user: null, merged_at: '2026-01-01T00:00:00Z' },
+      ],
+      { 3: ['a.ts', 'CLAUDE.md', 'CLAUDE.md'], 1: ['b.ts'] },
+    );
+    const out = await client.listMergedPullRequests(repo, { limit: 30 });
+
+    expect(list).toHaveBeenCalledWith(expect.objectContaining({ state: 'closed', sort: 'updated', direction: 'desc', per_page: 30 }));
+    expect(listFiles).toHaveBeenCalledTimes(2);
+    expect(listFiles).toHaveBeenCalledWith(expect.objectContaining({ pull_number: 3, per_page: 100 }));
+    expect(out).toEqual([
+      { number: 3, title: 'merged', author: 'ann', merged_at: '2026-01-03T00:00:00Z', files: ['a.ts', 'CLAUDE.md'] },
+      { number: 1, title: 'merged ghost', author: 'unknown', merged_at: '2026-01-01T00:00:00Z', files: ['b.ts'] },
+    ]);
+  });
+
+  it('does not read files when nothing merged', async () => {
+    const { client, listFiles } = clientWith([{ number: 2, title: 'x', user: null, merged_at: null }], {});
+    await expect(client.listMergedPullRequests(repo, { limit: 30 })).resolves.toEqual([]);
+    expect(listFiles).not.toHaveBeenCalled();
+  });
+});

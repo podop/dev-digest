@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { agent, connect, convention, fakeApi, fakeClock, finding, review, runSummary, text } from './helpers.js';
+import { ToolError } from '../src/errors.js';
+import { MAX_RESPONSE_CHARS } from '../src/present.js';
+import { agent, blast, connect, convention, fakeApi, fakeClock, finding, review, runSummary, text } from './helpers.js';
 
 const PR_ARGS = { repo: 'podop/dev-digest', pr_number: 3 };
 
@@ -60,11 +62,14 @@ describe('tool catalog', () => {
     // descriptions, input schemas, annotations (outputSchema is not listed there).
     const startup = tools.map(({ outputSchema: _out, ...rest }) => rest);
 
-    // Measured 5 190 chars (5 tools, titles, descriptions, input schemas); keep it there.
+    // Measured 5 167 chars (5 tools, titles, descriptions, input schemas); keep it there.
     expect(JSON.stringify(startup).length).toBeLessThanOrEqual(5_200);
     // Whole catalog: 11 700 before; z.enum output fields (verdict, blocks_on,
     // category, scan status) cost ~150 chars there and are never in the startup context.
-    expect(JSON.stringify(tools).length).toBeLessThanOrEqual(11_200);
+    // Measured 11 830 with get_blast_radius's real outputSchema (the stub's was ~1 000 chars
+    // smaller), 12 348 with its omitted_symbols/endpoints/groups fields; it only counts in
+    // outputSchema, which is never in the startup context.
+    expect(JSON.stringify(tools).length).toBeLessThanOrEqual(12_400);
   });
 });
 
@@ -290,12 +295,130 @@ describe('internal errors', () => {
 });
 
 describe('get_blast_radius', () => {
-  it('is an honest not_implemented error', async () => {
-    const client = await connect(fakeApi());
+  it('returns the server map unchanged plus a short text rendering', async () => {
+    const getBlastRadius = vi.fn(fakeApi().getBlastRadius);
+    const client = await connect(fakeApi({ getBlastRadius }));
+    const res = await client.callTool({ name: 'get_blast_radius', arguments: PR_ARGS });
+
+    expect(res.isError).toBeFalsy();
+    expect(getBlastRadius).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000003', expect.anything());
+    expect(res.structuredContent).toEqual({ repo: 'podop/dev-digest', pr_number: 3, ...blast(), degraded: false, omitted_callers: 0 });
+    const out = text(res);
+    expect(out).toContain('1 changed symbol · 3 callers · 2 endpoints · 1 cron');
+    expect(out).toContain('rateLimit <- publicRouter (src/router.ts:23)');
+    expect(out).toContain('endpoints: GET /public, POST /webhooks');
+    expect(out).toContain('crons: nightly-sweep');
+    expect(out).not.toContain('DEGRADED');
+    expect(out).not.toContain('"downstream"');
+  });
+
+  it('max_callers trims callers in group order and reports omitted_callers + next_step', async () => {
+    const two = { ...blast().downstream[0]!, symbol: 'other', callers: [{ name: 'z', file: 'src/z.ts', line: 1 }, { name: 'y', file: 'src/y.ts', line: 2 }] };
+    const client = await connect(fakeApi({ getBlastRadius: async () => blast({ downstream: [blast().downstream[0]!, two] }) }));
+    const res = await client.callTool({ name: 'get_blast_radius', arguments: { ...PR_ARGS, max_callers: 4 } });
+
+    const sc = res.structuredContent as { downstream: { symbol: string; callers: unknown[]; endpoints_affected: string[] }[]; omitted_callers: number; next_step?: string };
+    expect(sc.downstream.map((d) => [d.symbol, d.callers.length])).toEqual([['rateLimit', 3], ['other', 1]]);
+    expect(sc.downstream[1]!.endpoints_affected).toEqual(['GET /public', 'POST /webhooks']);
+    expect(sc.omitted_callers).toBe(1);
+    expect(sc.next_step).toContain('max_callers');
+  });
+
+  it('a huge PR stays within MAX_RESPONSE_CHARS and cuts the least valuable data first', async () => {
+    const caller = (g: number, i: number) => ({ name: `caller${g}_${i}`, file: `src/modules/group-${g}/handlers/caller-${i}.ts`, line: i + 1 });
+    const downstream = Array.from({ length: 100 }, (_, g) => ({
+      symbol: `symbol${g}`,
+      callers: g === 0 ? [caller(0, 0), caller(0, 1), caller(0, 2)] : [caller(g, 0), caller(g, 1)],
+      endpoints_affected: g === 1 ? Array.from({ length: 90 }, (_, e) => `GET /api/v1/resource-${e}/items`) : [],
+      crons_affected: [],
+    }));
+    const changed_symbols = Array.from({ length: 400 }, (_, i) => ({ file: `src/file-${i}.ts`, name: `changed${i}`, kind: 'function' }));
+    const summary = '400 changed symbols · 201 callers · 90 endpoints · 0 crons';
+    const client = await connect(fakeApi({ getBlastRadius: async () => blast({ changed_symbols, downstream, summary }) }));
+    const res = await client.callTool({ name: 'get_blast_radius', arguments: { ...PR_ARGS, max_callers: 200 } });
+
+    expect(res.isError).toBeFalsy();
+    expect(JSON.stringify(res.structuredContent).length).toBeLessThanOrEqual(MAX_RESPONSE_CHARS);
+    const sc = res.structuredContent as {
+      summary: string;
+      changed_symbols: unknown[];
+      downstream: { symbol: string; callers: unknown[]; endpoints_affected: string[] }[];
+      omitted_callers: number;
+      omitted_symbols?: number;
+      omitted_endpoints?: number;
+      omitted_groups?: number;
+      next_step?: string;
+    };
+    expect(sc.summary).toBe(summary);
+    expect(sc.downstream[0]).toMatchObject({ symbol: 'symbol0' });
+    expect(sc.downstream[0]!.callers).toHaveLength(3);
+    expect(sc.downstream[1]!.callers).toHaveLength(2);
+    expect(sc.downstream[1]!.endpoints_affected).toHaveLength(10);
+    expect(sc.changed_symbols).toHaveLength(50);
+    expect(sc.omitted_symbols).toBe(350);
+    expect(sc.omitted_endpoints).toBeGreaterThanOrEqual(80);
+    expect(sc.omitted_groups).toBeGreaterThan(0);
+    expect(sc.omitted_groups).toBe(100 - sc.downstream.length);
+    expect(sc.omitted_callers).toBeGreaterThan(0);
+    expect(sc.next_step).toContain('max_callers');
+    expect(sc.next_step).toContain('UI');
+    expect(text(res)).toContain('endpoints: GET /api/v1/resource-0/items');
+    expect(text(res)).toContain('+5 more');
+  });
+
+  it('a degraded result says so explicitly and never implies no impact', async () => {
+    const client = await connect(
+      fakeApi({ getBlastRadius: async () => blast({ changed_symbols: [], downstream: [], summary: '0 changed symbols · 0 callers · 0 endpoints · 0 crons', degraded: true, reason: 'no_data' }) }),
+    );
+    const res = await client.callTool({ name: 'get_blast_radius', arguments: PR_ARGS });
+
+    expect(res.isError).toBeFalsy();
+    expect(res.structuredContent).toMatchObject({ degraded: true, reason: 'no_data', downstream: [] });
+    expect(text(res)).toContain('DEGRADED (no_data)');
+    expect(text(res)).toContain("NOT 'no impact'");
+    expect((res.structuredContent as { next_step: string }).next_step).toContain('Resync');
+  });
+
+  it('an unknown PR number is a pr_not_found error with a next step, and the index is not read', async () => {
+    const getBlastRadius = vi.fn(fakeApi().getBlastRadius);
+    const client = await connect(fakeApi({ getBlastRadius }));
+    const res = await client.callTool({ name: 'get_blast_radius', arguments: { repo: 'podop/dev-digest', pr_number: 99 } });
+
+    expect(res.isError).toBe(true);
+    expect(text(res)).toContain('[pr_not_found]');
+    expect(text(res)).toContain('Next step:');
+    expect(getBlastRadius).not.toHaveBeenCalled();
+  });
+
+  it('an unknown repo is a repo_not_imported error with a next step, and the index is not read', async () => {
+    const getBlastRadius = vi.fn(fakeApi().getBlastRadius);
+    const client = await connect(fakeApi({ getBlastRadius }));
+    const res = await client.callTool({ name: 'get_blast_radius', arguments: { repo: 'acme/unknown-repo', pr_number: 3 } });
+
+    expect(res.isError).toBe(true);
+    expect(text(res)).toContain('[repo_not_imported]');
+    expect(text(res)).toContain('Next step:');
+    expect(getBlastRadius).not.toHaveBeenCalled();
+  });
+
+  it('an API 404 surfaces as a tool error, not a clean result', async () => {
+    const client = await connect(
+      fakeApi({
+        getBlastRadius: async () => {
+          throw new ToolError('not_found', 'Pull request not found', 'Re-resolve the id: call list_agents, or check the repo / PR number.');
+        },
+      }),
+    );
     const res = await client.callTool({ name: 'get_blast_radius', arguments: PR_ARGS });
 
     expect(res.isError).toBe(true);
-    expect(text(res)).toContain('[not_implemented]');
-    expect(text(res)).toContain('NOT a statement that the PR has no impact');
+    expect(text(res)).toContain('[not_found]');
+  });
+
+  it('rejects an unknown argument (strict input)', async () => {
+    const client = await connect(fakeApi());
+    const res = await client.callTool({ name: 'get_blast_radius', arguments: { ...PR_ARGS, bogus: 1 } });
+
+    expect(res.isError).toBe(true);
   });
 });

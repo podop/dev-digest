@@ -27,6 +27,7 @@ Reviewed monthly: stale entries are removed in a dedicated commit.
 
 ## Tool & Library Notes
 <!-- dependency quirks, versions, flags -->
+- 2026-10-01 — agent-browser install (npx shim, Chrome for Testing 154, 187 MB) on WSL: the download timed out on all 3 built-in retries ('error decoding response body … operation timed out'); simply re-running 'agent-browser install' resumed and finished (then reports 'already installed') → before the first ./scripts/e2e.sh on a new machine, loop 'agent-browser install' until it succeeds instead of debugging the network
 - 2026-09-22 — .github/workflows/e2e-web.yml pins agent-browser@0.27.0 and runs e2e npm ci + typecheck + lint BEFORE the stack boots → bump the CLI deliberately (flow batch-JSON syntax is version-bound) and update e2e/README + AGENTS together
 
 ## Recurring Errors & Fixes

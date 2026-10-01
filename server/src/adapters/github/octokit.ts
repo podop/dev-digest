@@ -13,6 +13,7 @@ import type {
   CommitFilesPayload,
   IssueMeta,
   FileAtRef,
+  MergedPrSummary,
 } from '@devdigest/shared';
 import { withRetry, withTimeout } from '../../platform/resilience.js';
 
@@ -22,6 +23,8 @@ export const MAX_PR_FILES = 3000;
 /** GitHub's own ceiling for GET /pulls/:n/commits. */
 export const MAX_PR_COMMITS = 250;
 const PAGE_SIZE = 100;
+/** Concurrent per-PR file reads in listMergedPullRequests (GitHub's secondary rate limit). */
+const MERGED_FILES_CONCURRENCY = 5;
 /** PR detail pages through files/commits (up to ~33 requests) — give it more room. */
 const DETAIL_TIMEOUT = 90_000;
 
@@ -123,6 +126,48 @@ export class OctokitGitHubClient implements GitHubClient {
           }));
         })(),
         TIMEOUT,
+      ),
+    );
+  }
+
+  async listMergedPullRequests(repo: RepoRef, opts: { limit: number }): Promise<MergedPrSummary[]> {
+    return withRetry(() =>
+      withTimeout(
+        (async () => {
+          const res = await this.octokit.rest.pulls.list({
+            owner: repo.owner,
+            repo: repo.name,
+            state: 'closed',
+            sort: 'updated',
+            direction: 'desc',
+            per_page: Math.min(Math.max(opts.limit, 1), PAGE_SIZE),
+          });
+          const merged = res.data.filter((pr) => pr.merged_at);
+          const out: MergedPrSummary[] = [];
+          for (let i = 0; i < merged.length; i += MERGED_FILES_CONCURRENCY) {
+            const batch = await Promise.all(
+              merged.slice(i, i + MERGED_FILES_CONCURRENCY).map(async (pr) => {
+                const { data: files } = await this.octokit.rest.pulls.listFiles({
+                  owner: repo.owner,
+                  repo: repo.name,
+                  pull_number: pr.number,
+                  per_page: PAGE_SIZE,
+                });
+                return {
+                  number: pr.number,
+                  title: pr.title,
+                  author: pr.user?.login ?? 'unknown',
+                  merged_at: pr.merged_at as string,
+                  // A file<->symlink type change is listed twice: one path, one entry.
+                  files: [...new Set(files.map((f) => f.filename))],
+                };
+              }),
+            );
+            out.push(...batch);
+          }
+          return out;
+        })(),
+        DETAIL_TIMEOUT,
       ),
     );
   }

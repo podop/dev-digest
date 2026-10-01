@@ -81,10 +81,26 @@ export const DownstreamImpact = z.object({
 });
 export type DownstreamImpact = z.infer<typeof DownstreamImpact>;
 
+/**
+ * Why the index could not give a full answer (mirrors repo-intel's DegradedReason).
+ * A degraded blast radius means "unknown", never "no impact".
+ */
+export const BlastDegradedReason = z.enum([
+  'flag_off',
+  'index_failed',
+  'index_partial',
+  'repo_too_large',
+  'no_data',
+]);
+export type BlastDegradedReason = z.infer<typeof BlastDegradedReason>;
+
 export const BlastRadius = z.object({
   changed_symbols: z.array(ChangedSymbol),
   downstream: z.array(DownstreamImpact),
   summary: z.string(),
+  /** True when the persistent index could not be used; absent = a full answer. */
+  degraded: z.boolean().optional(),
+  reason: BlastDegradedReason.optional(),
 });
 export type BlastRadius = z.infer<typeof BlastRadius>;
 

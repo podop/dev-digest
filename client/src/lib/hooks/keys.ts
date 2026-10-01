@@ -39,6 +39,10 @@ export const prKeys = {
   intent: (prId: Id) => [...prKeys.detail(prId), "intent"] as const,
   /** GET /pulls/:id/smart-diff (server/specs/06-smart-diff.md) — a review changes the newest one's finding lines. */
   smartDiff: (prId: Id) => [...prKeys.detail(prId), "smart-diff"] as const,
+  /** GET /pulls/:id/blast (server/specs/07-blast-radius.md) — an index read; a resync invalidates it. */
+  blast: (prId: Id) => [...prKeys.detail(prId), "blast"] as const,
+  /** GET /pulls/:id/history — previously merged PRs touching the same files. */
+  history: (prId: Id) => [...prKeys.detail(prId), "history"] as const,
 };
 
 /** PR-scoped children a finished run changes (used when the PR id is unknown). */

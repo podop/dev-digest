@@ -176,6 +176,17 @@ sums `findings_counts` over the same set (`latest_review_ids`); `score`,
 pre-filter (L08) can reuse it without an HTTP round-trip. A PR from another
 workspace is a 404, same as every other `/pulls/:id/*` route.
 
+### Blast radius (`modules/blast`, spec [`specs/07-blast-radius.md`](specs/07-blast-radius.md), deep dive [`docs/blast-radius.md`](docs/blast-radius.md))
+
+| Method | Path | Result |
+|---|---|---|
+| GET | `/pulls/:id/blast` | `BlastRadius` = changed symbols, callers grouped per changed symbol (`downstream[]` with affected endpoints/crons), `summary`, `degraded` + `reason` |
+| GET | `/pulls/:id/history` | `PrHistory` = prior merged PRs touching the same files (GitHub; `[]` when unavailable) |
+
+Read-only: one `repo-intel` facade `getBlastRadius` call per request, no re-parse, no LLM.
+`degraded`/`reason` pass through (degraded = unknown, not "no impact");
+`MAX_CALLERS_PER_SYMBOL` is applied per `viaSymbol` in the facade. Also used by MCP `get_blast_radius`.
+
 ## Environment
 
 `server/.env` (copied from `.env.example`):

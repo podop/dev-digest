@@ -20,6 +20,7 @@ describe('Container composition root', () => {
     expect(c.repoIntel).toBe(c.modules.repoIntel.service);
     expect(Object.keys(c.modules).sort()).toEqual([
       'agents',
+      'blast',
       'conventions',
       'intent',
       'polling',

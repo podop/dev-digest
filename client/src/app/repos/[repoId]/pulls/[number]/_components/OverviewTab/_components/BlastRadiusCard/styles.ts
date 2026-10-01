@@ -1,0 +1,76 @@
+import type { CSSProperties } from "react";
+
+export const s = {
+  card: {
+    border: "1px solid var(--border)",
+    borderRadius: 8,
+    background: "var(--bg-elevated)",
+    padding: 18,
+    display: "flex",
+    flexDirection: "column",
+    gap: 14,
+  } satisfies CSSProperties,
+  header: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  } satisfies CSSProperties,
+  headerIcon: { color: "var(--text-muted)" } satisfies CSSProperties,
+  headerTitle: {
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: "0.07em",
+    textTransform: "uppercase",
+    color: "var(--text-muted)",
+  } satisfies CSSProperties,
+  headerRight: {
+    marginLeft: "auto",
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+  } satisfies CSSProperties,
+  stats: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+    display: "grid",
+    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gap: 10,
+  } satisfies CSSProperties,
+  stat: {
+    border: "1px solid var(--border)",
+    borderRadius: 6,
+    padding: "8px 12px",
+    display: "flex",
+    alignItems: "baseline",
+    gap: 6,
+  } satisfies CSSProperties,
+  statValue: {
+    fontSize: 20,
+    fontWeight: 700,
+    color: "var(--text-primary)",
+  } satisfies CSSProperties,
+  statLabel: {
+    fontSize: 12,
+    color: "var(--text-muted)",
+  } satisfies CSSProperties,
+  degraded: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+    border: "1px solid var(--warn)",
+    background: "var(--warn-bg)",
+    borderRadius: 6,
+    padding: "8px 12px",
+    fontSize: 13,
+    color: "var(--text-primary)",
+  } satisfies CSSProperties,
+  degradedText: { flex: 1, minWidth: 200 } satisfies CSSProperties,
+  muted: {
+    margin: 0,
+    fontSize: 13,
+    color: "var(--text-muted)",
+  } satisfies CSSProperties,
+} as const;

@@ -23,6 +23,7 @@ import type {
   BlameLine,
   GitCommit,
   FileAtRef,
+  MergedPrSummary,
   CodeIndex,
   CodeMatch,
   CodeSymbol,
@@ -146,6 +147,8 @@ export interface MockGitHubOptions {
   comments?: PrReviewComment[];
   /** Files served by getFileContent, keyed by `path@ref` then plain `path` (any ref). */
   files?: Record<string, string>;
+  /** Merged PRs returned by listMergedPullRequests (default none). */
+  mergedPulls?: MergedPrSummary[];
 }
 
 export class MockGitHubClient implements GitHubClient {
@@ -175,6 +178,10 @@ export class MockGitHubClient implements GitHubClient {
         },
       ]
     );
+  }
+
+  async listMergedPullRequests(_repo: RepoRef, _opts: { limit: number }): Promise<MergedPrSummary[]> {
+    return this.opts.mergedPulls ?? [];
   }
 
   async getPullRequest(_repo: RepoRef, n: number): Promise<PrDetail> {

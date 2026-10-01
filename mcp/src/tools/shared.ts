@@ -27,13 +27,14 @@ export const PrArgs = {
 export type OutputOf<S extends z.ZodRawShape> = z.infer<z.ZodObject<S>>;
 
 /**
- * Success: structured content for the client + the same JSON as text for
- * clients without outputSchema support. Takes the tool's `outputSchema` shape
- * so a payload that does not match it fails typecheck, not the SDK's runtime
- * output validation (after a paid run, for run_agent_on_pr).
+ * Success: structured content for the client + a text twin for clients without
+ * outputSchema support — the same JSON, or a short rendering when the tool
+ * passes `text` (get_blast_radius). Takes the tool's `outputSchema` shape so a
+ * payload that does not match it fails typecheck, not the SDK's runtime output
+ * validation (after a paid run, for run_agent_on_pr).
  */
-export function ok<S extends z.ZodRawShape>(_outputSchema: S, data: OutputOf<S>): CallToolResult {
-  return { content: [{ type: 'text', text: JSON.stringify(data) }], structuredContent: data };
+export function ok<S extends z.ZodRawShape>(_outputSchema: S, data: OutputOf<S>, text?: string): CallToolResult {
+  return { content: [{ type: 'text', text: text ?? JSON.stringify(data) }], structuredContent: data };
 }
 
 export function fail(err: ToolError): CallToolResult {
