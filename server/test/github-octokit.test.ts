@@ -155,6 +155,31 @@ describe('OctokitGitHubClient.listMergedPullRequests', () => {
     ]);
   });
 
+  it('retries a transient listFiles failure on its own: the list and the other PR are read once', async () => {
+    const { client, list, listFiles } = clientWith(
+      [
+        { number: 3, title: 'a', user: { login: 'ann' }, merged_at: '2026-01-03T00:00:00Z' },
+        { number: 1, title: 'b', user: { login: 'bob' }, merged_at: '2026-01-01T00:00:00Z' },
+      ],
+      { 3: ['a.ts'], 1: ['b.ts'] },
+    );
+    let failed = false;
+    listFiles.mockImplementation(async (p: { pull_number: number }) => {
+      if (p.pull_number === 1 && !failed) {
+        failed = true;
+        throw Object.assign(new Error('bad gateway'), { status: 502 });
+      }
+      return { data: [{ filename: p.pull_number === 3 ? 'a.ts' : 'b.ts' }] };
+    });
+
+    const out = await client.listMergedPullRequests(repo, { limit: 30 });
+
+    expect(out.map((p) => p.files)).toEqual([['a.ts'], ['b.ts']]);
+    expect(list).toHaveBeenCalledTimes(1);
+    expect(listFiles.mock.calls.filter(([p]) => p.pull_number === 3)).toHaveLength(1);
+    expect(listFiles.mock.calls.filter(([p]) => p.pull_number === 1)).toHaveLength(2);
+  });
+
   it('does not read files when nothing merged', async () => {
     const { client, listFiles } = clientWith([{ number: 2, title: 'x', user: null, merged_at: null }], {});
     await expect(client.listMergedPullRequests(repo, { limit: 30 })).resolves.toEqual([]);

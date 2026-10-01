@@ -6,6 +6,7 @@
  */
 import type { OnboardingStaleReason, OnboardingTour } from '@devdigest/shared';
 import { ONBOARDING_LIMITS as L } from '@devdigest/shared';
+import { isDangerousCommand } from './command-safety.js';
 import { PROMPT_VERSION } from './constants.js';
 import { truncateText } from './input.js';
 import type { OnboardingLlmOutput } from './prompt.js';
@@ -128,7 +129,7 @@ function runStepsOf(raw: OnboardingLlmOutput['run_steps']): TourContent['run_ste
   const steps: TourContent['run_steps'] = [];
   for (const s of raw) {
     const command = s.command.trim();
-    if (command.length === 0 || command.length > L.commandMax) continue;
+    if (command.length === 0 || command.length > L.commandMax || isDangerousCommand(command)) continue;
     const comment = s.comment ? truncateText(s.comment, L.commentMax) : '';
     steps.push(comment.length > 0 ? { command, comment } : { command });
   }

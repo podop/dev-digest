@@ -24,6 +24,8 @@ const d = hasDocker ? describe : describe.skip;
 
 const FILES = ['src/index.ts', 'src/app.ts', 'src/db.ts', 'src/util.ts', 'README.md', 'package.json'];
 const SECRET_VALUE = 'sk-live-do-not-send';
+const COMPOSE_SECRET = 's3cret-compose-pw';
+const README_TOKEN = 'ghp_abcdefghijklmnopqrstuvwxyz0123456789';
 
 /** What the model returns: one invented path and one over-long command exercise the verification. */
 const LLM_TOUR = {
@@ -71,7 +73,8 @@ d('Onboarding Tour routes (Testcontainers pg)', () => {
   const index = fakeIndex();
   const git = new MockGitClient({
     files: {
-      'README.md': '# Demo\nRun it.',
+      'README.md': `# Demo\nRun it.\nToken: ${README_TOKEN}\n`,
+      'docker-compose.yml': `services:\n  db:\n    environment:\n      POSTGRES_PASSWORD: ${COMPOSE_SECRET}\n`,
       'package.json': '{"scripts":{"dev":"tsx watch src/index.ts"}}',
       '.env.example': `API_KEY=${SECRET_VALUE}\nPORT=3000\n`,
       'src/index.ts': '// TODO: wire graceful shutdown\n',
@@ -136,6 +139,10 @@ d('Onboarding Tour routes (Testcontainers pg)', () => {
     const sent = JSON.stringify(llm.calls.map((c) => c.req));
     expect(sent).toContain('API_KEY');
     expect(sent).not.toContain(SECRET_VALUE);
+    // README and compose excerpts are redacted too: the key stays, the value does not.
+    expect(sent).toContain('POSTGRES_PASSWORD');
+    expect(sent).not.toContain(COMPOSE_SECRET);
+    expect(sent).not.toContain(README_TOKEN);
   });
 
   it('GET returns a stored tour within 300 ms (AC13)', async () => {

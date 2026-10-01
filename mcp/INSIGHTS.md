@@ -16,6 +16,7 @@ Reviewed monthly: stale entries are removed in a dedicated commit.
 
 ## Codebase Patterns
 <!-- conventions and architectural decisions not obvious from the code -->
+- 2026-10-01 — test/tools.test.ts size guards: the whole-catalog tools/list guard counts outputSchema, the startup-context guard does not — a constant field added to every tool's Output (e.g. the untrusted_text z.literal, ~175 chars per tool) breaks only the catalog guard → re-measure and raise that limit deliberately, never the startup one
 - 2026-09-30 — @modelcontextprotocol/sdk 1.31 McpServer (dist/esm/server/mcp.js CallTool handler): a throw inside a tool callback becomes {isError:true, content:[text: err.message]}, and validateToolOutput skips outputSchema checks when isError is set, so error results need no structuredContent; input schema failures come back the same way ('Input validation error: …') → throw ToolError inside guarded() for a '[code] … Next step: …' text, never return a success-shaped object on failure
 
 ## Tool & Library Notes

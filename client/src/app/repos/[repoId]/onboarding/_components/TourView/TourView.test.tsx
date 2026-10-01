@@ -7,6 +7,7 @@ import type { OnboardingTour, OnboardingTourState } from "@devdigest/shared";
 import { renderWithProviders, screen, cleanup, within, waitFor } from "@/test/render";
 import { jsonResponse, mockFetch } from "@/test/fetch-mock";
 import { RepoProvider } from "@/lib/repo-context";
+import { repoKeys } from "@/lib/hooks/keys";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -257,7 +258,7 @@ describe("TourView — repo switch (EC10)", () => {
       "GET /repos/r2/index-state": { repoId: "r2", status: "full", filesIndexed: 3, filesSkipped: 0, durationMs: 1, lastIndexedSha: "d", indexerVersion: 1, updatedAt: "2026-10-01T00:00:00.000Z" },
       "POST /repos/r1/onboarding": () => new Promise<Response>((resolve) => (finish = resolve)),
     });
-    const { user, rerender } = renderWithProviders(view("r1"));
+    const { user, rerender, queryClient } = renderWithProviders(view("r1"));
 
     await user.click(await screen.findByRole("button", { name: "Generate tour" }));
     expect(await screen.findByText("Generating… (one LLM call)")).toBeInTheDocument();
@@ -268,7 +269,11 @@ describe("TourView — repo switch (EC10)", () => {
     expect(screen.getByRole("button", { name: "Regenerate" })).toBeEnabled();
 
     finish(jsonResponse(ready("A tour.")));
-    await new Promise((r) => setTimeout(r, 50));
+    // Deterministic signal: the late POST settled, so the hook-level onSuccess wrote A's tour into
+    // repo A's own cache entry — only then is the absence on B meaningful.
+    await waitFor(() =>
+      expect(queryClient.getQueryData<OnboardingTourState>(repoKeys.onboarding("r1"))).toMatchObject({ status: "ready" }),
+    );
     expect(screen.queryByText("A tour.")).not.toBeInTheDocument();
     expect(screen.queryByText("Tour updated")).not.toBeInTheDocument();
     expect(screen.getByText("B tour.")).toBeInTheDocument();

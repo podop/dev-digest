@@ -32,37 +32,40 @@ export function RunSteps({ steps }: { steps: readonly OnboardingRunStep[] }) {
   if (steps.length === 0) return <p style={s.empty}>{t("run.empty")}</p>;
 
   return (
-    <ol aria-label={t("run.list")} style={s.list}>
-      {steps.map((step, i) => {
-        const done = copied === i;
-        return (
-          <li key={i} style={s.row}>
-            <span aria-hidden style={s.num}>
-              {i + 1}
-            </span>
-            <div style={s.text}>
-              <code className="mono" style={s.command}>
-                {step.command}
-              </code>
-              {step.comment && <span style={s.comment}># {step.comment}</span>}
-            </div>
-            {done && (
-              <span role="status" style={s.copiedText}>
-                {t("run.copied")}
+    <>
+      <p style={s.warning}>{t("run.reviewWarning")}</p>
+      <ol aria-label={t("run.list")} style={s.list}>
+        {steps.map((step, i) => {
+          const done = copied === i;
+          return (
+            <li key={i} style={s.row}>
+              <span aria-hidden style={s.num}>
+                {i + 1}
               </span>
-            )}
-            <button
-              type="button"
-              aria-label={t("run.copy", { n: i + 1 })}
-              title={t("run.copy", { n: i + 1 })}
-              onClick={() => void onCopy(i, step.command)}
-              style={{ ...s.copyBtn, ...(done ? s.copyDone : null) }}
-            >
-              {done ? <Icon.Check size={14} /> : <Icon.Copy size={14} />}
-            </button>
-          </li>
-        );
-      })}
-    </ol>
+              <div style={s.text}>
+                <code className="mono" style={s.command}>
+                  {step.command}
+                </code>
+                {step.comment && <span style={s.comment}># {step.comment}</span>}
+              </div>
+              {done && (
+                <span role="status" style={s.copiedText}>
+                  {t("run.copied")}
+                </span>
+              )}
+              <button
+                type="button"
+                aria-label={t("run.copy", { n: i + 1 })}
+                title={t("run.copy", { n: i + 1 })}
+                onClick={() => void onCopy(i, step.command)}
+                style={{ ...s.copyBtn, ...(done ? s.copyDone : null) }}
+              >
+                {done ? <Icon.Check size={14} /> : <Icon.Copy size={14} />}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </>
   );
 }

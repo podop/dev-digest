@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 /** Co-located styles for RunSteps. */
 export const s = {
   empty: { margin: 0, fontSize: 13, color: "var(--text-muted)" } satisfies CSSProperties,
+  warning: { margin: "0 0 10px", fontSize: 12.5, color: "var(--text-muted)" } satisfies CSSProperties,
   list: { listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 } satisfies CSSProperties,
   row: {
     display: "flex",

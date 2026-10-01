@@ -2,13 +2,14 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { BlastDegradedReason } from '@devdigest/shared';
 import { z } from 'zod';
 import { exactly } from '../exactly.js';
-import { MAX_RESPONSE_CHARS, trimToBudget } from '../present.js';
+import { MAX_RESPONSE_CHARS, trimToBudget, UNTRUSTED_TEXT_NOTE, UntrustedTextField } from '../present.js';
 import { resolvePull, resolveRepo } from '../resolve.js';
 import { guarded, ok, type OutputOf, PrArgs, type ToolDeps } from './shared.js';
 
 const DEGRADED_REASONS = exactly<BlastDegradedReason>()(['flag_off', 'index_failed', 'index_partial', 'repo_too_large', 'no_data']);
 
 const Output = {
+  ...UntrustedTextField,
   repo: z.string(),
   pr_number: z.number().int(),
   summary: z.string().describe('Counts of changed symbols, callers, endpoints and crons'),
@@ -80,6 +81,7 @@ export function registerGetBlastRadius(server: McpServer, deps: ToolDeps): void 
 
       const degraded = blast.degraded === true;
       const payload: OutputOf<typeof Output> = {
+        untrusted_text: UNTRUSTED_TEXT_NOTE,
         repo: repo.full_name,
         pr_number,
         summary: blast.summary,
@@ -133,7 +135,7 @@ export function registerGetBlastRadius(server: McpServer, deps: ToolDeps): void 
 
 /** A short human rendering of the payload (the structured content stays the source of truth). */
 function renderText(p: OutputOf<typeof Output>): string {
-  const lines = [`Blast radius of ${p.repo} PR #${p.pr_number}: ${p.summary}.`];
+  const lines = [`Blast radius of ${p.repo} PR #${p.pr_number}: ${p.summary}.`, p.untrusted_text];
   if (p.degraded) {
     lines.push(`DEGRADED (${p.reason ?? 'unknown reason'}): the index could not answer fully; callers may be missing. This is NOT 'no impact'.`);
   }

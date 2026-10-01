@@ -38,8 +38,12 @@ describe("RunSteps", () => {
     expect(screen.queryByText("Copied")).not.toBeInTheDocument();
   });
 
-  it("shows the number, command and comment of each step", () => {
+  it("shows the number, command and comment of each step, with a review-before-running note", () => {
     renderWithProviders(<RunSteps steps={STEPS} />);
+
+    expect(
+      screen.getByText("Generated from the repo's files — review each command before running it."),
+    ).toBeInTheDocument();
 
     const second = screen.getAllByRole("listitem")[1] as HTMLElement;
     expect(within(second).getByText("2")).toBeInTheDocument();
@@ -76,5 +80,6 @@ describe("RunSteps", () => {
   it("shows the empty state", () => {
     renderWithProviders(<RunSteps steps={[]} />);
     expect(screen.getByText("No run steps found in this repo")).toBeInTheDocument();
+    expect(screen.queryByText(/review each command/)).not.toBeInTheDocument();
   });
 });

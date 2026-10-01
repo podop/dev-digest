@@ -1,7 +1,7 @@
 /**
  * Pure builders for the generation input (FR3, FR9): excerpts of root files and the
  * first-task candidate signals. Nothing here reads a file — the application layer
- * passes text in. Secrets never leave this file: `.env.example` yields NAMES only.
+ * passes text in. Secrets never leave this file: `.env.example` yields NAMES only; README/compose are redacted.
  */
 import {
   COMPOSE_MAX_CHARS,
@@ -12,6 +12,7 @@ import {
   TODO_MAX,
   UNTESTED_MAX,
 } from './constants.js';
+import { redactSecrets } from './redact.js';
 
 export interface TodoLine {
   path: string;
@@ -26,13 +27,15 @@ export function truncateText(text: string, max: number): string {
   return `${trimmed.slice(0, Math.max(0, max - 1))}…`;
 }
 
+/** README excerpt with secret values redacted (it is sent to the model). */
 export function readmeExcerpt(text: string): string | null {
-  const t = text.trim();
+  const t = redactSecrets(text).trim();
   return t.length === 0 ? null : t.slice(0, README_MAX_CHARS);
 }
 
+/** docker-compose excerpt with secret values redacted (it is sent to the model). */
 export function composeExcerpt(text: string): string | null {
-  const t = text.trim();
+  const t = redactSecrets(text).trim();
   return t.length === 0 ? null : t.slice(0, COMPOSE_MAX_CHARS);
 }
 

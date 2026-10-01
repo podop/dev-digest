@@ -61,6 +61,7 @@
   "run": {
     "list": "Run steps",
     "empty": "No run steps found in this repo",
+    "reviewWarning": "Generated from the repo's files — review each command before running it.",
     "copy": "Copy command {n}",
     "copied": "Copied",
     "copyFailed": "Copy failed"

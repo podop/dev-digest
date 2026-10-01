@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ConventionCategory, ConventionScanStatus, ConventionStatus } from '@devdigest/shared';
 import { z } from 'zod';
-import { trimToBudget } from '../present.js';
+import { trimToBudget, UNTRUSTED_TEXT_NOTE, UntrustedTextField } from '../present.js';
 import { resolveRepo } from '../resolve.js';
 import { exactly } from '../exactly.js';
 import { guarded, ok, type OutputOf, type ToolDeps } from './shared.js';
@@ -31,6 +31,7 @@ const ConventionView = z.object({
 });
 
 const Output = {
+  ...UntrustedTextField,
   repo: z.string(),
   scan: z
     .object({ status: z.enum(SCAN_STATUSES), finished_at: z.string().optional(), model: z.string().optional() })
@@ -87,6 +88,7 @@ export function registerGetConventions(server: McpServer, deps: ToolDeps): void 
       }
 
       const payload: OutputOf<typeof Output> = {
+        untrusted_text: UNTRUSTED_TEXT_NOTE,
         repo: repo.full_name,
         ...(state.scan ? { scan: { status: state.scan.status, ...(state.scan.finished_at ? { finished_at: state.scan.finished_at } : {}), ...(state.scan.model ? { model: state.scan.model } : {}) } } : {}),
         counts,
