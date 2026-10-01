@@ -174,10 +174,59 @@ export const SmartDiff = z.object({
 export type SmartDiff = z.infer<typeof SmartDiff>;
 
 // ---- Composed PR Brief (pr_brief.json) ----
+/** One "read this first" pointer: a changed file, a 1-based line and why (set by code from the model's output). */
+export const ReviewFocusItem = z.object({
+  file: z.string(),
+  line: z.number().int().min(1),
+  reason: z.string().max(160),
+});
+export type ReviewFocusItem = z.infer<typeof ReviewFocusItem>;
+
+/** An input the brief was generated without, and why. Built by the server, never echoed from the model. */
+export const BriefMissingInput = z.object({
+  input: z.enum(['intent', 'blast', 'specs', 'linked_issue', 'description']),
+  reason: z.enum([
+    'not_derived',
+    'degraded',
+    'no_review_run',
+    'none_attached',
+    'over_budget',
+    'unreadable',
+    'not_linked',
+    'fetch_failed',
+    'empty',
+  ]),
+  detail: z.string().optional(),
+});
+export type BriefMissingInput = z.infer<typeof BriefMissingInput>;
+
 export const PrBrief = z.object({
-  intent: Intent,
-  blast: BlastRadius,
+  summary: z.string().max(600),
+  /** `Risk.file_refs` entries are `path:start` or `path:start-end`. */
   risks: Risks,
-  history: PrHistory,
+  review_focus: z.array(ReviewFocusItem).max(8),
+  /** Snapshots of the data the brief was generated from; null when it was missing. */
+  intent: Intent.nullable(),
+  blast: BlastRadius.nullable(),
+  history: PrHistory.optional(),
+  missing_inputs: z.array(BriefMissingInput),
+  specs_used: z.array(z.string()),
+  head_sha: z.string(),
+  generated_at: z.string(),
+  prompt_version: z.string(),
+  provider: z.string(),
+  model: z.string(),
+  tokens_in: z.number().int(),
+  tokens_out: z.number().int(),
+  /** Null when the model is unpriced. */
+  cost_usd: z.number().nullable(),
+  /** 1, or 2 when the first response failed schema validation and was re-asked. */
+  model_requests: z.union([z.literal(1), z.literal(2)]),
 });
 export type PrBrief = z.infer<typeof PrBrief>;
+
+export const PrBriefResponse = z.object({
+  brief: PrBrief.nullable(),
+  stale: z.boolean(),
+});
+export type PrBriefResponse = z.infer<typeof PrBriefResponse>;

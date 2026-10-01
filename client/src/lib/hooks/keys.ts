@@ -46,6 +46,8 @@ export const prKeys = {
   smartDiff: (prId: Id) => [...prKeys.detail(prId), "smart-diff"] as const,
   /** GET /pulls/:id/blast (server/specs/07-blast-radius.md) — an index read; a resync invalidates it. */
   blast: (prId: Id) => [...prKeys.detail(prId), "blast"] as const,
+  /** GET /pulls/:id/brief (specs/2026-10-01-pr-brief.md) — written only by its own POST; not run-scoped, a run changes the banner (reviews), not the stored brief text. */
+  brief: (prId: Id) => [...prKeys.detail(prId), "brief"] as const,
   /** GET /pulls/:id/history — previously merged PRs touching the same files. */
   history: (prId: Id) => [...prKeys.detail(prId), "history"] as const,
 };

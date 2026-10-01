@@ -66,6 +66,7 @@ Reviewed monthly: stale entries are removed in a dedicated commit.
 
 ## Recurring Errors & Fixes
 <!-- error message → cause → fix -->
+- 2026-10-01 — lib/hooks/reviews.ts useLiveRunRefresh polls GET /pulls/:id/runs/active (not /active-runs); a mockFetch key with the wrong URL just 404s silently and the test still passes for the wrong reason → copy the path from reviews.ts when a component test mounts a view that uses live run refresh (e.g. OverviewTab)
 - 2026-10-01 — src/test mockFetch / api.on routes: a Response instance can be read only once, so returning the same Response object for two requests makes the second body read fail and the error path silently not trigger → register a factory (() => jsonResponse(...)) when a route is hit more than once
 - 2026-10-01 — file-upload tests (jsdom 25 + user-event): File/Blob has no arrayBuffer() in jsdom (polyfill via FileReader in the test), user.upload silently drops files not matching the input's accept (use userEvent.setup({ applyAccept: false }) to test rejected types), and findAllByText resolves at the first match, so wait for N identical toasts with waitFor(() => expect(getAllByText(x)).toHaveLength(N))
 - 2026-10-01 — clipboard tests (RunSteps, TourView): renderWithProviders calls userEvent.setup(), which installs its own navigator.clipboard stub and overwrites one stubbed earlier → call vi.stubGlobal('navigator', { clipboard }) AFTER renderWithProviders, or 'Copied'/'Copy failed' assertions silently test the wrong stub
