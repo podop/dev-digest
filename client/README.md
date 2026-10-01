@@ -32,6 +32,7 @@ flowchart TD
   SKILLS["/skills<br/>grid"] --> SKILL["/skills/:id<br/>list sidebar + editor (config · preview · versions · stats)"]
   CONV["/repos/:repoId/conventions<br/>rules + create-skill modal"]
   CTX["/repos/:repoId/context<br/>spec / doc / insight markdown, view-only"]
+  TOUR["/repos/:repoId/onboarding<br/>five-part onboarding tour: generate, TOC, share"]
   SETTINGS["/settings/:section<br/>API keys · models"]
 
   PULLS -->|"GET /repos/:id/pulls · /repos/:id/index-state"| API
@@ -41,6 +42,7 @@ flowchart TD
   SKILL -->|"/skills/:id · /versions · /versions/:v/restore · /agents · /stats"| API
   CONV -->|"/repos/:id/conventions · /extract · /skill · /conventions/:id"| API
   CTX -->|"/repos/:id/context · /repos/:id/context/doc?path="| API
+  TOUR -->|"GET · POST /repos/:id/onboarding · /repos/:id/index-state"| API
   SETTINGS -->|"/settings · /providers"| API
 ```
 

@@ -28,6 +28,8 @@ export const repoKeys = {
   /** One document preview (GET /repos/:id/context/doc?path=). */
   contextDoc: (repoId: Id, path: Id) => [...repoKeys.context(repoId), "doc", path] as const,
   intelState: (repoId: Id) => [...repoKeys.detail(repoId), "intel-state"] as const,
+  /** Onboarding tour of a repo (GET/POST /repos/:id/onboarding). */
+  onboarding: (repoId: Id) => [...repoKeys.detail(repoId), "onboarding"] as const,
 };
 
 export const prKeys = {

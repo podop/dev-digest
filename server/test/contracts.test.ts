@@ -9,7 +9,8 @@ import {
   SmartDiff,
   SmartDiffRole,
   Conformance,
-  Onboarding,
+  OnboardingTour,
+  OnboardingTourState,
   EvalRun,
   MemoryItem,
   RunTrace,
@@ -141,18 +142,13 @@ describe('AI contracts parse fixtures', () => {
     expect(SmartDiffRole.parse('docs')).toBe('docs');
   });
 
-  it('Conformance / Onboarding / EvalRun / MemoryItem', () => {
+  it('Conformance / EvalRun / MemoryItem', () => {
     expect(() =>
       Conformance.parse({
         spec_id: 's1',
         spec_title: 'Spec',
         items: [{ requirement: 'r', status: 'implemented' }],
         completeness_pct: 80,
-      }),
-    ).not.toThrow();
-    expect(() =>
-      Onboarding.parse({
-        sections: [{ kind: 'architecture', title: 'T', body: 'b', links: [] }],
       }),
     ).not.toThrow();
     expect(() =>
@@ -308,5 +304,68 @@ describe('platform DTOs', () => {
         commits: [],
       }),
     ).not.toThrow();
+  });
+});
+
+describe('OnboardingTour contract', () => {
+  const tour = () => ({
+    repo_id: 'r1',
+    generated_at: '2026-10-01T10:00:00.000Z',
+    indexed_sha: 'abc123',
+    files_indexed: 120,
+    provider: 'anthropic',
+    model: 'claude-sonnet-4',
+    tokens_in: 9000,
+    tokens_out: 1200,
+    cost_usd: null,
+    prompt_version: 1,
+    language: 'en' as const,
+    architecture: {
+      summary: 'A Fastify API over Postgres.',
+      nodes: [
+        { id: 'api', label: 'API', kind: 'entry' as const },
+        { id: 'db', label: 'Postgres', kind: 'store' as const },
+      ],
+      edges: [{ from: 'api', to: 'db' }],
+    },
+    critical_paths: [{ path: 'server/src/app.ts', reason: 'Bootstraps the API.' }],
+    run_steps: [{ command: './scripts/dev.sh', comment: 'Boots everything' }],
+    reading_path: [],
+    first_tasks: [{ title: 'Add a test', path: 'server/src/modules', complexity: 'low' as const }],
+  });
+
+  it('parses a valid tour and both state shapes', () => {
+    expect(OnboardingTour.parse(tour()).architecture.nodes).toHaveLength(2);
+    expect(OnboardingTourState.parse({ status: 'none' })).toEqual({ status: 'none' });
+    const ready = OnboardingTourState.parse({
+      status: 'ready',
+      stale: true,
+      stale_reason: 'index_changed',
+      tour: tour(),
+    });
+    expect(ready.status === 'ready' && ready.stale_reason).toBe('index_changed');
+  });
+
+  it('rejects 13 nodes', () => {
+    const t = tour();
+    t.architecture.nodes = Array.from({ length: 13 }, (_, i) => ({
+      id: `n${i}`,
+      label: `N${i}`,
+      kind: 'module' as const,
+    }));
+    expect(OnboardingTour.safeParse(t).success).toBe(false);
+  });
+
+  it('rejects an unknown stale reason and a non-en language', () => {
+    expect(
+      OnboardingTourState.safeParse({ status: 'ready', stale: true, stale_reason: 'x', tour: tour() }).success,
+    ).toBe(false);
+    expect(OnboardingTour.safeParse({ ...tour(), language: 'de' }).success).toBe(false);
+  });
+
+  it('rejects the old {sections} shape', () => {
+    const old = { sections: [{ kind: 'architecture', title: 'T', body: 'b', links: [] }] };
+    expect(OnboardingTour.safeParse(old).success).toBe(false);
+    expect(OnboardingTourState.safeParse(old).success).toBe(false);
   });
 });

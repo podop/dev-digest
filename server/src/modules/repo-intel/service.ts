@@ -37,6 +37,9 @@ import type {
 /** How many top-ranked files seed `getCriticalPaths` dependency chains. */
 const CRITICAL_PATH_ROOTS = 5;
 
+/** Upper bound of ranked rows read at once (`MAX_INDEXED_FILES` bounds the index itself). */
+const ALL_RANKED_PATHS_LIMIT = 100_000;
+
 /** Outcome of POST /repos/:id/resync — 202 either way; the UI polls /index-state. */
 export type ResyncRequest =
   | { status: 'accepted'; jobId: string }
@@ -187,5 +190,12 @@ export class RepoIntelService implements RepoIntel {
     if (edges.length === 0) return [];
     const ranked = await this.deps.reader.getRankedPaths(repoId, 100_000);
     return criticalPaths(edges, ranked, { rootCount: CRITICAL_PATH_ROOTS, depth: BFS_DEPTH });
+  }
+
+  /** Every indexed file path, rank DESC, unfiltered — the set an onboarding tour's paths are checked against. */
+  async listIndexedFiles(repoId: string): Promise<string[]> {
+    if (!this.deps.enabled) return [];
+    const rows = await this.deps.reader.getRankedPaths(repoId, ALL_RANKED_PATHS_LIMIT);
+    return rows.map((r) => r.path);
   }
 }

@@ -213,6 +213,23 @@ texts go to reviewer-core as `specs: {path, text}[]` (untrusted, `## Project con
 documents" and a `warning: project context unavailable` log line; no attachments → no log line, no trace key, the
 prompt is byte-identical to before.
 
+### Onboarding Tour (`modules/onboarding`, spec [`../specs/2026-10-01-onboarding-generator.md`](../specs/2026-10-01-onboarding-generator.md))
+
+| Method | Path | Result |
+|---|---|---|
+| GET | `/repos/:id/onboarding` | `OnboardingTourState`: `{status:'none'}`, or `{status:'ready', stale, stale_reason?, tour}`; stale = the index moved to another commit or `PROMPT_VERSION` changed (`index_changed`/`prompt_changed`) |
+| POST | `/repos/:id/onboarding` | generate synchronously (≤ 120 s), store and return `OnboardingTourReady` (`stale:false`); no body |
+
+One structured LLM call (the workspace's `onboarding` feature model, `maxRetries: 1`) over the repo-intel index
+(repo map, top files by rank, critical paths, `listIndexedFiles`) and at most four root files (README,
+`package.json` scripts, a compose file, `.env.example` variable names only) read with `git show` at the INDEXED
+commit; everything repo-derived is wrapped as untrusted. Every path in the answer is checked against the indexed
+files (folders only in first tasks) and the counts are clamped before anything is stored (`onboarding.json`, one
+row per repo, replaced on success; a failed run keeps the previous tour). Errors: 404 `repo_not_found`, 409
+`generation_in_progress` (one run per repo, in memory), 422 `index_not_ready` / `provider_not_configured`, 502
+`generation_failed`. One log line per run (`repoId`, provider, model, tokens, cost, duration, dropped counts,
+outcome), never repo text.
+
 ## Environment
 
 `server/.env` (copied from `.env.example`):
