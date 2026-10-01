@@ -5,6 +5,7 @@
   scripts/gates.sh --packages server,client --integration
   scripts/gates.sh --state               # print the current state hash only
   scripts/gates.sh --show                # print the cached report for this state, run nothing
+  scripts/gates.sh --only server:unit    # run just these gate ids (comma list), same cache
 
 The report lands in .devdigest/gates/<state>.json (+ logs in .devdigest/gates/<state>/),
 and a copy in .devdigest/gates/latest.json. Agents cite the report instead of re-running
@@ -138,6 +139,7 @@ def main():
     ap.add_argument("--force", action="store_true", help="re-run gates that already passed for this state")
     ap.add_argument("--state", action="store_true", help="print the state hash and exit")
     ap.add_argument("--show", action="store_true", help="print the cached report for this state and exit")
+    ap.add_argument("--only", help="comma list of gate ids to run (e.g. server:unit,client:test); others untouched")
     args = ap.parse_args()
 
     state = state_hash()
@@ -165,7 +167,16 @@ def main():
                   updated_at=datetime.datetime.now().isoformat(timespec="seconds"))
     os.makedirs(os.path.join(OUT_DIR, state), exist_ok=True)
 
-    for gid, cwd, argv in plan_gates(packages, changed, args.integration):
+    only = {g.strip() for g in args.only.split(",") if g.strip()} if args.only else None
+    planned = plan_gates(packages, changed, args.integration)
+    if only:
+        unknown = only - {gid for gid, _, _ in planned}
+        if unknown:
+            print(f"skipped, not planned for these packages: {', '.join(sorted(unknown))}", file=sys.stderr)
+        planned = [g for g in planned if g[0] in only]
+        if not planned:
+            return 2
+    for gid, cwd, argv in planned:
         prev = report["gates"].get(gid)
         if prev and prev["exit"] == 0 and not args.force:
             prev["cached"] = True

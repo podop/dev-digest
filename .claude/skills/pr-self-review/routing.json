@@ -72,7 +72,7 @@
   ],
   "no_review": {
     "$comment": "Skills that never review a diff: they are tools or meta-skills.",
-    "skills": ["mermaid-diagram", "engineering-insights", "pr-self-review"]
+    "skills": ["mermaid-diagram", "engineering-insights", "pr-self-review", "implement"]
   },
   "drift_check": {
     "$comment": "Changing a vendored shared contract runs the deterministic drift check instead of an LLM skill.",

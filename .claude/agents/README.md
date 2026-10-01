@@ -9,12 +9,13 @@ same-named agents in `~/.claude/agents/`.
 
 | Agent | Role | Model | Writes files? | Input | Output |
 |---|---|---|---|---|---|
+| [specreator](specreator.md) | Writes the spec: design/gap analysis, questions to the user, traceable ACs. Main session: `claude --agent specreator` | opus (effort high) | spec files only (`<module>/specs/`, root `specs/`) | request + design sources | `<date>-<slug>.md` spec · `Status: ready-for-planning` |
 | [researcher](researcher.md) | Finds facts in the repo or outside, with evidence | sonnet | no | a concrete question | Research report · or *Clarification needed* |
-| [planner](planner.md) | Turns a task/spec into an executable plan | opus (effort high) | `docs/plans/` only (2 new files) | task or `*/specs/NN-*.md` | `docs/plans/<date>-<slug>.md` + `.context.md` · short summary |
+| [implementation-planner](implementation-planner.md) | Checks requirements, recommends, asks single/multi-agent, plans. Main session: `claude --agent implementation-planner` | opus (effort high) | `docs/plans/` only (2 new files) | spec (or a small task) | `docs/plans/<date>-<slug>.md` + `.context.md` · short summary |
 | [implementer](implementer.md) | Executes an approved plan, verifies own diff | sonnet (effort high) | yes | `docs/plans/*.md` (or inline plan) | code + tests + Implementation Report |
-| [test-writer](test-writer.md) | Writes tests red-first or backfill, never production code | sonnet (effort high) | tests/fixtures only | plan (+ spec, reports), mode | tests + Test Report |
-| [architecture-reviewer](architecture-reviewer.md) | Checks the diff against architectural boundaries | opus (effort high) | own report in `.devdigest/review/` | branch diff (+ plan base) | short Architecture Review · PASS / BLOCK / INCOMPLETE |
-| [plan-verifier](plan-verifier.md) | Checks code against every plan item and acceptance criterion | opus (effort high) | own report in `.devdigest/review/` | plan (+ spec, reports), mode full/delta | short Plan Verification · PASS / FAIL / INCOMPLETE |
+| [test-writer](test-writer.md) | Writes tests red-first or backfill, never production code — **paused** (not used by `/implement`) | sonnet (effort high) | tests/fixtures only | plan (+ spec, reports), mode | tests + Test Report |
+| [architecture-reviewer](architecture-reviewer.md) | Checks the diff against architectural boundaries | sonnet (effort high; opus on `--opus-review`) | own report in `.devdigest/review/` | branch diff (+ plan base) | short Architecture Review · PASS / BLOCK / INCOMPLETE |
+| [plan-verifier](plan-verifier.md) | Checks code against every plan item and acceptance criterion | sonnet (effort high; opus on `--opus-review`) | own report in `.devdigest/review/` | plan (+ spec, reports), mode full/delta | short Plan Verification · PASS / FAIL / INCOMPLETE |
 | [delta-reviewer](delta-reviewer.md) | Fix rounds: re-checks findings, regressions and architecture on the delta only | sonnet (effort high) | own report in `.devdigest/review/` | plan, previous reports, delta label | short Delta Review · PASS / FAIL / ESCALATE |
 | [doc-writer](doc-writer.md) | Documents implemented features, with diagrams | sonnet (effort medium) | README.md, docs/** only | plan / reports / notes | docs + Documentation Report |
 
@@ -22,30 +23,33 @@ Security review is **not** in this set — a separate agent (not built yet).
 
 ## Pipeline
 
+Three manual phases, each in its own session; artifacts pass by path.
+
 ```
-task / spec ──► researcher (optional: facts, library docs)
-            ──► planner ──► docs/plans/<date>-<slug>.md + <slug>.context.md
-                                  │  user approves
-                                  ▼
-               [test-writer red-first] ──► failing tests (read-only for implementer)
-                                  ▼
-                            implementer ──► code + tests + Implementation Report
-                                  │            + gates report (scripts/gates.sh)
-                                  ▼
-               [test-writer backfill] ──► only if plan items still lack tests
-                                  ▼
-     round 1: architecture-reviewer ∥ plan-verifier   (full, same snapshot, in parallel)
-                  │ caller: scripts/review-delta.sh save r1
-                  │ BLOCK / FAIL rows ──► implementer (code) or test-writer (tests)
-                  ▼
-     round N≥2: delta-reviewer (delta since r<N-1> only)
-                  │ ESCALATE ──► full round again · FAIL ──► fix ──► next round
-                  ▼ PASS
-             doc-writer ──► README / docs ──► caller: engineering-insights WRAP-UP
-                                              (from "Insight candidates") ──► /pr-self-review
+1. claude --agent specreator          request + designs ──► <module>/specs/ or specs/<date>-<slug>.md
+     │  researcher subagents (parallel) for facts       user approves (Status: ready-for-planning)
+     ▼
+2. claude --agent implementation-planner   spec ──► requirements check, recommendations,
+     │  "single- or multi-agent?"               docs/plans/<date>-<slug>.md + .context.md
+     │  spec change requests ──► back to 1      user approves
+     ▼
+3. /implement docs/plans/<…>.md  (.claude/skills/implement)
+     implementer  (single pass | one fresh implementer per wave)  ──► ./scripts/gates.sh
+          ▼
+     round 1: plan-verifier ∥ architecture-reviewer   (sonnet; opus on --opus-review / high risk)
+          │  review-delta.sh save r1 · FAIL/CRITICAL/HIGH ──► one implementer fix brief
+          ▼
+     round N≥2: delta-reviewer (delta since r<N-1>) · ESCALATE ──► full round again
+          ▼ PASS (or max rounds ──► ask the user)
+     wrap-up: summary · engineering-insights WRAP-UP · next: doc-writer, /pr-self-review, commit
 ```
 
-Agents that write run sequentially so the reviewers read a stable snapshot. doc-writer's
+test-writer is paused to save tokens: the implementer writes the tests the plan lists,
+and plan-verifier's `Sx.tests` rows check them. Re-enable it as a backfill step between
+round 1 and the fix brief (see the skill's Notes).
+
+Agents that write run sequentially so the reviewers read a stable snapshot — the only
+exception is the implementers of one parallel wave, which edit different packages. doc-writer's
 output is not re-verified by plan-verifier; `/pr-self-review` covers it.
 
 Subagents cannot ask the user and return only their final message, so every hand-off
@@ -69,8 +73,9 @@ repetition. The lead session (caller) follows them when orchestrating:
    gates state. Never paste a diff, a plan or a report into a delegation prompt.
 3. **Short artifacts.** Plan ≤ 8 KB (what to follow) + context pack ≤ 6 KB (what to
    know: applicable INSIGHTS lines quoted with ids, verified facts, skill map). Specs
-   hold only acceptance criteria. Downstream agents read the pack instead of whole
-   `INSIGHTS.md` files.
+   (≤ ~15 KB) are read whole only by the planner; plan-verifier reads just their "Out of
+   scope", "Contracts" and "Acceptance criteria" sections. Downstream agents read the
+   pack instead of whole `INSIGHTS.md` files.
 4. **Short hand-backs.** Reviewers write the full tables to
    `.devdigest/review/<plan-slug>/<agent>-r<N>.md` and return ≤ 40 lines (verdict,
    counts, non-PASS rows); implementer ≤ 60 lines. The caller relays only non-PASS rows.
@@ -88,11 +93,18 @@ repetition. The lead session (caller) follows them when orchestrating:
    behaviour) is cheaper than continuing a context of several hundred thousand tokens.
 8. **Batch fixes.** Collect all findings of a round (including LOW ones you intend to
    fix) into one implementer brief; one delta round per batch.
-9. **Models by task.** opus: planner and the first full review (judgement, found the
-   real bugs). sonnet: implementer, test-writer, delta-reviewer, researcher. No model:
-   gates, drift, snapshots (scripts). Cheaper models cut cost, not always tokens —
+9. **Models by task.** opus: specreator and implementation-planner (judgement, run once
+   per feature). sonnet: implementer, both reviewers, delta-reviewer, researcher,
+   doc-writer; `/implement --opus-review` (or plan `Review risk: high`) puts round-1
+   reviewers on opus. No model: gates, drift, snapshots, spec-lint (scripts). Cheaper models cut cost, not always tokens —
    compare `subagent_tokens` in task notifications per run.
-10. **Lead session hygiene.** `grep` INSIGHTS for the relevant paths instead of `cat`
+10. **Fresh contexts and quiet tests.** A turn re-reads the whole context, so a long
+    implementer run costs far more per step than a short one: multi-agent plans split
+    steps into waves, one fresh implementer each. Per step the implementer runs only the
+    step's tests (`vitest run <file> --reporter=dot | tail`); whole suites only through
+    `gates.sh` (`--only <id>` to re-run one), which logs to a file and prints only
+    failure tails.
+11. **Lead session hygiene.** `grep` INSIGHTS for the relevant paths instead of `cat`
     of whole files; don't re-read files an agent already summarised.
 
 ## Agents
@@ -107,24 +119,48 @@ repetition. The lead session (caller) follows them when orchestrating:
 - **Input:** a question that can be answered yes/no/found; mode repo | external | both.
 - **Output:** `# Research: …` report (Answer · Findings · Sources · Not found / unverified).
 
-### planner
-- **Responsible for:** a Development Plan the implementer can follow without guessing:
-  reads the touched packages' `AGENTS.md`, `INSIGHTS.md`, `README.md`, `specs/`; maps
-  planned files to skills via [`routing.json`](../skills/pr-self-review/routing.json)
-  and reads those `SKILL.md`s, so the plan never contradicts implementation rules;
+### specreator
+- **Responsible for:** one spec per feature: intake of the design sources the user gives
+  (text, Figma exports/screenshots, code, another repo); reading only the touched
+  modules' docs and INSIGHTS lines; `researcher` subagents in parallel for facts; a gap
+  register (missing states, corner cases, module communication, UX, security NFRs);
+  blocking questions first (AskUserQuestion, ≤ 3 rounds), the rest inline with
+  defaults; revisions from the planner's spec change requests.
+- **Not responsible for:** plans, code, docs, INSIGHTS (exempt from WRAP-UP),
+  implementation skills (onion, fastify, drizzle, react, …).
+- **Permissions:** `Read, Grep, Glob, Bash, Write, Edit, AskUserQuestion,
+  Agent(researcher), WebFetch` — Write/Edit only for spec files, WebFetch only for
+  user-given URLs, Bash read-only + `scripts/spec-lint.sh`; all by prompt (no hook).
+  Runs as the main session so it can ask the user.
+- **Input:** request + design sources; or an existing spec + change requests.
+- **Output:** `<module>/specs/<date>-<slug>.md` (one module) or `specs/<date>-<slug>.md`
+  (several), English: Goal · Context · Scope · Scenarios · FR · Workflow & communication
+  (Mermaid) · Contracts · Data model (logical) · States & UX · Edge cases · NFR ·
+  Dependencies & rollout · AC (`Traces`, `Verify`) · Traceability · Design review ·
+  Decisions · Open questions. Stable IDs; `spec-lint.sh` clean.
+
+### implementation-planner
+- **Responsible for:** checking the spec (plannable, testable, consistent with code /
+  INSIGHTS / skills, complete) → blocking questions, recommendations, spec change
+  requests; asking single- vs multi-agent; then a Development Plan the implementer can
+  follow without guessing: reads the touched packages' `AGENTS.md`, `INSIGHTS.md`,
+  `README.md`, `specs/`; maps planned files to skills via
+  [`routing.json`](../skills/pr-self-review/routing.json) and reads those `SKILL.md`s;
   checks standing constraints (shared-contract copies, migrations, onion rings, client
-  data/i18n rules, do-not-touch list).
-- **Not responsible for:** writing code, running tests/scripts, reviewing diffs.
-- **Permissions:** `Read, Grep, Glob, Bash, Write` — Write only for the two new plan
-  files in `docs/plans/` (by prompt), no `Edit`, no `Skill` (skills are read as files),
-  no `Agent`, no `memory`. Bash read-only by prompt.
-- **Input:** task description or spec path. Unclear task → returns only
-  *Clarification needed* (≤5 questions with defaults).
-- **Output:** `docs/plans/<date>-<slug>.md` (≤ 8 KB: Goal · Out of scope · Decisions ·
-  Steps with files, rules, tests, "Done when" · Contracts & migrations · Verification ·
-  Open questions) + `<slug>.context.md` (≤ 6 KB: applicable INSIGHTS lines quoted with
-  ids, verified facts, mirrors, skill map, risks, notes for reviewers); returns a
-  ≤ 25-line summary with both paths and the open questions.
+  data/i18n rules, do-not-touch list); groups steps into waves.
+- **Not responsible for:** writing or editing specs, writing code, running
+  tests/scripts, reviewing diffs.
+- **Permissions:** `Read, Grep, Glob, Bash, Write, AskUserQuestion` — Write only for the
+  two plan files in `docs/plans/` (by prompt), no `Edit`, no `Skill`, no `Agent`.
+  Bash read-only by prompt. As a subagent (no AskUserQuestion) it returns
+  *Clarification needed* instead of asking.
+- **Input:** spec path (or a small, clear task).
+- **Output:** `docs/plans/<date>-<slug>.md` (≤ 8 KB: header with `Execution` ·
+  Goal · Out of scope · Decisions · Recommendations not adopted · Steps with files,
+  rules, `Covers: AC…`, tests, targeted "Done when" · Execution (mode, waves) ·
+  Contracts & migrations · Verification + Review risk · Open questions) +
+  `<slug>.context.md` (≤ 6 KB); a ≤ 25-line summary; after approval the user runs
+  `/implement <plan>`.
 
 ### implementer
 - **Responsible for:** executing the plan step by step in `server/`, `client/`,
@@ -264,7 +300,8 @@ not from the sources above. Not backed by an official source: "Not for …" in a
 descriptions (repo convention from the skills), "test first where practical", the
 plan-verifier scope check as a set difference of changed vs planned files, the
 architecture-reviewer confidence threshold of 80 (borrowed from the code-review plugin
-default), doc-writer's placement table (repo convention) and opus for the reviewers.
+default), doc-writer's placement table (repo convention), sonnet for the reviewers with an opus
+opt-in, and the single- vs multi-agent size thresholds in implementation-planner.
 Researched but not adopted: mutation testing with StrykerJS (single-threaded Vitest
 runner — at most a manual, per-module check).
 

@@ -10,7 +10,7 @@ description: >
   findings with rule source, file:line, import chain and evidence. Read-only; returns
   PASS / BLOCK. Not for security review, style/lint, hook correctness, plan compliance,
   or fixing code.
-model: opus
+model: sonnet
 effort: high
 tools: Read, Grep, Glob, Bash
 disallowedTools: Write, Edit, NotebookEdit, Skill

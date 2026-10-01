@@ -26,6 +26,10 @@ API and web run on the host).
   `./scripts/gates.sh` (`--integration` · `--show` · `--state`). Review rounds see only the
   delta: `./scripts/review-delta.sh save r1` / `diff r1`. Orchestration rules that keep
   tokens down: `.claude/agents/README.md` → Token budget.
+- Spec Driven Development, three manual sessions: `claude --agent specreator` (spec) →
+  `claude --agent implementation-planner` (plan) → `/implement <plan>` (code + review
+  rounds). Pipeline: `.claude/agents/README.md` → Pipeline. Spec check:
+  `./scripts/spec-lint.sh <spec>`.
 
 ## Read when
 - Change spans packages or you need the big picture → read `README.md` (Architecture)
@@ -35,14 +39,15 @@ API and web run on the host).
 - Every task, right after the user's request and before planning/editing → read the
   `INSIGHTS.md` of each package it concerns; treat it as high-confidence guidance
   unless told otherwise (skill `engineering-insights`, step READ). Subagents working
-  from a plan read its context pack (`docs/plans/<plan>.context.md`, the planner's
+  from a plan read its context pack (`docs/plans/<plan>.context.md`, the implementation-planner's
   READ output) instead of the whole files
 
 ## Per-package layout (convention)
 Every package has the same four knowledge slots:
 - `README.md` — source of truth (stack, diagrams, API/route maps). Link, don't copy.
 - `docs/` — deep dives too long for the README.
-- `specs/` — feature specs (what to build and acceptance criteria), one file per feature.
+- `specs/` — feature specs (what to build and acceptance criteria), one file per feature;
+  a feature spanning several modules has one spec in the root `specs/` instead.
 - `INSIGHTS.md` — lessons learned, fixed sections, append-only (skill `engineering-insights`).
 
 ## Gotchas

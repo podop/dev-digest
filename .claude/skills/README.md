@@ -20,6 +20,7 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
 | [pr-self-review](pr-self-review/SKILL.md) | Workflow | Pre-PR self-review: routes the branch diff to the other skills, runs the deterministic gates, PASS/BLOCK |
 | [engineering-insights](engineering-insights/SKILL.md) | Shared | Append non-obvious lessons to the touched package's `INSIGHTS.md` |
+| [implement](implement/SKILL.md) | Workflow | `/implement <plan>`: implementer (single pass or waves) → plan-verifier ∥ architecture-reviewer → delta fix rounds → wrap-up. Manual only |
 
 ## What Are Skills?
 
