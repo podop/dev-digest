@@ -11,7 +11,9 @@ export const s = {
     padding: "7px 12px",
     fontSize: 13.5,
     color: "var(--text-secondary)",
-    borderLeft: "2px solid var(--border)",
+    borderLeftWidth: 2,
+    borderLeftStyle: "solid",
+    borderLeftColor: "var(--border)",
   } satisfies CSSProperties,
   itemActive: { color: "var(--text-primary)", fontWeight: 600, borderLeftColor: "var(--accent)" } satisfies CSSProperties,
 } as const;
