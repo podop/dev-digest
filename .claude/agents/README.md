@@ -44,6 +44,9 @@ Three manual phases, each in its own session; artifacts pass by path.
      wrap-up: summary · engineering-insights WRAP-UP · next: doc-writer, /pr-self-review, commit
 ```
 
+After a full pipeline run, `/workflow-retro <label> --deep` (manual, never automatic) measures
+it per agent and appends a row to [`docs/retros/ledger.md`](../../docs/retros/ledger.md).
+
 test-writer is paused to save tokens: the implementer writes the tests the plan lists,
 and plan-verifier's `Sx.tests` rows check them. Re-enable it as a backfill step between
 round 1 and the fix brief (see the skill's Notes).
