@@ -21,6 +21,7 @@ describe('Container composition root', () => {
     expect(Object.keys(c.modules).sort()).toEqual([
       'agents',
       'blast',
+      'brief',
       'conventions',
       'intent',
       'onboarding',

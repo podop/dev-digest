@@ -4,9 +4,9 @@ import {
   PROJECT_CONTEXT_MAX_DOC_BYTES,
   type ContextAttachments,
   type ContextAttachmentsInput,
+  type ContextDoc,
   type ContextDocPreview,
   type ContextList,
-  type ContextUsedByAgent,
 } from '@devdigest/shared';
 import type { TransactionRunner } from '../../../application/transaction.js';
 import {
@@ -16,6 +16,7 @@ import {
   ValidationError,
 } from '../../../platform/errors.js';
 import { docNameOf, docTypeOf, checkPath, isListablePath, validateAttachmentPaths } from '../domain/paths.js';
+import { checkStorePath } from '../domain/store-files.js';
 import {
   applyBudget,
   buildRunDocList,
@@ -24,6 +25,7 @@ import {
   toRunDoc,
 } from '../domain/run-context.js';
 import type { ReadOutcome, RunDocRef, SkillAttachmentSet } from '../domain/types.js';
+import { storeDocPreview, tokensOf, usedByPath } from './doc-helpers.js';
 import type {
   CloneDocs,
   ContextRepoRef,
@@ -31,11 +33,7 @@ import type {
   ResolveForRunInput,
   RunContextResult,
   RunGit,
-  UsageRow,
 } from './ports.js';
-
-/** Same estimate as the whole product: ceil(chars / 4). */
-const tokensOf = (chars: number) => Math.ceil(chars / 4);
 
 export interface ProjectContextDeps {
   store: ContextStore;
@@ -62,62 +60,64 @@ async function mapLimit<T, R>(items: readonly T[], limit: number, fn: (item: T) 
   return out;
 }
 
-/** Agents using each path in a repo: one entry per agent, a direct attachment beating a skill one. */
-function usedByPath(rows: readonly UsageRow[]): Map<string, ContextUsedByAgent[]> {
-  const byPath = new Map<string, Map<string, ContextUsedByAgent>>();
-  for (const r of rows) {
-    const agents = byPath.get(r.path) ?? new Map<string, ContextUsedByAgent>();
-    byPath.set(r.path, agents);
-    const have = agents.get(r.agentId);
-    if (have && (have.via === 'direct' || r.via === 'skill')) continue;
-    agents.set(
-      r.agentId,
-      r.via === 'direct'
-        ? { id: r.agentId, name: r.agentName, via: 'direct' }
-        : { id: r.agentId, name: r.agentName, via: 'skill', ...(r.skillName ? { skill_name: r.skillName } : {}) },
-    );
-  }
-  const byName = (a: ContextUsedByAgent, b: ContextUsedByAgent) =>
-    a.name < b.name ? -1 : a.name > b.name ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-  return new Map([...byPath].map(([path, agents]) => [path, [...agents.values()].sort(byName)]));
-}
-
 export class ProjectContextService {
   constructor(private readonly deps: ProjectContextDeps) {}
 
-  /** GET /repos/:id/context — documents of the clone that the globs accept. */
+  /** GET /repos/:id/context — store files first, then the documents of the clone that the globs accept. */
   async listDocs(workspaceId: string, repoId: string): Promise<ContextList> {
     const repo = await this.requireRepo(workspaceId, repoId);
     const globs = [...this.deps.globs];
+    const [stored, usage] = await Promise.all([this.deps.store.listFiles(repoId), this.deps.store.listUsage(repoId)]);
+    const used = usedByPath(usage);
+    const storeDocs: ContextDoc[] = stored.map((f) => ({
+      path: f.path,
+      name: docNameOf(f.path),
+      doc_type: 'specs',
+      size_bytes: f.sizeBytes,
+      tokens: tokensOf(f.chars),
+      updated_at: f.updatedAt.toISOString(),
+      used_by: used.get(f.path)?.length ?? 0,
+      source: 'store',
+      editable: true,
+      version: f.version,
+    }));
     const listed = repo.clonePath
       ? await this.deps.docs.list(repo.clonePath, this.deps.globs, PROJECT_CONTEXT_MAX_DOCS)
       : null;
-    if (!listed) return { clone_status: 'not_cloned', globs, docs: [], tokens_total: 0 };
-
-    const used = usedByPath(await this.deps.store.listUsage(repoId));
-    const docs = listed.docs.map((d) => ({
-      path: d.path,
-      name: docNameOf(d.path),
-      doc_type: docTypeOf(d.path),
-      size_bytes: d.sizeBytes,
-      tokens: tokensOf(d.chars),
-      updated_at: d.updatedAt.toISOString(),
-      used_by: used.get(d.path)?.length ?? 0,
-    }));
+    // A store file wins over a clone file at the same path (the clone gained it later).
+    const inStore = new Set(stored.map((f) => f.path));
+    const repoDocs: ContextDoc[] = (listed?.docs ?? [])
+      .filter((d) => !inStore.has(d.path))
+      .map((d) => ({
+        path: d.path,
+        name: docNameOf(d.path),
+        doc_type: docTypeOf(d.path),
+        size_bytes: d.sizeBytes,
+        tokens: tokensOf(d.chars),
+        updated_at: d.updatedAt.toISOString(),
+        used_by: used.get(d.path)?.length ?? 0,
+        source: 'repo',
+        editable: false,
+      }));
+    const docs = [...storeDocs, ...repoDocs];
     return {
-      clone_status: 'ready',
+      clone_status: listed ? 'ready' : 'not_cloned',
       globs,
       docs,
       tokens_total: docs.reduce((sum, d) => sum + d.tokens, 0),
-      ...(listed.truncated ? { truncated: true } : {}),
+      ...(listed?.truncated ? { truncated: true } : {}),
     };
   }
 
-  /** GET /repos/:id/context/doc?path= — one listable document with who uses it. */
+  /** GET /repos/:id/context/doc?path= — one store file or listable repo document, with who uses it. */
   async previewDoc(workspaceId: string, repoId: string, path: string): Promise<ContextDocPreview> {
     const repo = await this.requireRepo(workspaceId, repoId);
+    const usage = usedByPath(await this.deps.store.listUsage(repoId));
+    const stored = await this.deps.store.findFile(repoId, path);
+    if (stored) return storeDocPreview(stored, usage.get(path) ?? []);
     // Shape, excluded directories and globs are all checked before any filesystem access (NFR3).
-    if (!isListablePath(path, this.deps.globs)) {
+    // A store-shaped path passes too, so a deleted store file is a 404, not a 400.
+    if (!isListablePath(path, this.deps.globs) && !checkStorePath(path)) {
       throw new InvalidInputError('Not a listable document path', undefined, 'invalid_path');
     }
     const read = repo.clonePath ? await this.deps.docs.read(repo.clonePath, path) : null;
@@ -125,7 +125,7 @@ export class ProjectContextService {
     if (read.status === 'too_large') {
       throw new PayloadTooLargeError('Document is too large to preview', undefined, 'doc_too_large');
     }
-    const usedBy = usedByPath(await this.deps.store.listUsage(repoId)).get(path) ?? [];
+    const usedBy = usage.get(path) ?? [];
     return {
       path,
       name: docNameOf(path),
@@ -135,6 +135,8 @@ export class ProjectContextService {
       size_bytes: read.sizeBytes,
       used_by: usedBy.length,
       used_by_agents: usedBy,
+      source: 'repo',
+      editable: false,
     };
   }
 
@@ -181,7 +183,9 @@ export class ProjectContextService {
   /**
    * The documents of one run: the agent's attachments, then each enabled
    * skill's, read at the PR base commit (never the working tree, so an
-   * unreviewed head cannot rewrite the rules it is judged by). Never throws:
+   * unreviewed head cannot rewrite the rules it is judged by). A DevDigest
+   * store file is the exception: its latest saved text comes from the database
+   * (trace `source: 'store'`), even when the base commit cannot be resolved. Never throws:
    * any failure degrades to "no documents" and is reported through `onWarn`.
    * Workspace ownership was already checked by the review that calls this.
    */
@@ -203,14 +207,25 @@ export class ProjectContextService {
       const refs = buildRunDocList(agentPaths, sets);
       if (refs.length === 0) return none;
 
+      // Store files are read from the database (the latest save), never from git.
+      const stored = new Map(
+        (
+          await this.deps.store.findFiles(
+            input.repoId,
+            refs.map((r) => r.path).filter(checkStorePath),
+          )
+        ).map((f) => [f.path, f.content]),
+      );
       const sha = await this.deps.git.resolveBaseCommit(input.repo, input.base, input.headSha);
       // No base commit: a repo that was never cloned has none of its documents ("missing");
       // a clone whose base commit cannot be resolved cannot be read ("unreadable").
       const missingClone =
         sha === null && (await this.deps.store.findRepo(input.workspaceId, input.repoId))?.clonePath == null;
-      const read = await mapLimit(refs, RUN_READ_CONCURRENCY, async (ref) =>
-        toRunDoc(ref, await this.readAtBase(input, sha, missingClone, ref)),
-      );
+      const read = await mapLimit(refs, RUN_READ_CONCURRENCY, async (ref) => {
+        const text = stored.get(ref.path);
+        if (text !== undefined) return toRunDoc(ref, { status: 'ok', text }, 'store');
+        return toRunDoc(ref, await this.readAtBase(input, sha, missingClone, ref));
+      });
       const { docs, tokensTotal } = applyBudget(read);
       return {
         docs,

@@ -10,6 +10,8 @@ const doc = (path: string): ContextDoc => ({
   tokens: 3,
   updated_at: "2026-10-01T00:00:00.000Z",
   used_by: 0,
+  source: "repo",
+  editable: false,
 });
 const DOCS = [doc("docs/a.md"), doc("docs/b.md"), doc("specs/c.md")];
 

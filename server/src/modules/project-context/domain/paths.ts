@@ -2,6 +2,7 @@ import { PROJECT_CONTEXT_MAX_PATHS, PROJECT_CONTEXT_PATH_MAX } from '@devdigest/
 import type { ContextDocType } from '@devdigest/shared';
 import { DEFAULT_DOC_TYPE, DOC_EXTENSION, EXCLUDED_DIRS } from './constants.js';
 import { matchesAnyGlob } from './globs.js';
+import { checkStorePath } from './store-files.js';
 import type { AttachmentValidation } from './types.js';
 
 /**
@@ -46,8 +47,8 @@ export function docTypeOf(path: string): ContextDocType {
 }
 
 /**
- * Validate a PUT body's path list: at most 50 paths, each listable, no
- * duplicates. Existence is not checked — a missing file is a run-time status.
+ * Validate a PUT body's path list: at most 50 paths, each listable or a store
+ * path (store files are attachable like repo docs), no duplicates. Existence is not checked — a missing file is a run-time status.
  */
 export function validateAttachmentPaths(
   paths: readonly unknown[],
@@ -56,7 +57,7 @@ export function validateAttachmentPaths(
   if (paths.length > PROJECT_CONTEXT_MAX_PATHS) return { ok: false, code: 'too_many_paths' };
   const seen = new Set<string>();
   for (const p of paths) {
-    if (!isListablePath(p, globs)) return { ok: false, code: 'invalid_path' };
+    if (!isListablePath(p, globs) && !checkStorePath(p)) return { ok: false, code: 'invalid_path' };
     if (seen.has(p)) return { ok: false, code: 'duplicate_path' };
     seen.add(p);
   }

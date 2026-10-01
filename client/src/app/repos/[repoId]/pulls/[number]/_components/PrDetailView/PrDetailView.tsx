@@ -92,6 +92,8 @@ export function PrDetailView({ repoId, number }: PrDetailViewProps) {
             <OverviewTab
               prId={prId}
               repoId={repoId}
+              number={number}
+              changedPaths={pr.files.map((f) => f.path)}
               prBody={pr.body}
               repoFullName={repoFullName}
               headSha={pr.head_sha}

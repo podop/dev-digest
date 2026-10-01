@@ -14,6 +14,8 @@ export function makeDoc(path: string, overrides: Partial<ContextDoc> = {}): Cont
     tokens: 100,
     updated_at: "2026-10-01T00:00:00.000Z",
     used_by: 0,
+    source: "repo",
+    editable: false,
     ...overrides,
   };
 }
@@ -51,6 +53,8 @@ export function makePreview(path: string, content: string): ContextDocPreview {
     size_bytes: doc.size_bytes,
     used_by: 0,
     used_by_agents: [],
+    source: doc.source,
+    editable: doc.editable,
   };
 }
 

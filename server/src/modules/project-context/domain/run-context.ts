@@ -1,4 +1,4 @@
-import { PROJECT_CONTEXT_BUDGET_TOKENS } from '@devdigest/shared';
+import { PROJECT_CONTEXT_BUDGET_TOKENS, type ContextDocSource } from '@devdigest/shared';
 import { estimateTokens } from '@devdigest/reviewer-core';
 import { docTypeOf } from './paths.js';
 import type { ReadOutcome, RunDoc, RunDocRef, SkillAttachmentSet } from './types.js';
@@ -28,8 +28,8 @@ export function buildRunDocList(
 }
 
 /** Turn one read result into a trace record (before the budget is applied). */
-export function toRunDoc(ref: RunDocRef, outcome: ReadOutcome): RunDoc {
-  const base = { path: ref.path, doc_type: docTypeOf(ref.path), origin: ref.origin };
+export function toRunDoc(ref: RunDocRef, outcome: ReadOutcome, source: ContextDocSource = 'repo'): RunDoc {
+  const base = { path: ref.path, doc_type: docTypeOf(ref.path), origin: ref.origin, source };
   if (outcome.status === 'ok') {
     return { ...base, tokens: estimateTokens(outcome.text), status: 'included', text: outcome.text };
   }

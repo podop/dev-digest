@@ -39,7 +39,7 @@ import { evalCases, evalRuns, conformanceChecks, composedReviews } from './schem
 import { ciInstallations, ciRuns } from './schema/ci';
 import { agentRuns, agentRunSkills, runTraces, multiAgentRuns } from './schema/runs';
 import { jobs, installedPlugins, digests } from './schema/ops';
-import { agentContextDocs, skillContextDocs } from './schema/project-context';
+import { agentContextDocs, contextFiles, skillContextDocs } from './schema/project-context';
 import {
   repoIndexState,
   fileEdges,
@@ -95,4 +95,5 @@ export const schema = {
   repoMapCache,
   agentContextDocs,
   skillContextDocs,
+  contextFiles,
 };

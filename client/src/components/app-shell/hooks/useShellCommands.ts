@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { NAV, SETTINGS_ITEM, resolveHref, type Command } from "@devdigest/ui";
 import { useActiveRepo } from "@/lib/repo-context";
+import { useConfirmLeave } from "@/lib/leave-guard";
 import { useTheme } from "@/lib/theme";
 
 /**
@@ -14,6 +15,7 @@ import { useTheme } from "@/lib/theme";
 export function useShellCommands(): Command[] {
   const t = useTranslations("shell");
   const router = useRouter();
+  const confirmLeave = useConfirmLeave();
   const { repoId } = useActiveRepo();
   const { theme, toggle } = useTheme();
 
@@ -24,7 +26,7 @@ export function useShellCommands(): Command[] {
         label: t("commandPalette.goTo", { label: t(`nav.${it.key}`) }),
         group: g.section,
         icon: it.icon,
-        run: () => router.push(resolveHref(it.href, repoId)),
+        run: () => confirmLeave() && router.push(resolveHref(it.href, repoId)),
       }))
     );
     navCmds.push({
@@ -32,7 +34,7 @@ export function useShellCommands(): Command[] {
       label: t("commandPalette.goToSettings"),
       group: t("commandPalette.globalGroup"),
       icon: SETTINGS_ITEM.icon,
-      run: () => router.push(SETTINGS_ITEM.href),
+      run: () => confirmLeave() && router.push(SETTINGS_ITEM.href),
     });
     navCmds.push({
       id: "toggle-theme",
@@ -44,5 +46,5 @@ export function useShellCommands(): Command[] {
       run: toggle,
     });
     return navCmds;
-  }, [t, router, repoId, theme, toggle]);
+  }, [t, router, confirmLeave, repoId, theme, toggle]);
 }

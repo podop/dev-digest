@@ -1,5 +1,6 @@
-/* DocPreviewPane — the selected document rendered as markdown (view-only) with
-   its token estimate and "Used by N agents". Raw HTML in a document is printed
+/* DocPreviewPane — the selected document: rendered as markdown or, for a store file
+   in Edit mode, the editor over the draft the ContextView owns; with its token
+   estimate, "Used by N agents" and a dirty dot. Raw HTML in a document is printed
    as text by the vendored <Markdown>, never executed. */
 "use client";
 
@@ -7,6 +8,9 @@ import { useTranslations } from "next-intl";
 import { Badge, EmptyState, ErrorState, Icon, Markdown, Skeleton } from "@devdigest/ui";
 import { ApiError } from "@/lib/api";
 import { useContextDoc } from "@/lib/hooks";
+import { isDirty, type ContextMode } from "../../helpers";
+import { DocEditor } from "../DocEditor";
+import { ModeToggle } from "./_components/ModeToggle";
 import { s } from "./styles";
 
 /** The API codes a preview can end with, mapped to their message key. */
@@ -16,7 +20,26 @@ const ERROR_KEYS: Record<number, "notFound" | "tooLarge" | "invalidPath"> = {
   400: "invalidPath",
 };
 
-export function DocPreviewPane({ repoId, path }: { repoId: string; path: string | null }) {
+export function DocPreviewPane({
+  repoId,
+  path,
+  mode,
+  draft,
+  onModeChange,
+  onDraftChange,
+  onSaved,
+  onDiscard,
+}: {
+  repoId: string;
+  path: string | null;
+  mode: ContextMode;
+  /** Unsaved text of the selected file, or null while nothing was typed. */
+  draft: string | null;
+  onModeChange: (mode: ContextMode) => void;
+  onDraftChange: (text: string) => void;
+  onSaved: (path: string, savedText: string) => void;
+  onDiscard: () => void;
+}) {
   const t = useTranslations("context");
   const tc = useTranslations("common");
   const { data: doc, isLoading, isError, error, refetch } = useContextDoc(repoId, path);
@@ -54,6 +77,8 @@ export function DocPreviewPane({ repoId, path }: { repoId: string; path: string 
     );
   }
 
+  const editing = mode === "edit" && doc.editable;
+  const text = draft ?? doc.content;
   const usedByTitle = doc.used_by_agents
     .map((a) =>
       a.via === "skill"
@@ -68,6 +93,10 @@ export function DocPreviewPane({ repoId, path }: { repoId: string; path: string 
         <h2 className="mono" style={s.title} title={doc.path}>
           {doc.name}
         </h2>
+        {isDirty(draft, doc.content) && (
+          <span role="img" aria-label={t("editor.unsaved")} title={t("editor.unsaved")} style={s.dot} />
+        )}
+        <ModeToggle mode={editing ? "edit" : "preview"} canEdit={doc.editable} onChange={onModeChange} />
         <Badge>{t(`docType.${doc.doc_type}`)}</Badge>
         <div style={s.meta}>
           <span className="tnum">{t("preview.tokens", { tokens: doc.tokens })}</span>
@@ -78,7 +107,19 @@ export function DocPreviewPane({ repoId, path }: { repoId: string; path: string 
         </div>
       </div>
       <div style={s.body}>
-        <Markdown>{doc.content}</Markdown>
+        {editing ? (
+          <DocEditor
+            key={doc.path}
+            repoId={repoId}
+            doc={doc}
+            text={text}
+            onChange={onDraftChange}
+            onSaved={onSaved}
+            onDiscard={onDiscard}
+          />
+        ) : (
+          <Markdown>{text}</Markdown>
+        )}
       </div>
     </div>
   );

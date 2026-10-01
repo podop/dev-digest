@@ -120,6 +120,13 @@
       "when": 1790854798597,
       "tag": "0016_fearless_katie_power",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790872847021,
+      "tag": "0017_lowly_moira_mactaggert",
+      "breakpoints": true
     }
   ]
 }

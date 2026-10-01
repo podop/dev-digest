@@ -8,6 +8,12 @@ import {
   isListablePath,
   validateAttachmentPaths,
 } from '../src/modules/project-context/domain/paths.js';
+import {
+  checkStorePath,
+  hasNul,
+  utf8Bytes,
+  withSuffix,
+} from '../src/modules/project-context/domain/store-files.js';
 import { compileGlob, matchesAnyGlob } from '../src/modules/project-context/domain/globs.js';
 import {
   applyBudget,
@@ -121,6 +127,79 @@ describe('validateAttachmentPaths', () => {
     const many = Array.from({ length: 51 }, (_, i) => `specs/${i}.md`);
     expect(validateAttachmentPaths(many, GLOBS)).toEqual({ ok: false, code: 'too_many_paths' });
     expect(validateAttachmentPaths(many.slice(0, 50), GLOBS)).toEqual({ ok: true });
+  });
+
+  it('accepts store paths, even when the globs would not list them; rejects bad store paths', () => {
+    expect(validateAttachmentPaths(['.devdigest/specs/a.md', 'specs/b.md'], ['**/never/**/*.md'])).toEqual({
+      ok: false,
+      code: 'invalid_path',
+    });
+    expect(validateAttachmentPaths(['.devdigest/specs/a.md'], ['**/never/**/*.md'])).toEqual({ ok: true });
+    expect(validateAttachmentPaths(['.devdigest/other/a.md'], GLOBS)).toEqual({ ok: false, code: 'invalid_path' });
+    expect(validateAttachmentPaths(['.devdigest/specs/a.md', '.devdigest/specs/a.md'], GLOBS)).toEqual({
+      ok: false,
+      code: 'duplicate_path',
+    });
+  });
+});
+
+describe('checkStorePath (FR8, AC7 paths)', () => {
+  const R = '.devdigest/specs/';
+
+  it('accepts files under the root, up to 5 folder levels', () => {
+    for (const p of [`${R}a.md`, `${R}api/public.md`, `${R}A_b-1.2/x.v1.md`, `${R}1/2/3/4/5/a.md`]) {
+      expect(checkStorePath(p), p).toBe(true);
+    }
+  });
+
+  it('rejects the AC7 paths', () => {
+    const bad = [
+      '../x.md',
+      `/${R}a.md`,
+      `${R}a b.md`,
+      `${R}a.txt`,
+      `${R}1/2/3/4/5/6/a.md`,
+      'specs/a.md',
+    ];
+    for (const p of bad) expect(checkStorePath(p), p).toBe(false);
+  });
+
+  it('rejects empty/dot segments, backslash, unicode, NUL, wrong root, length, non-strings', () => {
+    const bad = [
+      `${R}../a.md`,
+      `${R}./a.md`,
+      `${R}a//b.md`,
+      `${R}a\\b.md`,
+      `${R}é.md`,
+      `${R}a\0.md`,
+      `${R}a.MD`,
+      '.devdigest/spec/a.md',
+      `.devdigest/specs`,
+      `${R}${'a'.repeat(512)}.md`,
+      '',
+    ];
+    for (const p of bad) expect(checkStorePath(p), JSON.stringify(p)).toBe(false);
+    expect(checkStorePath(undefined)).toBe(false);
+    expect(checkStorePath(7)).toBe(false);
+    expect(checkStorePath(`${R}${'a'.repeat(512 - R.length - 3)}.md`)).toBe(true); // exactly 512
+  });
+});
+
+describe('withSuffix / utf8Bytes / hasNul', () => {
+  it('inserts the number before .md', () => {
+    expect(withSuffix('.devdigest/specs/untitled.md', 2)).toBe('.devdigest/specs/untitled-2.md');
+    expect(withSuffix('.devdigest/specs/a/b-2.md', 3)).toBe('.devdigest/specs/a/b-2-3.md');
+  });
+
+  it('counts UTF-8 bytes, not characters', () => {
+    expect(utf8Bytes('abc')).toBe(3);
+    expect(utf8Bytes('é')).toBe(2);
+    expect(utf8Bytes('€')).toBe(3);
+  });
+
+  it('detects NUL', () => {
+    expect(hasNul('a\0b')).toBe(true);
+    expect(hasNul('ab')).toBe(false);
   });
 });
 

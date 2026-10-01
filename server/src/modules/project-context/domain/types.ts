@@ -1,4 +1,4 @@
-import type { ProjectContextDocStatus, ProjectContextOrigin } from '@devdigest/shared';
+import type { ContextDocSource, ProjectContextDocStatus, ProjectContextOrigin } from '@devdigest/shared';
 
 /** What one attachment-path check found; `ok` carries no data. */
 export type PathCheckCode = 'invalid_path' | 'duplicate_path' | 'too_many_paths';
@@ -32,6 +32,8 @@ export interface RunDoc {
   origin: ProjectContextOrigin;
   tokens: number;
   status: ProjectContextDocStatus;
+  /** Where the text came from: a DevDigest store file (latest save) or the repo at the base commit. */
+  source: ContextDocSource;
   /** The text as sent — only for `included` documents. */
   text?: string;
 }

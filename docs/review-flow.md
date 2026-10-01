@@ -189,7 +189,11 @@ sequenceDiagram
 - **Project Context is read per agent, at the PR base commit.** Documents attached
   to the agent (then to each enabled skill, duplicates dropped) are read with
   `git show <base>:<path>` — never from the clone's working tree, so the PR under
-  review cannot rewrite the rules it is judged by. The base is `merge-base(origin/<base>, head)`,
+  review cannot rewrite the rules it is judged by. The exception is a DevDigest
+  store file (`.devdigest/specs/…`, kept in the `context_files` table): its latest
+  saved text comes from the database, even without a base commit, and its trace
+  record carries `source: 'store'` (repo documents `source: 'repo'`); a deleted
+  one ends `missing`. The base is `merge-base(origin/<base>, head)`,
   else the tip of `origin/<base>`; heads are never fetched. Each document ends as
   `included`, `missing`, `too_large` (> 256 KB), `unreadable` or `over_budget`
   (the first one past 16 000 estimated tokens and every one after it); all are in

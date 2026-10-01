@@ -24,6 +24,29 @@ export interface UsageRow {
   skillName: string | null;
 }
 
+/** A store file as saved (S1 table `context_files`). */
+export interface ContextFileRow {
+  path: string;
+  content: string;
+  sizeBytes: number;
+  version: number;
+  updatedAt: Date;
+}
+
+/** A store file in the list: no content, its text length in characters instead. */
+export interface ContextFileInfo {
+  path: string;
+  sizeBytes: number;
+  chars: number;
+  version: number;
+  updatedAt: Date;
+}
+
+/** Request-scoped logger (fastify's `req.log` satisfies it). */
+export interface Logger {
+  info: (obj: unknown, msg?: string) => void;
+}
+
 export interface ContextStore {
   /** Workspace-scoped: a repo of another workspace is `null` (→ 404). */
   findRepo(workspaceId: string, repoId: string): Promise<ContextRepoRef | null>;
@@ -38,6 +61,30 @@ export interface ContextStore {
   /** Replace the whole list (order = array order). Serialised per owner. */
   replaceAgentPaths(agentId: string, repoId: string, paths: readonly string[]): Promise<void>;
   replaceSkillPaths(skillId: string, repoId: string, paths: readonly string[]): Promise<void>;
+
+  /** Store files of the repo, by path (`COLLATE "C"`), without content. */
+  listFiles(repoId: string): Promise<ContextFileInfo[]>;
+  findFile(repoId: string, path: string): Promise<ContextFileRow | null>;
+  /** The store files among `paths` (with content); the others are simply absent. */
+  findFiles(repoId: string, paths: readonly string[]): Promise<ContextFileRow[]>;
+  /** Lock the repo row until the transaction ends (serialises create / rename per repo). Null → 404. */
+  lockRepo(workspaceId: string, repoId: string): Promise<ContextRepoRef | null>;
+  /** Insert at version 1. A taken path → `ConflictError` `path_exists`. */
+  insertFile(repoId: string, path: string, content: string, sizeBytes: number): Promise<ContextFileRow>;
+  /** `UPDATE … WHERE version = baseVersion`, bumping it. Null → no such file at that version. */
+  saveFile(
+    repoId: string,
+    path: string,
+    content: string,
+    sizeBytes: number,
+    baseVersion: number,
+  ): Promise<ContextFileRow | null>;
+  /** Move to `newPath` at `baseVersion`, bumping it. Null → no such file at that version; a taken path → `path_exists`. */
+  renameFile(repoId: string, path: string, newPath: string, baseVersion: number): Promise<ContextFileRow | null>;
+  /** Point every attachment of `from` in this repo (agents and skills) at `to`, keeping its position. */
+  moveAttachments(repoId: string, from: string, to: string): Promise<void>;
+  /** True when a row was deleted. Attachments are left alone. */
+  deleteFile(repoId: string, path: string): Promise<boolean>;
 }
 
 /** A document found in a clone. `chars` is the text length (the byte size when too large to read). */
