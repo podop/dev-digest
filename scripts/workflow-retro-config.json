@@ -1,0 +1,148 @@
+{
+  "_pricing_source": "USD per 1M tokens. Source: claude-api skill model table (cached 2026-09-25); cache write = 1.25x input (5 min TTL) / 2x input (1 h TTL). Verify against the pricing page before quoting; costs are estimates.",
+  "pricing": {
+    "claude-opus-5-5": {
+      "input": 4.0,
+      "output": 20.0,
+      "cache_read": 0.2
+    },
+    "claude-opus-5": {
+      "input": 5.0,
+      "output": 25.0,
+      "cache_read": 0.5
+    },
+    "claude-sonnet-5-5": {
+      "input": 2.0,
+      "output": 10.0,
+      "cache_read": 0.2
+    },
+    "claude-sonnet-5": {
+      "input": 2.0,
+      "output": 10.0,
+      "cache_read": 0.2
+    },
+    "claude-haiku-4-5": {
+      "input": 1.0,
+      "output": 5.0,
+      "cache_read": 0.1
+    },
+    "claude-fable-5-1": {
+      "input": 10.0,
+      "output": 50.0,
+      "cache_read": 0.25
+    }
+  },
+  "model_aliases": {
+    "opus": "claude-opus-5-5",
+    "sonnet": "claude-sonnet-5-5",
+    "haiku": "claude-haiku-4-5",
+    "fable": "claude-fable-5-1"
+  },
+  "_scope": "Write scope per agent type (globs, repo-relative). An agent writing outside its scope is reported. '*' = any path except deny. Bash writes are detected heuristically (sed -i, > file, tee, rm, git rm, mv, cp).",
+  "scope": {
+    "researcher": {
+      "allow": []
+    },
+    "specreator": {
+      "allow": [
+        "specs/*.md",
+        "*/specs/*.md"
+      ]
+    },
+    "implementation-planner": {
+      "allow": [
+        "docs/plans/*.md"
+      ]
+    },
+    "planner": {
+      "allow": [
+        "docs/plans/*.md"
+      ]
+    },
+    "architecture-reviewer": {
+      "allow": [
+        ".devdigest/review/**"
+      ]
+    },
+    "plan-verifier": {
+      "allow": [
+        ".devdigest/review/**"
+      ]
+    },
+    "delta-reviewer": {
+      "allow": [
+        ".devdigest/review/**"
+      ]
+    },
+    "doc-writer": {
+      "allow": [
+        "README.md",
+        "*/README.md",
+        "docs/**",
+        "*/docs/**"
+      ],
+      "deny": [
+        "docs/plans/**",
+        "docs/retros/**"
+      ]
+    },
+    "test-writer": {
+      "allow": [
+        "**/test/**",
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/fixtures/**",
+        "client/src/test/**"
+      ]
+    },
+    "implementer": {
+      "allow": [
+        "*"
+      ],
+      "deny": [
+        "design/**",
+        "server/clones/**",
+        "*/INSIGHTS.md",
+        "INSIGHTS.md",
+        ".claude/**",
+        "docs/plans/**",
+        "specs/**",
+        "*/specs/**",
+        "docs/retros/**"
+      ]
+    },
+    "general-purpose": {
+      "allow": []
+    },
+    "Explore": {
+      "allow": []
+    }
+  },
+  "code_dirs": [
+    "server/src/",
+    "client/src/",
+    "reviewer-core/src/",
+    "mcp/src/",
+    "e2e/"
+  ],
+  "shared_dirs": [
+    "server/src/vendor/shared/",
+    "client/src/vendor/shared/"
+  ],
+  "schema_dirs": [
+    "server/src/db/schema"
+  ],
+  "reviewer_types": [
+    "plan-verifier",
+    "architecture-reviewer",
+    "delta-reviewer"
+  ],
+  "reask_patterns": [
+    "Clarification needed",
+    "STATUS: BLOCKED",
+    "STATUS: PARTIAL",
+    "Please (apply|delete|approve|do) [^.]{0,60}yourself",
+    "tell me to",
+    "need(s)? your (approval|decision)"
+  ]
+}

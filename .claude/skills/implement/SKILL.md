@@ -133,7 +133,8 @@ feature again and its context is small; fix-round implementers are always fresh.
    candidates" only, append what is new, verified and non-obvious; nothing qualifies →
    write nothing.
 4. Next steps for the user, not run automatically: `doc-writer` for the README/docs;
-   `/pr-self-review` before opening the PR (it reuses the gates cache); commit.
+   `/pr-self-review` before opening the PR (it reuses the gates cache); commit; then, in this
+   same session, `/workflow-retro <slug>` to see where the agents lost tokens and time.
 
 ## Notes
 
