@@ -3,6 +3,7 @@ import { buildBlastModule } from './blast/composition.js';
 import { buildConventionsModule } from './conventions/composition.js';
 import { buildIntentModule } from './intent/composition.js';
 import { buildPollingModule } from './polling/composition.js';
+import { buildProjectContextModule } from './project-context/composition.js';
 import { buildPullsModule } from './pulls/composition.js';
 import { buildRepoIntelModule } from './repo-intel/composition.js';
 import { buildReposModule } from './repos/composition.js';
@@ -36,4 +37,5 @@ export const moduleFactories = {
   intent: buildIntentModule,
   smartDiff: buildSmartDiffModule,
   blast: buildBlastModule,
+  projectContext: buildProjectContextModule,
 };

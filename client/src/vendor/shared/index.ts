@@ -7,13 +7,16 @@
  *  - contracts/knowledge  Conformance, Onboarding, EvalRun/EvalCase, MemoryItem,
  *                         Skill/CommunitySkill, ConventionCandidate, Agent
  *  - contracts/trace      RunTrace, RunEvent, RunLogLine (single-document trace)
- *  - contracts/platform   Settings, ConnTestResult, Repo, PrMeta/PrDetail, SpecFile, …
+ *  - contracts/platform   Settings, ConnTestResult, Repo, PrMeta/PrDetail, …
+ *  - contracts/project-context  ContextDoc, ContextList, ContextAttachments, RunTrace.project_context
  *  - adapters             adapter interfaces + ModelInfo
  *  - constants/feature-models  zod-free FEATURE_MODELS registry (re-exported by
  *                         contracts/platform; import the subpath from bundles
  *                         that must stay zod-free)
  *  - constants/skills     zod-free skill limits + name regex (re-exported by
  *                         contracts/knowledge; same subpath rule)
+ *  - constants/project-context  zod-free Project Context limits + default glob
+ *                         (re-exported by contracts/project-context)
  *
  * Feature agents (A1–A6) and F2 import everything from here. The barrel is
  * stable — feature agents EXTEND with new files, they do not edit existing ones.
@@ -29,4 +32,5 @@ export * from './contracts/why.js';
 export * from './contracts/eval-ci.js';
 export * from './contracts/observability.js';
 export * from './contracts/productionize.js';
+export * from './contracts/project-context.js';
 export * from './adapters.js';

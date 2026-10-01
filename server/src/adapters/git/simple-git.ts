@@ -32,6 +32,9 @@ const SAFE_SEGMENT = /^[A-Za-z0-9_.-]+$/;
 /** `readFileAt` accepts only a full or short commit sha (never a ref/branch name). */
 const COMMIT_SHA_RE = /^[0-9a-f]{7,40}$/i;
 
+/** `resolveBaseCommit` branch names: plain ref characters only (never an option or a range). */
+const BASE_REF_RE = /^[A-Za-z0-9._/-]+$/;
+
 /** Default cap on `readFileAt` — matches the intent layer's doc-read budget. */
 const DEFAULT_READ_AT_MAX_BYTES = 64 * 1024;
 
@@ -215,6 +218,37 @@ export class SimpleGitClient implements GitClient {
       author: c.author_name,
       date: c.date,
     }));
+  }
+
+  /**
+   * Commit to read a PR's base side at (see `GitClient.resolveBaseCommit`).
+   * The clone is shallow (depth 1) and PR heads are never fetched, so the
+   * merge-base usually fails and the tip of the base branch is the answer.
+   * Never throws: no clone directory (or an unsafe repo name) → null.
+   */
+  async resolveBaseCommit(repo: RepoRef, baseRef: string, head: string): Promise<string | null> {
+    if (!BASE_REF_RE.test(baseRef) || baseRef.startsWith('-') || baseRef.includes('..')) return null;
+    if (!COMMIT_SHA_RE.test(head)) return null;
+    let g: SimpleGit;
+    try {
+      g = this.git(repo);
+    } catch {
+      return null; // no clone directory (simple-git refuses a missing baseDir)
+    }
+    for (const ref of [`origin/${baseRef}`, baseRef]) {
+      for (const args of [
+        ['merge-base', ref, head],
+        ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`],
+      ]) {
+        try {
+          const sha = (await g.raw(args)).trim();
+          if (/^[0-9a-f]{40}$/i.test(sha)) return sha;
+        } catch {
+          // not resolvable in this clone — try the next candidate
+        }
+      }
+    }
+    return null;
   }
 
   /**

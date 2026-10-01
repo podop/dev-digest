@@ -32,6 +32,9 @@ export function buildReviewsModule(c: Container) {
     ...(c.config.reviewIntentEnabled
       ? { intent: { resolveForReview: (input) => c.modules.intent.service.resolveForReview(input) } }
       : {}),
+    // Project Context: documents attached to the agent/its skills, read at the PR
+    // base commit — reached only through this port, never module internals.
+    projectContext: { resolveForRun: (input) => c.modules.projectContext.service.resolveForRun(input) },
     promptLog: c.promptLog,
   });
   return {

@@ -24,6 +24,7 @@ describe('Container composition root', () => {
       'conventions',
       'intent',
       'polling',
+      'projectContext',
       'pulls',
       'repoIntel',
       'repos',

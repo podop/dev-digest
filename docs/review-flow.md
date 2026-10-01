@@ -15,6 +15,7 @@ sequenceDiagram
     participant GIT as Local clone (git)
     participant RI as RepoIntel
     participant INT as IntentService
+    participant PCX as ProjectContextService
     participant CORE as reviewer-core
     participant LLM as LLM provider
     participant BUS as RunBus (in-memory)
@@ -102,8 +103,14 @@ sequenceDiagram
             EX->>RI: getRepoMap
             EX->>RI: getFileRank (top 5 percent)
         end
+        opt agent or its enabled skills have attached docs
+            EX->>PCX: resolveForRun (agent docs, then skill docs)
+            PCX->>GIT: resolveBaseCommit + readFileAt (base commit, never the working tree)
+            PCX-->>EX: docs with status, included texts
+            EX-->>BUS: info: project context: N included, M skipped
+        end
         EX->>CORE: reviewPullRequest(systemPrompt, diff, context, task)
-        Note right of CORE: input.intent (when resolved above) → `## PR intent`
+        Note right of CORE: input.intent (when resolved above) → `## PR intent`; input.specs → `## Project context`
         CORE->>CORE: selectMode (single-pass by default)
         loop each chunk (1 in single-pass, N files in map-reduce)
             CORE->>CORE: checkCancelled
@@ -179,6 +186,16 @@ sequenceDiagram
   missing key, timeout or provider error only logs `warning: intent
   unavailable — …` and the run proceeds without it (server/specs/
   05-intent-layer.md).
+- **Project Context is read per agent, at the PR base commit.** Documents attached
+  to the agent (then to each enabled skill, duplicates dropped) are read with
+  `git show <base>:<path>` — never from the clone's working tree, so the PR under
+  review cannot rewrite the rules it is judged by. The base is `merge-base(origin/<base>, head)`,
+  else the tip of `origin/<base>`; heads are never fetched. Each document ends as
+  `included`, `missing`, `too_large` (> 256 KB), `unreadable` or `over_budget`
+  (the first one past 16 000 estimated tokens and every one after it); all are in
+  `trace.project_context`, texts only for included ones. They go into the prompt
+  as untrusted `## Project context`. A failure here never fails the run, and a run
+  with nothing attached has no log line, no trace key and a byte-identical prompt.
 - **Smart Diff is independent of a review, and free of a model call.**
   `GET /pulls/:id/smart-diff` classifies every PR file by role as soon as
   `pr_files` exists — before any review has run. Once a review exists, it
@@ -215,6 +232,7 @@ sequenceDiagram
 | Trigger | `server/src/modules/reviews/routes.ts`, `server/src/modules/reviews/application/review-service.ts` |
 | Execution | `server/src/modules/reviews/application/run-executor.ts` (+ `diff-loader.ts`, `intent-prework.ts`, `prompt-context.ts`), rules in `reviews/domain/` |
 | Intent | `server/src/modules/intent/` (`application/intent-service.ts`, `domain/{links,intent,classification}.ts`, `infrastructure/{doc-source,ticket-source,llm-model,repository}.ts`) — server/specs/05-intent-layer.md |
+| Project Context | `server/src/modules/project-context/` (`application/project-context-service.ts` `resolveForRun`, `domain/run-context.ts`) — specs/2026-10-01-project-context.md |
 | Smart Diff | `server/src/modules/smart-diff/` (`domain/{classify,smart-diff,constants}.ts`, `application/smart-diff-service.ts`, `infrastructure/repository.ts`) — server/specs/06-smart-diff.md |
 | Engine | `reviewer-core/src/review/run.ts`, `reviewer-core/src/prompt.ts` (`renderIntent`, `INTENT_SCOPE_RULE`), `reviewer-core/src/grounding.ts`, `reviewer-core/src/review/scope.ts` (`applyScopePolicy`), `reviewer-core/src/review/reduce.ts` |
 | Live events | `server/src/platform/sse.ts` |

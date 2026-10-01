@@ -47,7 +47,7 @@ score is identical with or without an intent.
 
 `assemblePrompt` also returns `sections: PromptSectionMeta[]` — one entry per
 rendered section (`system`, `injection_guard`, `task`, `pr_description`,
-`intent_rule`, `intent`, `skills`, `memory`, `repo_map`, `specs`, `callers`,
+`intent_rule`, `intent`, `skills`, `memory`, `repo_map`, `specs_rule`, `specs`, `callers`,
 `diff`), in render order, with its `source`/`role`/`trust` and `chars`/`tokens`
 — **never the section's text**, so a consumer can log what went into a prompt
 without ever logging the prompt itself. `ReviewInput.onPrompt` fires with this

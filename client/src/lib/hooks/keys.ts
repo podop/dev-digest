@@ -23,7 +23,10 @@ export const repoKeys = {
   list: () => [...repoKeys.all, "list"] as const,
   detail: (repoId: Id) => [...repoKeys.all, "detail", repoId] as const,
   pulls: (repoId: Id) => [...repoKeys.detail(repoId), "pulls"] as const,
+  /** Project Context list of a repo (GET /repos/:id/context); also the prefix of its doc previews. */
   context: (repoId: Id) => [...repoKeys.detail(repoId), "context"] as const,
+  /** One document preview (GET /repos/:id/context/doc?path=). */
+  contextDoc: (repoId: Id, path: Id) => [...repoKeys.context(repoId), "doc", path] as const,
   intelState: (repoId: Id) => [...repoKeys.detail(repoId), "intel-state"] as const,
 };
 
@@ -57,6 +60,8 @@ export const agentKeys = {
   skillsAll: () => [...agentKeys.all, "skills"] as const,
   /** The ordered skill links of one agent (GET /agents/:id/skills). */
   skills: (id: Id) => [...agentKeys.skillsAll(), id] as const,
+  /** The ordered Project Context paths of one agent in one repo (GET /agents/:id/context). */
+  context: (id: Id, repoId: Id) => [...agentKeys.all, "context", id, repoId] as const,
 };
 
 /** Filters of the community catalog search (GET /skills/community). */
@@ -78,6 +83,8 @@ export const skillKeys = {
   /** Prefix of every skill's "used by" list (agent links change them all). */
   agentsAll: () => [...skillKeys.all, "agents"] as const,
   agents: (id: Id) => [...skillKeys.agentsAll(), id] as const,
+  /** The ordered Project Context paths of one skill in one repo (GET /skills/:id/context). */
+  context: (id: Id, repoId: Id) => [...skillKeys.all, "context", id, repoId] as const,
   community: (f: CommunitySkillFilters) =>
     [...skillKeys.all, "community", f.q ?? "", f.tag ?? "", f.lang ?? ""] as const,
 };

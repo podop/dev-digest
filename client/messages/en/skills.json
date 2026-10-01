@@ -144,6 +144,7 @@
     "loadErrorBody": "It may have been deleted.",
     "tabs": {
       "config": "Config",
+      "context": "Context",
       "preview": "Preview",
       "versions": "Versions",
       "stats": "Stats"
@@ -203,5 +204,14 @@
       "title": "No stats yet",
       "body": "Stats accumulate from review runs. Link this skill to an agent and run a review."
     }
+  },
+  "context": {
+    "noRepoTitle": "No repository selected",
+    "noRepoBody": "Pick a repository in the sidebar to attach its documents to this skill.",
+    "loadError": "Couldn’t load the attached documents",
+    "title": "Project context to use",
+    "badge": "{attached} attached",
+    "hint": "Any agent using this skill inherits these documents.",
+    "serializesAs": "Serializes as"
   }
 }

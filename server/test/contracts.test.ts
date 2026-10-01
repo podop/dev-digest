@@ -14,6 +14,9 @@ import {
   MemoryItem,
   RunTrace,
   RunStats,
+  ContextList,
+  ContextDocPreview,
+  ContextAttachments,
   Settings,
   Repo,
   PrDetail,
@@ -189,6 +192,76 @@ describe('AI contracts parse fixtures', () => {
     expect(trace.tool_calls).toHaveLength(1);
     // A trace written before cost tracking has no cost_usd key — still valid.
     expect(trace.stats.cost_usd).toBeUndefined();
+    // ...and one written before Project Context has no project_context key.
+    expect(trace.project_context).toBeUndefined();
+  });
+
+  it('RunTrace carries project_context docs (included + skipped, both origins)', () => {
+    const trace = RunTrace.parse({
+      config: { agent: 'Security Reviewer', model: 'gpt-4.1' },
+      stats: { duration_ms: 1, tokens_in: 1, tokens_out: 1, findings: 0, grounding: '0/0 passed' },
+      prompt_assembly: { system: 's', user: 'u' },
+      tool_calls: [],
+      raw_output: '{}',
+      memory_pulled: [],
+      specs_read: ['docs/a.md'],
+      log: [],
+      project_context: {
+        budget_tokens: 16000,
+        tokens_total: 10,
+        docs: [
+          { path: 'docs/a.md', doc_type: 'docs', origin: { kind: 'agent' }, tokens: 10, status: 'included', text: 'hello' },
+          {
+            path: 'specs/b.md',
+            doc_type: 'specs',
+            origin: { kind: 'skill', skill_id: 's1', skill_name: 'security' },
+            tokens: 0,
+            status: 'missing',
+          },
+        ],
+      },
+    });
+    expect(trace.project_context?.docs).toHaveLength(2);
+    expect(trace.project_context?.docs[1]?.text).toBeUndefined();
+    expect(() =>
+      RunTrace.parse({
+        config: { agent: 'a', model: 'm' },
+        stats: { duration_ms: 1, tokens_in: 1, tokens_out: 1, findings: 0, grounding: 'x' },
+        prompt_assembly: { system: 's', user: 'u' },
+        tool_calls: [],
+        raw_output: '{}',
+        memory_pulled: [],
+        specs_read: [],
+        log: [],
+        project_context: {
+          budget_tokens: 1,
+          tokens_total: 0,
+          docs: [{ path: 'a.md', doc_type: 'docs', origin: { kind: 'agent' }, tokens: 0, status: 'bogus' }],
+        },
+      }),
+    ).toThrow();
+  });
+
+  it('Project Context list, preview and attachment shapes parse', () => {
+    const doc = {
+      path: 'docs/a.md',
+      name: 'a.md',
+      doc_type: 'docs',
+      size_bytes: 40,
+      tokens: 10,
+      updated_at: '2026-10-01T00:00:00.000Z',
+      used_by: 2,
+    };
+    const list = ContextList.parse({ clone_status: 'ready', globs: ['**/docs/**/*.md'], docs: [doc], tokens_total: 10 });
+    expect(list.truncated).toBeUndefined();
+    expect(ContextList.parse({ clone_status: 'not_cloned', globs: [], docs: [], tokens_total: 0, truncated: true }).truncated).toBe(true);
+    const preview = ContextDocPreview.parse({
+      ...doc,
+      content: '# a',
+      used_by_agents: [{ id: 'a1', name: 'Sec', via: 'skill', skill_name: 'security' }, { id: 'a2', name: 'Perf', via: 'direct' }],
+    });
+    expect(preview.used_by_agents).toHaveLength(2);
+    expect(ContextAttachments.parse({ repo_id: 'r1', paths: ['docs/b.md', 'docs/a.md'] }).paths[0]).toBe('docs/b.md');
   });
 
   it('RunTrace stats carry cost_usd (number or null)', () => {

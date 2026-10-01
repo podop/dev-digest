@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { IntentChangeType, IntentConfidence, IntentDerivedFrom, IntentSource } from './brief.js';
+import { ProjectContextTrace } from './project-context.js';
 
 /**
  * Run trace. The ENTIRE trace of one run is persisted as a SINGLE
@@ -130,6 +131,8 @@ export const RunTrace = z.object({
   skills_used: z.array(SkillUsed).nullish(),
   /** Intent layer contribution to this run; null when the run had no intent. */
   intent: IntentTrace.nullish(),
+  /** Project Context docs of this run (statuses + text as sent). Absent on old traces. */
+  project_context: ProjectContextTrace.nullish(),
 });
 export type RunTrace = z.infer<typeof RunTrace>;
 

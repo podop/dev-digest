@@ -187,6 +187,32 @@ Read-only: one `repo-intel` facade `getBlastRadius` call per request, no re-pars
 `degraded`/`reason` pass through (degraded = unknown, not "no impact");
 `MAX_CALLERS_PER_SYMBOL` is applied per `viaSymbol` in the facade. Also used by MCP `get_blast_radius`.
 
+### Project Context (`modules/project-context`, spec [`../specs/2026-10-01-project-context.md`](../specs/2026-10-01-project-context.md))
+
+| Method | Path | Result |
+|---|---|---|
+| GET | `/repos/:id/context` | `ContextList` = `.md` files of the clone matching the globs (`docs[]` with type, size, tokens, `used_by`), `tokens_total`, `clone_status` (`not_cloned` without a clone), `truncated` when cut at 500 |
+| GET | `/repos/:id/context/doc?path=` | `ContextDocPreview` = content + `used_by_agents` (`via` direct / skill); 400 `invalid_path`, 404 `repo_not_found` / `doc_not_found`, 413 `doc_too_large` (> 256 KB) |
+| GET / PUT | `/agents/:id/context` (`?repoId=` on GET) | ordered attached paths of an agent in one repo; PUT replaces the whole list in one transaction |
+| GET / PUT | `/skills/:id/context` | same for a skill |
+
+Documents are derived from the clone on each call, never stored; only paths are (`agent_context_docs`,
+`skill_context_docs`, per repo, ordered). Attaching never bumps an agent/skill version. PUT errors: 404
+`agent_not_found` / `skill_not_found` / `repo_not_found` (workspace checks first), 422 `invalid_path` /
+`duplicate_path` / `too_many_paths` (> 50). Symlinks are never listed or read, `node_modules`, `.git`, `dist`,
+`build`, `coverage`, `.next`, `out`, `vendor` are never entered. `used_by` counts distinct agents that attach a
+path directly or link a skill that does (enabled or not). No LLM call.
+
+**In a run** (`ProjectContextService.resolveForRun`, reached from `reviews` only through a port): the agent's
+documents, then each enabled skill's (a path already listed is not repeated), are read with
+`GitClient.readFileAt` at `GitClient.resolveBaseCommit(repo, pr.base, pr.headSha)` — the merge-base, else the tip
+of the base branch; never the clone's working tree, never a fetch. Each document gets a status in
+`RunTrace.project_context` (`included` / `missing` / `too_large` > 256 KB / `unreadable` / `over_budget`; text only
+for included ones); the budget is 16 000 estimated tokens, cut at the first document that would pass it. Included
+texts go to reviewer-core as `specs: {path, text}[]` (untrusted, `## Project context`). Any failure degrades to "no
+documents" and a `warning: project context unavailable` log line; no attachments → no log line, no trace key, the
+prompt is byte-identical to before.
+
 ## Environment
 
 `server/.env` (copied from `.env.example`):
@@ -205,6 +231,7 @@ Read-only: one `repo-intel` facade `getBlastRadius` call per request, no re-pars
 | `LLM_PROVIDER_OVERRIDE` | — | **dev/e2e only**: `mock` → every provider is the deterministic mock (`src/adapters/llm/mock.ts`, fixed review grounded on the seeded PR #482); refused with `NODE_ENV=production`, loud warning at boot |
 | `LLM_MOCK_DELAY_MS` | `0` | latency of each mock LLM call (abortable), so the live-run UI is observable |
 | `PROMPT_LOG_VERBOSE` | — | **dev only**: adds identifiers (file paths, ticket/doc refs — never prompt content) to the structured `prompt_assembled` log line; refused with `NODE_ENV=production`; silently OFF outside development or when `API_HOST` isn't loopback (boot warns once when that happens) |
+| `PROJECT_CONTEXT_GLOBS` | `**/{specs,docs,insights}/**/*.md` | globs of the repo markdown docs Project Context lists and agents/skills may attach; comma-separated (commas inside `{a,b}` stay part of the glob) |
 | `DEVDIGEST_CLONE_DIR` | `./clones` | imported-repo checkouts (git-ignored) |
 | `LOG_LEVEL` | `info` (`silent` in test) | pino level |
 | `NODE_ENV` | `development` | `test` → silent logs + global rate-limit disabled |

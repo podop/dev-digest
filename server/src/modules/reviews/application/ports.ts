@@ -12,6 +12,7 @@ import type {
   IntentTrace,
   LLMProvider,
   Provider,
+  ProjectContextTraceDoc,
   RunEventKind,
   RunSummary,
   RunTrace,
@@ -130,4 +131,38 @@ export type IntentResolveResult =
 /** Shared review pre-work's view of the intent layer; undefined = kill switch off. */
 export interface IntentResolver {
   resolveForReview(input: IntentResolveInput): Promise<IntentResolveResult>;
+}
+
+// ---- Project context (specs/2026-10-01-project-context.md) ------------------
+// Defined locally — reviews reaches the project-context module only through this
+// port, wired in reviews/composition.ts via `c.modules.projectContext.service`.
+
+export interface ProjectContextResolveInput {
+  workspaceId: string;
+  repoId: string;
+  repo: ReviewRepo;
+  /** The PR's base branch name and head commit (documents are read at the base). */
+  base: string;
+  headSha: string;
+  agentId: string;
+  /** The agent's linked skills in prompt order. */
+  skills: { id: string; name: string; enabled: boolean }[];
+  /** A content-free reason when the documents could not be resolved. */
+  onWarn?: (reason: string) => void;
+}
+
+export interface ProjectContextResolveResult {
+  /** Every attached document with its status, in prompt order. */
+  docs: ProjectContextTraceDoc[];
+  /** The included documents for the prompt. */
+  included: { path: string; text: string }[];
+  tokensTotal: number;
+  budgetTokens: number;
+  /** The run's single log line; empty when there are no documents. */
+  logLine: string;
+}
+
+/** Never throws by contract: a failure degrades to no documents. */
+export interface ProjectContextResolver {
+  resolveForRun(input: ProjectContextResolveInput): Promise<ProjectContextResolveResult>;
 }

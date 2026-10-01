@@ -1,7 +1,14 @@
 /**
  * Pure builders of the single-document RunTrace persisted per run.
  */
-import type { IntentTrace, PromptAssembly, RunLogLine, RunTrace, SkillUsed } from '@devdigest/shared';
+import type {
+  IntentTrace,
+  ProjectContextTrace,
+  PromptAssembly,
+  RunLogLine,
+  RunTrace,
+  SkillUsed,
+} from '@devdigest/shared';
 import { NO_GROUNDING } from './constants.js';
 import type { ReviewAgent } from './types.js';
 
@@ -11,6 +18,20 @@ export interface TraceUsage {
   tokensIn: number;
   tokensOut: number;
   costUsd: number | null;
+}
+
+/** The trace record of a run's project-context documents (statuses; text only for included ones). */
+export function toProjectContextTrace(result: {
+  docs: ProjectContextTrace['docs'];
+  tokensTotal: number;
+  budgetTokens: number;
+}): ProjectContextTrace {
+  return { budget_tokens: result.budgetTokens, tokens_total: result.tokensTotal, docs: result.docs };
+}
+
+/** `specs_read`: the paths of the documents that reached the prompt, in prompt order. */
+function specsRead(projectContext: ProjectContextTrace | undefined): string[] {
+  return projectContext?.docs.filter((d) => d.status === 'included').map((d) => d.path) ?? [];
 }
 
 function traceConfig(agent: TraceAgent, prNumber: number): RunTrace['config'] {
@@ -41,6 +62,8 @@ export function completedRunTrace(input: {
   skillsUsed?: SkillUsed[];
   /** Intent layer contribution to this run; undefined → not in the trace (kill switch off). */
   intent?: IntentTrace;
+  /** Project Context documents of this run; undefined → no `project_context` key (no attachments). */
+  projectContext?: ProjectContextTrace;
 }): RunTrace {
   const { agent, durationMs, usage, chunks } = input;
   return {
@@ -62,10 +85,11 @@ export function completedRunTrace(input: {
     })),
     raw_output: input.raw,
     memory_pulled: [],
-    specs_read: [],
+    specs_read: specsRead(input.projectContext),
     log: input.log,
     skills_used: input.skillsUsed ?? [],
     intent: input.intent ?? null,
+    ...(input.projectContext ? { project_context: input.projectContext } : {}),
   };
 }
 
@@ -83,6 +107,8 @@ export function endedRunTrace(input: {
   skillsUsed?: SkillUsed[];
   /** Intent derived before the run ended (failed/cancelled runs may still have one). */
   intent?: IntentTrace;
+  /** Project Context documents resolved before the run ended. */
+  projectContext?: ProjectContextTrace;
 }): RunTrace {
   const usage = input.usage ?? { tokensIn: 0, tokensOut: 0, costUsd: 0 };
   return {
@@ -99,9 +125,10 @@ export function endedRunTrace(input: {
     tool_calls: [],
     raw_output: '',
     memory_pulled: [],
-    specs_read: [],
+    specs_read: specsRead(input.projectContext),
     log: input.log,
     skills_used: input.skillsUsed ?? [],
     intent: input.intent ?? null,
+    ...(input.projectContext ? { project_context: input.projectContext } : {}),
   };
 }

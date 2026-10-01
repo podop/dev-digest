@@ -1,4 +1,4 @@
-import type { Intent, IntentTrace, UnifiedDiff } from '@devdigest/shared';
+import type { Intent, IntentTrace, ProjectContextTrace, UnifiedDiff } from '@devdigest/shared';
 import { reviewPullRequest, countBlockers, estimateTokens, type ReviewOutcome } from '@devdigest/reviewer-core';
 import type { PromptLogPort } from '../../../platform/prompt-log.js';
 import { RunLogger } from '../../../platform/run-logger.js';
@@ -8,7 +8,7 @@ import { NO_GROUNDING, REVIEW_STRATEGY } from '../domain/constants.js';
 import { taskLine } from '../domain/prompt.js';
 import { RunCancelledError, runEnding } from '../domain/run.js';
 import { skillIdsByName, skillsLogLine, skillsUsed } from '../domain/skills.js';
-import { completedRunTrace, endedRunTrace } from '../domain/trace.js';
+import { completedRunTrace, endedRunTrace, toProjectContextTrace } from '../domain/trace.js';
 import type { ReviewAgent, ReviewPull, ReviewRepo, ReviewSkill } from '../domain/types.js';
 import { UsageMeter } from '../domain/usage-meter.js';
 import { loadDiff } from './diff-loader.js';
@@ -20,6 +20,8 @@ import type {
   IntentResolver,
   LlmResolver,
   Logger,
+  ProjectContextResolveResult,
+  ProjectContextResolver,
   RepoContext,
   ReviewStore,
   ReviewTx,
@@ -41,6 +43,8 @@ export interface RunExecutorDeps {
   mapConcurrency?: number;
   /** Intent layer (server/specs/05-intent-layer.md); undefined = kill switch off. */
   intent?: IntentResolver;
+  /** Project Context (specs/2026-10-01-project-context.md); undefined = no documents are ever attached. */
+  projectContext?: ProjectContextResolver;
   /** Structured, content-free prompt-assembly logging (platform/prompt-log.ts); undefined = no-op. */
   promptLog?: PromptLogPort;
 }
@@ -189,9 +193,25 @@ export class ReviewRunExecutor {
 
     runLog.info(`Starting review with agent "${agent.name}" (${agent.provider}/${agent.model})`);
     let skills: ReviewSkill[] = [];
+    let projectContext: ProjectContextTrace | undefined;
     try {
       skills = await this.attachSkills(agent, runId, runLog);
-      const outcome = await this.review(pull, repo, diff, agent, skills, runLog, usage, abort.signal, isCancelled, intent, runId);
+      const context = await this.attachProjectContext(workspaceId, pull, repo, agent, skills, runLog);
+      projectContext = context && toProjectContextTrace(context);
+      const outcome = await this.review(
+        pull,
+        repo,
+        diff,
+        agent,
+        skills,
+        context?.included ?? [],
+        runLog,
+        usage,
+        abort.signal,
+        isCancelled,
+        intent,
+        runId,
+      );
       // Last in-memory checkpoint: a cancel that arrived DURING the final LLM
       // call must still win. A later one is caught by the conditional status
       // update inside the persist transaction.
@@ -221,6 +241,7 @@ export class ReviewRunExecutor {
         log: runLog.logFor(runId),
         skillsUsed: skillsUsed(skills),
         intent: intentTrace,
+        projectContext,
       });
       runLog.info('Run complete; trace persisted');
       await this.deps.reviews.saveRunTrace(runId, trace);
@@ -228,7 +249,7 @@ export class ReviewRunExecutor {
       return findings;
     } catch (err) {
       const cancelled = isCancelled();
-      await this.recordEnd(err, cancelled, runId, pull, agent, runLog, start, usage, skills, intentTrace);
+      await this.recordEnd(err, cancelled, runId, pull, agent, runLog, start, usage, skills, intentTrace, projectContext);
       // An error raised by an aborted LLM call is reported as the cancel it is.
       throw cancelled && !(err instanceof RunCancelledError) ? new RunCancelledError() : err;
     } finally {
@@ -251,6 +272,39 @@ export class ReviewRunExecutor {
     return skills;
   }
 
+  /**
+   * Read the agent's (and its skills') attached project documents at the PR
+   * base commit and log the one summary line. Undefined when nothing is
+   * attached (or no resolver is wired): the run is then byte-identical to one
+   * without this feature. Never throws.
+   */
+  private async attachProjectContext(
+    workspaceId: string,
+    pull: ReviewPull,
+    repo: ReviewRepo,
+    agent: ReviewAgent,
+    skills: readonly ReviewSkill[],
+    runLog: RunLogger,
+  ): Promise<ProjectContextResolveResult | undefined> {
+    const resolver = this.deps.projectContext;
+    if (!resolver) return undefined;
+    const result = await resolver.resolveForRun({
+      workspaceId,
+      repoId: pull.repoId,
+      repo,
+      base: pull.base,
+      headSha: pull.headSha,
+      agentId: agent.id,
+      // enabledForAgent already dropped the disabled skills, in link order.
+      skills: skills.map((s) => ({ id: s.id, name: s.name, enabled: true })),
+      onWarn: (reason) =>
+        runLog.info(`warning: project context unavailable — ${reason}`, { warning: 'project_context_unavailable' }),
+    });
+    if (result.docs.length === 0) return undefined;
+    runLog.info(result.logLine);
+    return result;
+  }
+
   /** Resolve the provider, gather prompt context and run the engine. */
   private async review(
     pull: ReviewPull,
@@ -258,6 +312,7 @@ export class ReviewRunExecutor {
     diff: UnifiedDiff,
     agent: ReviewAgent,
     skills: readonly ReviewSkill[],
+    specs: readonly { path: string; text: string }[],
     runLog: RunLogger,
     usage: UsageMeter,
     signal: AbortSignal,
@@ -288,6 +343,9 @@ export class ReviewRunExecutor {
       ...(ctx.repoMap ? { repoMap: ctx.repoMap } : {}),
       // Zero skills → the key is absent → the prompt is byte-identical to before.
       ...(skills.length > 0 ? { skills: skills.map(renderSkillBlock) } : {}),
+      // Project Context documents (untrusted; the engine wraps + labels each);
+      // none → the key is absent → the prompt is byte-identical to before.
+      ...(specs.length > 0 ? { specs: [...specs] } : {}),
       // PR author's body — untrusted; the engine wraps + truncates it.
       ...(pull.body ? { prDescription: pull.body } : {}),
       // Derived PR intent (server/specs/05-intent-layer.md); undefined → the
@@ -377,6 +435,7 @@ export class ReviewRunExecutor {
     usage: UsageMeter,
     skills: readonly ReviewSkill[],
     intentTrace: IntentTrace | undefined,
+    projectContext: ProjectContextTrace | undefined,
   ): Promise<void> {
     const { status, note } = runEnding(err, cancelled);
     runLog.error(status === 'cancelled' ? 'Run cancelled by user' : `Run failed: ${note}`);
@@ -403,6 +462,7 @@ export class ReviewRunExecutor {
           usage,
           skillsUsed: skillsUsed(skills),
           intent: intentTrace,
+          projectContext,
         }),
       )
       .catch(() => undefined);
