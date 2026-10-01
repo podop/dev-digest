@@ -1,6 +1,6 @@
 /* IntentCard — the PR's derived intent (server/specs/05-intent-layer.md):
    plain-text intent, change-type chip, confidence badge, inferred/stale hints,
-   in/out-of-scope bullets, sources (client-built links), model/cost, Refresh.
+   in/out-of-scope columns, sources (client-built links), model/cost, Refresh.
    Empty state (no derivation yet) offers a "Derive now" CTA. */
 "use client";
 
@@ -77,32 +77,18 @@ export function IntentCard({ prId, repoFullName, headSha }: IntentCardProps) {
       {intent.derived_from === "inferred" && <p style={s.hint}>{t("intent.inferredHint")}</p>}
       {data?.stale && <p style={s.hint}>{t("intent.staleHint")}</p>}
 
-      <p style={s.text}>{intent.intent}</p>
+      <p style={s.text}>{`“${intent.intent}”`}</p>
 
-      {intent.in_scope.length > 0 && (
-        <div style={s.scopeBlock}>
-          <div style={s.scopeLabel}>{t("intent.inScope")}</div>
-          <ul style={s.scopeList}>
-            {intent.in_scope.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {intent.out_of_scope.length > 0 && (
-        <div style={s.scopeBlock}>
-          <div style={s.scopeLabel}>{t("intent.outOfScope")}</div>
-          <ul style={s.scopeList}>
-            {intent.out_of_scope.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
+      {(intent.in_scope.length > 0 || intent.out_of_scope.length > 0) && (
+        <div style={s.scopeGrid}>
+          {intent.in_scope.length > 0 && <ScopeBlock inScope label={t("intent.inScope")} lines={intent.in_scope} />}
+          {intent.out_of_scope.length > 0 && <ScopeBlock inScope={false} label={t("intent.outOfScope")} lines={intent.out_of_scope} />}
         </div>
       )}
 
       {intent.sources && intent.sources.length > 0 && (
         <div style={s.sourcesBlock}>
-          <div style={s.scopeLabel}>{t("intent.sources")}</div>
+          <div style={s.sourcesLabel}>{t("intent.sources")}</div>
           <ul style={s.sourceList}>
             {intent.sources.map((src, i) => {
               const SourceIcon = Icon[sourceIcon(src.kind)];
@@ -137,5 +123,28 @@ export function IntentCard({ prId, repoFullName, headSha }: IntentCardProps) {
         <span>{formatUsd(intent.cost_usd)}</span>
       </div>
     </section>
+  );
+}
+
+/** One scope column: "✓ IN SCOPE" (green, normal items) or "✕ OUT OF SCOPE" (muted items). */
+function ScopeBlock({ inScope, label, lines }: { inScope: boolean; label: string; lines: string[] }) {
+  const Mark = inScope ? Icon.Check : Icon.X;
+  return (
+    <div style={s.scopeBlock}>
+      <div style={s.scopeLabel(inScope)}>
+        <Mark size={13} />
+        {label}
+      </div>
+      <ul style={s.scopeList}>
+        {lines.map((line) => (
+          <li key={line} style={s.scopeItem(inScope)}>
+            <span aria-hidden="true" style={s.scopeDot(inScope)}>
+              ·
+            </span>
+            {line}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 /* BlastRadiusCard — "what else can this diff hit?" (server/specs/07-blast-radius.md,
-   client/specs/07-blast-radius.md): stat row, symbol tree, endpoint/cron chips.
+   client/specs/07-blast-radius.md): one inline stat row + Tree/Graph switch, symbol tree, endpoint/cron chips.
    Read from GET /pulls/:id/blast (an index read). A degraded answer is shown as
    "unknown", never as an empty "no impact" — with a Resync button. */
 "use client";
@@ -12,6 +12,7 @@ import { useBlastRadius, useResyncBlast } from "@/lib/hooks/blast";
 import { BlastGraph } from "./_components/BlastGraph";
 import { BlastTree } from "./_components/BlastTree";
 import { PriorPrs } from "./_components/PriorPrs";
+import { STAT_ICON, STAT_KEYS, VIEWS } from "./constants";
 import { blastStats, callerHref, degradedReasonKey } from "./helpers";
 import { s } from "./styles";
 
@@ -27,7 +28,7 @@ export function BlastRadiusCard({ prId, repoId, repoFullName, headSha }: BlastRa
   const tc = useTranslations("common");
   const { data, isLoading, isError, error, refetch } = useBlastRadius(prId);
   const resync = useResyncBlast(repoId, prId);
-  const [view, setView] = React.useState<"tree" | "graph">("tree");
+  const [view, setView] = React.useState<(typeof VIEWS)[number]>("tree");
 
   if (isLoading) return <Skeleton height={140} />;
   if (isError || !data) {
@@ -47,27 +48,33 @@ export function BlastRadiusCard({ prId, repoId, repoFullName, headSha }: BlastRa
   return (
     <section style={s.card} aria-label={t("title")}>
       <div style={s.header}>
-        <Icon.Target size={16} style={s.headerIcon} />
+        <Icon.Workflow size={14} style={s.headerIcon} />
         <span style={s.headerTitle}>{t("title")}</span>
-        <div style={s.headerRight} role="group" aria-label={t("view.label")}>
-          {(["tree", "graph"] as const).map((v) => (
-            <Button key={v} kind="ghost" size="sm" active={view === v} aria-pressed={view === v} onClick={() => setView(v)}>
+      </div>
+
+      <div style={s.summary}>
+        <ul style={s.stats}>
+          {STAT_KEYS.map((key) => {
+            const StatIcon = Icon[STAT_ICON[key]];
+            return (
+              <li key={key} style={s.stat}>
+                <StatIcon size={13} style={s.statIcon} />
+                <b className="tnum" style={s.statValue}>
+                  {stats[key]}
+                </b>
+                {t(`stat.${key}`, { count: stats[key] })}
+              </li>
+            );
+          })}
+        </ul>
+        <div style={s.segmented} role="group" aria-label={t("view.label")}>
+          {VIEWS.map((v) => (
+            <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)} style={s.segment(view === v)}>
               {t(`view.${v}`)}
-            </Button>
+            </button>
           ))}
         </div>
       </div>
-
-      <ul style={s.stats}>
-        {(["symbols", "callers", "endpoints", "crons"] as const).map((key) => (
-          <li key={key} style={s.stat}>
-            <span className="mono" style={s.statValue}>
-              {stats[key]}
-            </span>
-            <span style={s.statLabel}>{t(`stat.${key}`)}</span>
-          </li>
-        ))}
-      </ul>
 
       {degraded && (
         <div style={s.degraded} role="status">

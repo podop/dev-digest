@@ -18,8 +18,10 @@ export function OverviewTab({ prId, repoId, prBody, repoFullName, headSha }: Ove
   const t = useTranslations("prReview");
   return (
     <div style={s.stack}>
-      <IntentCard prId={prId} repoFullName={repoFullName} headSha={headSha} />
-      <BlastRadiusCard prId={prId} repoId={repoId} repoFullName={repoFullName} headSha={headSha} />
+      <div style={s.cards}>
+        <IntentCard prId={prId} repoFullName={repoFullName} headSha={headSha} />
+        <BlastRadiusCard prId={prId} repoId={repoId} repoFullName={repoFullName} headSha={headSha} />
+      </div>
       {prBody && (
         <section>
           <SectionLabel icon="MessageSquare">{t("overview.description")}</SectionLabel>

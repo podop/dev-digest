@@ -1,14 +1,14 @@
 {
   "title": "Blast radius",
   "stat": {
-    "symbols": "symbols",
-    "callers": "callers",
-    "endpoints": "endpoints",
-    "crons": "cron/jobs"
+    "symbols": "{count, plural, one {symbol} other {symbols}}",
+    "callers": "{count, plural, one {caller} other {callers}}",
+    "endpoints": "{count, plural, one {endpoint} other {endpoints}}",
+    "crons": "{count, plural, one {cron} other {crons}}"
   },
   "view": {
-    "tree": "tree",
-    "graph": "graph",
+    "tree": "Tree",
+    "graph": "Graph",
     "label": "Blast radius view"
   },
   "callerCount": "{count, plural, one {# caller} other {# callers}}",
@@ -47,10 +47,13 @@
       "cron": "Cron job"
     }
   },
+  "tree": {
+    "showMore": "{count, plural, one {Show # more symbol} other {Show # more symbols}}",
+    "showFewer": "Show fewer"
+  },
   "priorPrs": {
     "title": "Prior PRs touching these files",
-    "meta": "by {author} · merged {date}",
-    "files": "{count, plural, one {# overlapping file} other {# overlapping files}}",
-    "moreFiles": "{count, plural, one {+# more file} other {+# more files}}"
+    "meta": "{author} · {date}",
+    "touched": "Touched {count, plural, one {this file} other {# of these files}}: {names}{more, plural, =0 {} other {, … +# more}}"
   }
 }

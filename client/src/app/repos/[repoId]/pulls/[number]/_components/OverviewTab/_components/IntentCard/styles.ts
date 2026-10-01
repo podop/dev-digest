@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 
+/* Typography/spacing from the design mockup's IntentBlock (screen_pr_detail.jsx). */
 export const s = {
   card: {
     border: "1px solid var(--border)",
@@ -8,7 +9,8 @@ export const s = {
     padding: 18,
     display: "flex",
     flexDirection: "column",
-    gap: 12,
+    gap: 14,
+    minWidth: 0,
   } satisfies CSSProperties,
   header: {
     display: "flex",
@@ -18,7 +20,7 @@ export const s = {
   } satisfies CSSProperties,
   headerIcon: { color: "var(--text-muted)" } satisfies CSSProperties,
   headerTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 700,
     letterSpacing: "0.07em",
     textTransform: "uppercase",
@@ -39,30 +41,60 @@ export const s = {
   text: {
     margin: 0,
     fontSize: 14,
+    fontStyle: "italic",
     color: "var(--text-primary)",
-    lineHeight: 1.55,
+    lineHeight: 1.5,
+    textWrap: "pretty",
   } satisfies CSSProperties,
-  scopeBlock: { display: "flex", flexDirection: "column", gap: 4 } satisfies CSSProperties,
-  scopeLabel: {
+  scopeGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+    gap: 18,
+  } satisfies CSSProperties,
+  scopeBlock: { minWidth: 0 } satisfies CSSProperties,
+  scopeLabel: (inScope: boolean): CSSProperties => ({
+    display: "flex",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 7,
     fontSize: 11,
     fontWeight: 700,
-    letterSpacing: "0.05em",
+    letterSpacing: "0.04em",
     textTransform: "uppercase",
-    color: "var(--text-muted)",
-  } satisfies CSSProperties,
+    color: inScope ? "var(--ok)" : "var(--text-muted)",
+  }),
   scopeList: {
     margin: 0,
-    paddingLeft: 18,
-    fontSize: 13,
-    color: "var(--text-secondary)",
-    lineHeight: 1.6,
+    padding: 0,
+    listStyle: "none",
+    display: "flex",
+    flexDirection: "column",
+    gap: 5,
   } satisfies CSSProperties,
+  scopeItem: (inScope: boolean): CSSProperties => ({
+    display: "flex",
+    gap: 7,
+    fontSize: 12.5,
+    lineHeight: 1.45,
+    color: inScope ? "var(--text-secondary)" : "var(--text-muted)",
+  }),
+  scopeDot: (inScope: boolean): CSSProperties => ({
+    marginTop: 1,
+    color: inScope ? "var(--ok)" : "var(--text-muted)",
+  }),
   sourcesBlock: {
     display: "flex",
     flexDirection: "column",
     gap: 6,
-    paddingTop: 8,
+    paddingTop: 14,
     borderTop: "1px solid var(--border)",
+  } satisfies CSSProperties,
+  sourcesLabel: {
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    color: "var(--text-muted)",
   } satisfies CSSProperties,
   sourceList: {
     listStyle: "none",
@@ -94,7 +126,7 @@ export const s = {
     display: "flex",
     alignItems: "center",
     gap: 10,
-    paddingTop: 8,
+    paddingTop: 14,
     borderTop: "1px solid var(--border)",
     fontSize: 12,
     color: "var(--text-muted)",

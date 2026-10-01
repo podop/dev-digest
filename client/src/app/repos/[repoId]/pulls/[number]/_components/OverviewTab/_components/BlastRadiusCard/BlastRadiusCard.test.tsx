@@ -46,7 +46,7 @@ describe("BlastRadiusCard", () => {
 
     const card = await screen.findByRole("region", { name: "Blast radius" });
     const stats = within(card).getAllByRole("listitem").slice(0, 4).map((li) => li.textContent);
-    expect(stats).toEqual(["3symbols", "2callers", "2endpoints", "1cron/jobs"]);
+    expect(stats).toEqual(["3symbols", "2callers", "2endpoints", "1cron"]);
 
     expect(within(card).getByRole("button", { name: /rateLimit\(\)/ })).toHaveAttribute("aria-expanded", "true");
     expect(within(card).getByRole("link", { name: "src/router.ts:23" })).toHaveAttribute(
@@ -62,8 +62,8 @@ describe("BlastRadiusCard", () => {
     mockFetch({ "GET /pulls/pr-1/blast": BLAST });
     const { user } = renderCard();
 
-    const tree = await screen.findByRole("button", { name: "tree" });
-    const graph = screen.getByRole("button", { name: "graph" });
+    const tree = await screen.findByRole("button", { name: "Tree" });
+    const graph = screen.getByRole("button", { name: "Graph" });
     expect(tree).toHaveAttribute("aria-pressed", "true");
     expect(graph).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: /rateLimit\(\)/ })).toBeInTheDocument();
