@@ -10,6 +10,8 @@ export interface RequestContext {
  * Resolve the tenancy context for a request via the AuthProvider. In MVP
  * (LocalNoAuthProvider) this always returns the default workspace + system user.
  * Every module uses this so workspace scoping is never forgotten.
+ *
+ * The result is frozen: route handlers must not mutate the tenancy context.
  */
 export async function getContext(
   container: Container,
@@ -19,5 +21,5 @@ export async function getContext(
     container.auth.currentUser(req),
     container.auth.currentWorkspace(req),
   ]);
-  return { workspaceId: workspace.id, userId: user.id };
+  return Object.freeze({ workspaceId: workspace.id, userId: user.id });
 }
