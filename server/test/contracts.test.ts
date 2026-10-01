@@ -16,8 +16,17 @@ import {
   RunTrace,
   RunStats,
   ContextList,
+  ContextDoc,
   ContextDocPreview,
   ContextAttachments,
+  ContextFileCreateInput,
+  ContextFileSaveInput,
+  ContextFileRenameInput,
+  ProjectContextTraceDoc,
+  PROJECT_CONTEXT_STORE_ROOT,
+  PROJECT_CONTEXT_STORE_MAX_FILES,
+  PROJECT_CONTEXT_STORE_MAX_DEPTH,
+  PROJECT_CONTEXT_STORE_SEGMENT_RE,
   Settings,
   Repo,
   PrDetail,
@@ -247,6 +256,8 @@ describe('AI contracts parse fixtures', () => {
       tokens: 10,
       updated_at: '2026-10-01T00:00:00.000Z',
       used_by: 2,
+      source: 'repo',
+      editable: false,
     };
     const list = ContextList.parse({ clone_status: 'ready', globs: ['**/docs/**/*.md'], docs: [doc], tokens_total: 10 });
     expect(list.truncated).toBeUndefined();
@@ -258,6 +269,44 @@ describe('AI contracts parse fixtures', () => {
     });
     expect(preview.used_by_agents).toHaveLength(2);
     expect(ContextAttachments.parse({ repo_id: 'r1', paths: ['docs/b.md', 'docs/a.md'] }).paths[0]).toBe('docs/b.md');
+  });
+
+  it('Project Context store docs carry source/editable/version; old trace docs still parse', () => {
+    const storeDoc = {
+      path: '.devdigest/specs/a.md',
+      name: 'a.md',
+      doc_type: 'specs',
+      size_bytes: 10,
+      tokens: 3,
+      updated_at: '2026-10-01T00:00:00.000Z',
+      used_by: 0,
+      source: 'store',
+      editable: true,
+      version: 1,
+    };
+    expect(ContextDoc.parse(storeDoc).version).toBe(1);
+    expect(ContextDoc.parse({ ...storeDoc, source: 'repo', editable: false, version: undefined }).version).toBeUndefined();
+    expect(() => ContextDoc.parse({ ...storeDoc, source: 'cloud' })).toThrow();
+    expect(() => ContextDoc.parse({ ...storeDoc, source: undefined })).toThrow();
+    const preview = ContextDocPreview.parse({ ...storeDoc, content: '# a', used_by_agents: [] });
+    expect(preview.source).toBe('store');
+    expect(preview.editable).toBe(true);
+
+    const traceDoc = { path: 'docs/a.md', doc_type: 'docs', origin: { kind: 'agent' }, tokens: 4, status: 'included' };
+    expect(ProjectContextTraceDoc.parse(traceDoc).source).toBeUndefined(); // older trace = repo
+    expect(ProjectContextTraceDoc.parse({ ...traceDoc, source: 'store' }).source).toBe('store');
+
+    expect(ContextFileCreateInput.parse({}).on_conflict).toBeUndefined();
+    expect(ContextFileCreateInput.parse({ path: 'x', content: 'y', on_conflict: 'suffix' }).on_conflict).toBe('suffix');
+    expect(() => ContextFileCreateInput.parse({ on_conflict: 'overwrite' })).toThrow();
+    expect(ContextFileSaveInput.parse({ content: '', base_version: 1 }).base_version).toBe(1);
+    expect(() => ContextFileSaveInput.parse({ content: 'x' })).toThrow();
+    expect(ContextFileRenameInput.parse({ path: 'a', new_path: 'b', base_version: 2 }).new_path).toBe('b');
+    expect(PROJECT_CONTEXT_STORE_ROOT).toBe('.devdigest/specs/');
+    expect(PROJECT_CONTEXT_STORE_MAX_FILES).toBe(500);
+    expect(PROJECT_CONTEXT_STORE_MAX_DEPTH).toBe(5);
+    expect(PROJECT_CONTEXT_STORE_SEGMENT_RE.test('a-b_c.1')).toBe(true);
+    expect(PROJECT_CONTEXT_STORE_SEGMENT_RE.test('a b')).toBe(false);
   });
 
   it('RunTrace stats carry cost_usd (number or null)', () => {

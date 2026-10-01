@@ -22,3 +22,12 @@ export const PROJECT_CONTEXT_MAX_DOCS = 500;
 export const PROJECT_CONTEXT_MAX_PATHS = 50;
 /** Longest accepted repo-relative path. */
 export const PROJECT_CONTEXT_PATH_MAX = 512;
+
+/** Folder of the DevDigest-owned store files (DB rows, not clone files). */
+export const PROJECT_CONTEXT_STORE_ROOT = '.devdigest/specs/';
+/** Store files per repo. */
+export const PROJECT_CONTEXT_STORE_MAX_FILES = 500;
+/** Folder levels allowed below the store root. */
+export const PROJECT_CONTEXT_STORE_MAX_DEPTH = 5;
+/** One path segment of a store path: letters, digits, `.`, `_`, `-` (`.` / `..` are rejected separately). */
+export const PROJECT_CONTEXT_STORE_SEGMENT_RE = /^[A-Za-z0-9._-]+$/;

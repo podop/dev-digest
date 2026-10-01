@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { type ShellContext } from "@devdigest/ui";
 import { useTheme } from "@/lib/theme";
 import { useActiveRepo } from "@/lib/repo-context";
+import { useConfirmLeave } from "@/lib/leave-guard";
 import { usePulls, useDeleteRepo } from "@/lib/hooks";
 import { activeKeyFor, toShellRepo } from "../helpers";
 
@@ -27,16 +28,20 @@ export function useShellContext({ onOpenCommandPalette }: ShellContextOptions): 
   const { repoId, repos, activeRepo, setRepoId } = useActiveRepo();
   const { data: pulls } = usePulls(repoId);
   const deleteRepo = useDeleteRepo();
+  const confirmLeave = useConfirmLeave();
 
   const onSelectRepo = React.useCallback(
     (id: string) => {
+      if (!confirmLeave()) return;
       setRepoId(id);
       router.push(`/repos/${id}/pulls`);
     },
-    [setRepoId, router],
+    [setRepoId, router, confirmLeave],
   );
 
-  const onAddRepo = React.useCallback(() => router.push("/onboarding"), [router]);
+  const onAddRepo = React.useCallback(() => {
+    if (confirmLeave()) router.push("/onboarding");
+  }, [router, confirmLeave]);
 
   const onRemoveRepo = React.useCallback(
     (id: string) => {

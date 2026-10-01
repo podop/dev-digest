@@ -12,6 +12,7 @@ export const s = {
     flexWrap: "wrap",
   } satisfies CSSProperties,
   title: { fontSize: 15, fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } satisfies CSSProperties,
+  dot: { width: 8, height: 8, borderRadius: "50%", background: "var(--warn)", flexShrink: 0 } satisfies CSSProperties,
   meta: { marginLeft: "auto", display: "flex", alignItems: "center", gap: 14, fontSize: 13, color: "var(--text-muted)" } satisfies CSSProperties,
   usedBy: { display: "inline-flex", alignItems: "center", gap: 6 } satisfies CSSProperties,
   body: { padding: "24px 28px 48px", maxWidth: 860, fontSize: 14 } satisfies CSSProperties,

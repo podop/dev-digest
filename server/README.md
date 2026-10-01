@@ -191,20 +191,28 @@ Read-only: one `repo-intel` facade `getBlastRadius` call per request, no re-pars
 
 | Method | Path | Result |
 |---|---|---|
-| GET | `/repos/:id/context` | `ContextList` = `.md` files of the clone matching the globs (`docs[]` with type, size, tokens, `used_by`), `tokens_total`, `clone_status` (`not_cloned` without a clone), `truncated` when cut at 500 |
-| GET | `/repos/:id/context/doc?path=` | `ContextDocPreview` = content + `used_by_agents` (`via` direct / skill); 400 `invalid_path`, 404 `repo_not_found` / `doc_not_found`, 413 `doc_too_large` (> 256 KB) |
+| GET | `/repos/:id/context` | `ContextList` = store files first (`source: 'store'`, `editable`, `version`; listed even when `not_cloned`), then the `.md` files of the clone matching the globs (`source: 'repo'`; `docs[]` with type, size, tokens, `used_by`), `tokens_total`, `clone_status` (`not_cloned` without a clone), `truncated` when the clone list is cut at 500 |
+| GET | `/repos/:id/context/doc?path=` | `ContextDocPreview` = content + `used_by_agents` (`via` direct / skill), `source` / `editable` / `version`; a store file is served before the clone; 400 `invalid_path`, 404 `repo_not_found` / `doc_not_found`, 413 `doc_too_large` (> 256 KB) |
+| POST | `/repos/:id/context/files` | create a store file (`{ path?, content?, on_conflict?: 'fail' \| 'suffix' }`, body optional; no path → `.devdigest/specs/untitled.md` with suffix) → 201 `ContextDocPreview`; 404 `repo_not_found`, 409 `path_exists` (store or clone), 413 `doc_too_large`, 422 `invalid_path` / `invalid_content` (NUL) / `too_many_files` (500). `bodyLimit` 2 MiB |
+| PUT | `/repos/:id/context/files?path=` | `{ content, base_version }` → 200 at the new version; 403 `read_only` (a clone file), 404 `doc_not_found`, 409 `stale_version` (`details.current_version`), 413 |
+| POST | `/repos/:id/context/files/rename` | `{ path, new_path, base_version }` → 200 at the new path; attachments of this repo (agents and skills) move with it, keeping their position, in one transaction; 403 / 404 / 409 `path_exists` · `stale_version` / 422 `invalid_path` |
+| DELETE | `/repos/:id/context/files?path=` | 204; attachments stay (the document is `missing` for runs); 403 `read_only`, 404 |
 | GET / PUT | `/agents/:id/context` (`?repoId=` on GET) | ordered attached paths of an agent in one repo; PUT replaces the whole list in one transaction |
 | GET / PUT | `/skills/:id/context` | same for a skill |
 
-Documents are derived from the clone on each call, never stored; only paths are (`agent_context_docs`,
-`skill_context_docs`, per repo, ordered). Attaching never bumps an agent/skill version. PUT errors: 404
+Repo documents are derived from the clone on each call, never stored; attachments store only paths
+(`agent_context_docs`, `skill_context_docs`, per repo, ordered). Store files live in `context_files` (unique
+`(repo_id, path)`, `version` +1 per save or rename; `ContextFilesService`): paths are `.devdigest/specs/**.md`
+(`checkStorePath`), never touch the file system, and a path the clone already holds stays a read-only repo
+document. Every write logs one content-free line through `req.log`. Attaching never bumps an agent/skill version. PUT errors: 404
 `agent_not_found` / `skill_not_found` / `repo_not_found` (workspace checks first), 422 `invalid_path` /
 `duplicate_path` / `too_many_paths` (> 50). Symlinks are never listed or read, `node_modules`, `.git`, `dist`,
 `build`, `coverage`, `.next`, `out`, `vendor` are never entered. `used_by` counts distinct agents that attach a
 path directly or link a skill that does (enabled or not). No LLM call.
 
 **In a run** (`ProjectContextService.resolveForRun`, reached from `reviews` only through a port): the agent's
-documents, then each enabled skill's (a path already listed is not repeated), are read with
+documents, then each enabled skill's (a path already listed is not repeated); a store file is read from the
+database (latest save, trace `source: 'store'`, even with no base commit), everything else with
 `GitClient.readFileAt` at `GitClient.resolveBaseCommit(repo, pr.base, pr.headSha)` — the merge-base, else the tip
 of the base branch; never the clone's working tree, never a fetch. Each document gets a status in
 `RunTrace.project_context` (`included` / `missing` / `too_large` > 256 KB / `unreadable` / `over_budget`; text only

@@ -4,11 +4,17 @@
  * owns the two attachment tables. Attachments are never part of agent/skill
  * version snapshots, so nothing here touches `agents.version`.
  */
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { DbOrTx } from '../../../db/client.js';
-import { NotFoundError } from '../../../platform/errors.js';
+import { ConflictError, NotFoundError } from '../../../platform/errors.js';
 import * as t from '../../../db/schema.js';
-import type { ContextRepoRef, ContextStore, UsageRow } from '../application/ports.js';
+import type {
+  ContextFileInfo,
+  ContextFileRow,
+  ContextRepoRef,
+  ContextStore,
+  UsageRow,
+} from '../application/ports.js';
 
 /** pg SQLSTATE of a driver error (Drizzle wraps it: the code is on `cause`). */
 function sqlState(err: unknown): string | undefined {
@@ -25,6 +31,17 @@ async function insertOrNotFound(insert: Promise<unknown>, code: 'agent_not_found
     throw err;
   }
 }
+
+const FILE_COLS = {
+  path: t.contextFiles.path,
+  content: t.contextFiles.content,
+  sizeBytes: t.contextFiles.sizeBytes,
+  version: t.contextFiles.version,
+  updatedAt: t.contextFiles.updatedAt,
+};
+
+/** A taken (repo, path) is a 409, not a 500 (a concurrent writer got there first). */
+const pathExists = () => new ConflictError('A file already exists at this path', undefined, 'path_exists');
 
 export class ProjectContextRepository implements ContextStore {
   constructor(private readonly db: DbOrTx) {}
@@ -125,5 +142,141 @@ export class ProjectContextRepository implements ContextStore {
       this.db.insert(t.skillContextDocs).values(paths.map((path, position) => ({ skillId, repoId, path, position }))),
       'skill_not_found',
     );
+  }
+
+  async listFiles(repoId: string): Promise<ContextFileInfo[]> {
+    return this.db
+      .select({
+        path: t.contextFiles.path,
+        sizeBytes: t.contextFiles.sizeBytes,
+        chars: sql<number>`length(${t.contextFiles.content})`.mapWith(Number),
+        version: t.contextFiles.version,
+        updatedAt: t.contextFiles.updatedAt,
+      })
+      .from(t.contextFiles)
+      .where(eq(t.contextFiles.repoId, repoId))
+      .orderBy(sql`${t.contextFiles.path} COLLATE "C"`);
+  }
+
+  async findFile(repoId: string, path: string): Promise<ContextFileRow | null> {
+    const [row] = await this.db
+      .select(FILE_COLS)
+      .from(t.contextFiles)
+      .where(and(eq(t.contextFiles.repoId, repoId), eq(t.contextFiles.path, path)));
+    return row ?? null;
+  }
+
+  async findFiles(repoId: string, paths: readonly string[]): Promise<ContextFileRow[]> {
+    if (paths.length === 0) return [];
+    return this.db
+      .select(FILE_COLS)
+      .from(t.contextFiles)
+      .where(and(eq(t.contextFiles.repoId, repoId), inArray(t.contextFiles.path, [...paths])));
+  }
+
+  async lockRepo(workspaceId: string, repoId: string): Promise<ContextRepoRef | null> {
+    const [row] = await this.db
+      .select({ id: t.repos.id, owner: t.repos.owner, name: t.repos.name, clonePath: t.repos.clonePath })
+      .from(t.repos)
+      .where(and(eq(t.repos.workspaceId, workspaceId), eq(t.repos.id, repoId)))
+      .for('update');
+    return row ?? null;
+  }
+
+  async insertFile(repoId: string, path: string, content: string, sizeBytes: number): Promise<ContextFileRow> {
+    try {
+      const [row] = await this.db
+        .insert(t.contextFiles)
+        .values({ repoId, path, content, sizeBytes })
+        .returning(FILE_COLS);
+      return row!;
+    } catch (err) {
+      if (sqlState(err) === '23505') throw pathExists();
+      if (sqlState(err) === '23503') throw new NotFoundError('Repository not found', undefined, 'repo_not_found');
+      throw err;
+    }
+  }
+
+  async saveFile(
+    repoId: string,
+    path: string,
+    content: string,
+    sizeBytes: number,
+    baseVersion: number,
+  ): Promise<ContextFileRow | null> {
+    const [row] = await this.db
+      .update(t.contextFiles)
+      .set({ content, sizeBytes, version: sql`${t.contextFiles.version} + 1`, updatedAt: sql`now()` })
+      .where(
+        and(
+          eq(t.contextFiles.repoId, repoId),
+          eq(t.contextFiles.path, path),
+          eq(t.contextFiles.version, baseVersion),
+        ),
+      )
+      .returning(FILE_COLS);
+    return row ?? null;
+  }
+
+  async renameFile(
+    repoId: string,
+    path: string,
+    newPath: string,
+    baseVersion: number,
+  ): Promise<ContextFileRow | null> {
+    try {
+      const [row] = await this.db
+        .update(t.contextFiles)
+        .set({ path: newPath, version: sql`${t.contextFiles.version} + 1`, updatedAt: sql`now()` })
+        .where(
+          and(
+            eq(t.contextFiles.repoId, repoId),
+            eq(t.contextFiles.path, path),
+            eq(t.contextFiles.version, baseVersion),
+          ),
+        )
+        .returning(FILE_COLS);
+      return row ?? null;
+    } catch (err) {
+      if (sqlState(err) === '23505') throw pathExists();
+      throw err;
+    }
+  }
+
+  /**
+   * An owner that already has `to` attached keeps one row: the old `to` row is
+   * dropped and the moved row keeps its own position. Run in the rename's transaction.
+   */
+  async moveAttachments(repoId: string, from: string, to: string): Promise<void> {
+    const a = t.agentContextDocs;
+    await this.db
+      .delete(a)
+      .where(
+        and(
+          eq(a.repoId, repoId),
+          eq(a.path, to),
+          inArray(a.agentId, this.db.select({ id: a.agentId }).from(a).where(and(eq(a.repoId, repoId), eq(a.path, from)))),
+        ),
+      );
+    await this.db.update(a).set({ path: to }).where(and(eq(a.repoId, repoId), eq(a.path, from)));
+    const s = t.skillContextDocs;
+    await this.db
+      .delete(s)
+      .where(
+        and(
+          eq(s.repoId, repoId),
+          eq(s.path, to),
+          inArray(s.skillId, this.db.select({ id: s.skillId }).from(s).where(and(eq(s.repoId, repoId), eq(s.path, from)))),
+        ),
+      );
+    await this.db.update(s).set({ path: to }).where(and(eq(s.repoId, repoId), eq(s.path, from)));
+  }
+
+  async deleteFile(repoId: string, path: string): Promise<boolean> {
+    const rows = await this.db
+      .delete(t.contextFiles)
+      .where(and(eq(t.contextFiles.repoId, repoId), eq(t.contextFiles.path, path)))
+      .returning({ id: t.contextFiles.id });
+    return rows.length > 0;
   }
 }

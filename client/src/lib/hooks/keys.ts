@@ -63,7 +63,9 @@ export const agentKeys = {
   /** The ordered skill links of one agent (GET /agents/:id/skills). */
   skills: (id: Id) => [...agentKeys.skillsAll(), id] as const,
   /** The ordered Project Context paths of one agent in one repo (GET /agents/:id/context). */
-  context: (id: Id, repoId: Id) => [...agentKeys.all, "context", id, repoId] as const,
+  context: (id: Id, repoId: Id) => [...agentKeys.contextAll(), id, repoId] as const,
+  /** Prefix of every agent's Project Context paths (a store-file rename rewrites them all). */
+  contextAll: () => [...agentKeys.all, "context"] as const,
 };
 
 /** Filters of the community catalog search (GET /skills/community). */
@@ -86,7 +88,9 @@ export const skillKeys = {
   agentsAll: () => [...skillKeys.all, "agents"] as const,
   agents: (id: Id) => [...skillKeys.agentsAll(), id] as const,
   /** The ordered Project Context paths of one skill in one repo (GET /skills/:id/context). */
-  context: (id: Id, repoId: Id) => [...skillKeys.all, "context", id, repoId] as const,
+  context: (id: Id, repoId: Id) => [...skillKeys.contextAll(), id, repoId] as const,
+  /** Prefix of every skill's Project Context paths (a store-file rename rewrites them all). */
+  contextAll: () => [...skillKeys.all, "context"] as const,
   community: (f: CommunitySkillFilters) =>
     [...skillKeys.all, "community", f.q ?? "", f.tag ?? "", f.lang ?? ""] as const,
 };

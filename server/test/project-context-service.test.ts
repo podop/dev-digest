@@ -24,6 +24,17 @@ function fakeStore(opts: { agent?: boolean; skill?: boolean; repo?: boolean; usa
     getSkillPaths: vi.fn(async () => ['specs/a.md']),
     replaceAgentPaths: vi.fn(async () => undefined),
     replaceSkillPaths: vi.fn(async () => undefined),
+    listFiles: vi.fn(async () => []),
+    findFile: vi.fn(async () => null),
+    findFiles: vi.fn(async () => []),
+    lockRepo: vi.fn(async () => null),
+    insertFile: vi.fn(async () => {
+      throw new Error('not used');
+    }),
+    saveFile: vi.fn(async () => null),
+    renameFile: vi.fn(async () => null),
+    moveAttachments: vi.fn(async () => undefined),
+    deleteFile: vi.fn(async () => false),
   } satisfies ContextStore;
   return store;
 }

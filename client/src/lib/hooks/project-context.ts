@@ -1,12 +1,22 @@
 /* hooks/project-context.ts — React Query hooks for Project Context
    (specs/2026-10-01-project-context.md §7): the repo's document list + preview,
    and the per-repo ordered attachments of an agent or a skill. Saves are
-   optimistic, roll back on error and run one at a time per owner × repo (EC8). */
+   optimistic, roll back on error and run one at a time per owner × repo (EC8).
+   Store-file mutations (create/save/rename/delete) live at the end of the file. */
 "use client";
 
 import { useMutation, useQueries, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
-import type { ContextAttachments, ContextAttachmentsInput, ContextDocPreview, ContextList } from "@devdigest/shared";
+import type {
+  ContextAttachments,
+  ContextAttachmentsInput,
+  ContextDocPreview,
+  ContextFileCreateInput,
+  ContextFileRenameInput,
+  ContextFileSaveInput,
+  ContextList,
+} from "@devdigest/shared";
 import { api } from "../api";
+import { STALE_VERSION_CODE } from "./skills";
 import { agentKeys, repoKeys, skillKeys } from "./keys";
 
 const enc = encodeURIComponent;
@@ -123,5 +133,80 @@ export function useSetSkillContext(skillId: string, repoId: string) {
     key: skillKeys.context(skillId, repoId),
     repoId,
     scopeId: `context:skill:${skillId}:${repoId}`,
+  });
+}
+
+/** ApiError codes of the store-file writes that the editor / row shows inline, not as a toast. */
+const DOC_NOT_FOUND_CODE = "doc_not_found";
+const PATH_QUIET_CODES = ["path_exists", "invalid_path", STALE_VERSION_CODE, DOC_NOT_FOUND_CODE] as const;
+
+/** Everything a store-file write can change: the list + previews, and the attachments
+ *  of every agent and skill (a rename rewrites their paths; a delete turns rows `missing`). */
+function useInvalidateStoreFiles(repoId: string) {
+  const qc = useQueryClient();
+  return () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: repoKeys.context(repoId) }),
+      qc.invalidateQueries({ queryKey: agentKeys.contextAll() }),
+      qc.invalidateQueries({ queryKey: skillKeys.contextAll() }),
+    ]);
+}
+
+const filesUrl = (repoId: string) => `/repos/${enc(repoId)}/context/files`;
+
+/** POST /repos/:id/context/files — no `path` creates `.devdigest/specs/untitled*.md`. */
+export function useCreateContextFile(repoId: string) {
+  const qc = useQueryClient();
+  const invalidate = useInvalidateStoreFiles(repoId);
+  return useMutation({
+    mutationFn: (input: ContextFileCreateInput) => api.post<ContextDocPreview>(filesUrl(repoId), input),
+    // path_exists (a re-create with on_conflict "fail") is shown by the editor.
+    meta: { quietErrorCodes: ["path_exists"] },
+    onSuccess: (doc) => {
+      qc.setQueryData(repoKeys.contextDoc(repoId, doc.path), doc);
+      return invalidate();
+    },
+  });
+}
+
+export interface SaveContextFileVars extends ContextFileSaveInput {
+  path: string;
+}
+
+/** PUT /repos/:id/context/files?path= — stale_version / doc_not_found are shown by the editor. */
+export function useSaveContextFile(repoId: string) {
+  const qc = useQueryClient();
+  const invalidate = useInvalidateStoreFiles(repoId);
+  return useMutation({
+    mutationFn: ({ path, ...body }: SaveContextFileVars) =>
+      api.put<ContextDocPreview>(`${filesUrl(repoId)}?path=${enc(path)}`, body),
+    meta: { quietErrorCodes: [STALE_VERSION_CODE, DOC_NOT_FOUND_CODE] },
+    onSuccess: (doc, { path }) => {
+      qc.setQueryData(repoKeys.contextDoc(repoId, path), doc);
+      return invalidate();
+    },
+  });
+}
+
+/** POST /repos/:id/context/files/rename — the row / editor shows path and version errors inline. */
+export function useRenameContextFile(repoId: string) {
+  const invalidate = useInvalidateStoreFiles(repoId);
+  return useMutation({
+    mutationFn: (input: ContextFileRenameInput) => api.post<ContextDocPreview>(`${filesUrl(repoId)}/rename`, input),
+    meta: { quietErrorCodes: PATH_QUIET_CODES },
+    onSuccess: invalidate,
+  });
+}
+
+/** DELETE /repos/:id/context/files?path= — 204. */
+export function useDeleteContextFile(repoId: string) {
+  const qc = useQueryClient();
+  const invalidate = useInvalidateStoreFiles(repoId);
+  return useMutation({
+    mutationFn: (path: string) => api.del<void>(`${filesUrl(repoId)}?path=${enc(path)}`),
+    onSuccess: (_void, path) => {
+      qc.removeQueries({ queryKey: repoKeys.contextDoc(repoId, path) });
+      return invalidate();
+    },
   });
 }

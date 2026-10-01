@@ -1,5 +1,15 @@
 import { sql } from 'drizzle-orm';
-import { pgTable, uuid, text, integer, primaryKey, index, check } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  uuid,
+  text,
+  integer,
+  timestamp,
+  primaryKey,
+  index,
+  check,
+  unique,
+} from 'drizzle-orm/pg-core';
 import { now } from './_shared';
 import { repos } from './repos';
 import { agents } from './agents';
@@ -49,5 +59,29 @@ export const skillContextDocs = pgTable(
     primaryKey({ columns: [t.skillId, t.repoId, t.path] }),
     index('skill_context_docs_repo_idx').on(t.repoId),
     check('skill_context_docs_path_len_chk', sql`length(${t.path}) BETWEEN 1 AND 512`),
+  ],
+);
+
+// DevDigest-owned markdown files under `.devdigest/specs/`, per repo. The text
+// lives here (never in the clone). `version` starts at 1 and is bumped on every
+// content save or rename; deleted with the repo. Attachments reference `path`.
+export const contextFiles = pgTable(
+  'context_files',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    repoId: uuid('repo_id')
+      .notNull()
+      .references(() => repos.id, { onDelete: 'cascade' }),
+    path: text('path').notNull(),
+    content: text('content').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    version: integer('version').notNull().default(1),
+    createdAt: now(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    // The unique constraint's index leads with repo_id, so it also serves the repo FK.
+    unique('context_files_repo_path_uq').on(t.repoId, t.path),
+    check('context_files_path_len_chk', sql`length(${t.path}) BETWEEN 1 AND 512`),
   ],
 );

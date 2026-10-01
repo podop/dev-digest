@@ -1,4 +1,5 @@
 import type { Container } from '../../platform/container.js';
+import { ContextFilesService } from './application/context-files-service.js';
 import { ProjectContextService } from './application/project-context-service.js';
 import { FsCloneDocs } from './infrastructure/clone-docs.js';
 import { ProjectContextRepository } from './infrastructure/repository.js';
@@ -11,10 +12,13 @@ import { ProjectContextRepository } from './infrastructure/repository.js';
  * (`PROJECT_CONTEXT_GLOBS`).
  */
 export function buildProjectContextModule(c: Container) {
+  const store = new ProjectContextRepository(c.db);
+  const tx = c.transactionRunner((db) => ({ store: new ProjectContextRepository(db) }));
+  const docs = new FsCloneDocs();
   const service = new ProjectContextService({
-    store: new ProjectContextRepository(c.db),
-    tx: c.transactionRunner((db) => ({ store: new ProjectContextRepository(db) })),
-    docs: new FsCloneDocs(),
+    store,
+    tx,
+    docs,
     // Resolved per call so test overrides of `c.git` keep working.
     git: {
       resolveBaseCommit: (repo, baseRef, head) => c.git.resolveBaseCommit(repo, baseRef, head),
@@ -22,5 +26,7 @@ export function buildProjectContextModule(c: Container) {
     },
     globs: c.config.projectContextGlobs,
   });
-  return { service };
+  // Write side of the DB-stored `.devdigest/specs/` files; reads the clone only for collision checks.
+  const files = new ContextFilesService({ store, tx, docs, globs: c.config.projectContextGlobs });
+  return { service, files };
 }

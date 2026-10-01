@@ -246,6 +246,7 @@ d('project context in review runs (Testcontainers pg)', () => {
       ['docs/shared.md', 'included'],
       ['specs/skill.md', 'included'],
     ]);
+    expect(pc.docs.map((x: { source: string }) => x.source)).toEqual(['repo', 'repo', 'repo', 'repo', 'repo', 'repo']);
     expect(pc.docs[0]).toMatchObject({ doc_type: 'docs', origin: { kind: 'agent' } });
     expect(pc.docs[0].text).toContain('must not import');
     expect(pc.docs[4].origin).toEqual({ kind: 'agent' });
@@ -328,7 +329,7 @@ d('project context in review runs (Testcontainers pg)', () => {
     // Nothing is read from anywhere else (e.g. the working tree) as a fallback.
     expect(git.reads).toEqual([]);
     expect(trace.project_context.docs).toEqual([
-      { path: 'docs/a.md', doc_type: 'docs', origin: { kind: 'agent' }, tokens: 0, status: 'unreadable' },
+      { path: 'docs/a.md', doc_type: 'docs', origin: { kind: 'agent' }, source: 'repo', tokens: 0, status: 'unreadable' },
     ]);
     expect(llm.calls[0]![1]!.content).not.toContain('## Project context');
     const [row] = await pg.handle.db.select().from(t.agentRuns).where(eq(t.agentRuns.id, runId));
@@ -348,14 +349,103 @@ d('project context in review runs (Testcontainers pg)', () => {
 
     expect(git.reads).toEqual([]);
     expect(trace.project_context.docs).toEqual([
-      { path: 'docs/a.md', doc_type: 'docs', origin: { kind: 'agent' }, tokens: 0, status: 'missing' },
-      { path: 'specs/b.md', doc_type: 'specs', origin: { kind: 'agent' }, tokens: 0, status: 'missing' },
+      { path: 'docs/a.md', doc_type: 'docs', origin: { kind: 'agent' }, source: 'repo', tokens: 0, status: 'missing' },
+      { path: 'specs/b.md', doc_type: 'specs', origin: { kind: 'agent' }, source: 'repo', tokens: 0, status: 'missing' },
     ]);
     expect(trace.specs_read).toEqual([]);
     expect(logMsgs(trace)).toContain('project context: 0 included, 2 skipped · ~0 tokens');
     expect(llm.calls[0]![1]!.content).not.toContain('## Project context');
     const [row] = await pg.handle.db.select().from(t.agentRuns).where(eq(t.agentRuns.id, runId));
     expect(row?.status).toBe('done');
+    await app.close();
+  });
+
+  /** Create a store file through the API (the latest-save text a run must read). */
+  async function storeFile(app: App, repoId: string, path: string, content: string) {
+    const res = await app.inject({ method: 'POST', url: `/repos/${repoId}/context/files`, payload: { path, content } });
+    expect(res.statusCode, res.body).toBe(201);
+    return res.json() as { version: number };
+  }
+
+  it('AC6 (EC10): a store file is read from the database at its latest save, a repo doc still from the base commit', async () => {
+    const git = new ContextGit({ files: { 'docs/repo.md': 'Repo rule.' } });
+    const llm = new RecordingLLM();
+    const app = await appWith(llm, git);
+    const pr = await setupPr();
+    const ag = await agent(app);
+    const path = '.devdigest/specs/security-rules.md';
+    await storeFile(app, pr.repoId, path, 'Old rule.');
+    await attach(app, 'agents', ag.id, pr.repoId, [path, 'docs/repo.md']);
+
+    const first = await run(app, pr.id, ag.id);
+    expect(llm.calls[0]![1]!.content).toContain('Old rule.');
+    expect(first.trace.project_context.docs[0]).toMatchObject({ path, status: 'included', source: 'store', text: 'Old rule.' });
+
+    // Saved after the PR was opened and after the first run: the next run sends the new text.
+    const saved = await app.inject({
+      method: 'PUT',
+      url: `/repos/${pr.repoId}/context/files?path=${encodeURIComponent(path)}`,
+      payload: { content: 'Never log request bodies.', base_version: 1 },
+    });
+    expect(saved.statusCode, saved.body).toBe(200);
+    const second = await run(app, pr.id, ag.id);
+    const user = llm.calls[1]![1]!.content;
+    expect(user).toContain('Never log request bodies.');
+    expect(user).not.toContain('Old rule.');
+    expect(user).toContain('Repo rule.');
+    expect(second.trace.project_context.docs.map((x: { path: string; status: string; source: string }) => [x.path, x.status, x.source])).toEqual([
+      [path, 'included', 'store'],
+      ['docs/repo.md', 'included', 'repo'],
+    ]);
+    // The first trace keeps the text it actually sent (EC10); git never served the store file.
+    expect(first.trace.project_context.docs[0].text).toBe('Old rule.');
+    expect(new Set(git.reads.map((r) => r.path))).toEqual(new Set(['docs/repo.md']));
+    expect(second.trace.specs_read).toEqual([path, 'docs/repo.md']);
+    await app.close();
+  });
+
+  it('AC6: a store file is included even when the base commit cannot be resolved', async () => {
+    const git = new ContextGit({ files: {}, base: null });
+    const llm = new RecordingLLM();
+    const app = await appWith(llm, git);
+    const pr = await setupPr('/clones/acme/cloned');
+    const ag = await agent(app);
+    const path = '.devdigest/specs/a.md';
+    await storeFile(app, pr.repoId, path, 'Store text.');
+    await attach(app, 'agents', ag.id, pr.repoId, [path, 'docs/r.md']);
+
+    const { trace } = await run(app, pr.id, ag.id);
+
+    expect(trace.project_context.docs.map((x: { status: string; source: string }) => [x.status, x.source])).toEqual([
+      ['included', 'store'],
+      ['unreadable', 'repo'],
+    ]);
+    expect(llm.calls[0]![1]!.content).toContain('Store text.');
+    await app.close();
+  });
+
+  it('AC5: a deleted store file is `missing` in the trace, the attachment stays and the run completes', async () => {
+    const git = new ContextGit({ files: {} });
+    const llm = new RecordingLLM();
+    const app = await appWith(llm, git);
+    const pr = await setupPr();
+    const ag = await agent(app);
+    const path = '.devdigest/specs/a.md';
+    await storeFile(app, pr.repoId, path, 'Soon gone.');
+    await attach(app, 'agents', ag.id, pr.repoId, [path]);
+    const del = await app.inject({ method: 'DELETE', url: `/repos/${pr.repoId}/context/files?path=${encodeURIComponent(path)}` });
+    expect(del.statusCode).toBe(204);
+
+    const { runId, trace } = await run(app, pr.id, ag.id);
+
+    expect(trace.project_context.docs).toEqual([
+      { path, doc_type: 'specs', origin: { kind: 'agent' }, source: 'repo', tokens: 0, status: 'missing' },
+    ]);
+    expect(llm.calls[0]![1]!.content).not.toContain('Soon gone.');
+    const [row] = await pg.handle.db.select().from(t.agentRuns).where(eq(t.agentRuns.id, runId));
+    expect(row?.status).toBe('done');
+    const kept = await app.inject({ method: 'GET', url: `/agents/${ag.id}/context?repoId=${pr.repoId}` });
+    expect(kept.json().paths).toEqual([path]);
     await app.close();
   });
 

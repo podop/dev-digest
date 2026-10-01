@@ -7,6 +7,10 @@ import {
   PROJECT_CONTEXT_MAX_DOC_BYTES,
   PROJECT_CONTEXT_MAX_PATHS,
   PROJECT_CONTEXT_PATH_MAX,
+  PROJECT_CONTEXT_STORE_MAX_DEPTH,
+  PROJECT_CONTEXT_STORE_MAX_FILES,
+  PROJECT_CONTEXT_STORE_ROOT,
+  PROJECT_CONTEXT_STORE_SEGMENT_RE,
 } from '../constants/project-context.js';
 
 /**
@@ -22,12 +26,20 @@ export {
   PROJECT_CONTEXT_MAX_DOC_BYTES,
   PROJECT_CONTEXT_MAX_PATHS,
   PROJECT_CONTEXT_PATH_MAX,
+  PROJECT_CONTEXT_STORE_MAX_DEPTH,
+  PROJECT_CONTEXT_STORE_MAX_FILES,
+  PROJECT_CONTEXT_STORE_ROOT,
+  PROJECT_CONTEXT_STORE_SEGMENT_RE,
 };
 
 export const ContextDocType = z.enum(PROJECT_CONTEXT_DOC_TYPES);
 export type ContextDocType = z.infer<typeof ContextDocType>;
 
-/** One listed document (derived from the clone, never stored). */
+/** Where a document lives: the repo clone (read-only) or the DevDigest store (editable). */
+export const ContextDocSource = z.enum(['repo', 'store']);
+export type ContextDocSource = z.infer<typeof ContextDocSource>;
+
+/** One listed document: a clone file (never stored) or a store file. */
 export const ContextDoc = z.object({
   path: z.string(),
   name: z.string(),
@@ -38,6 +50,11 @@ export const ContextDoc = z.object({
   updated_at: z.string(),
   /** Distinct agents using it in this repo (directly or via a linked skill). */
   used_by: z.number().int(),
+  source: ContextDocSource,
+  /** True only for `store` documents. */
+  editable: z.boolean(),
+  /** Store files only; starts at 1, +1 on every content save or rename. */
+  version: z.number().int().optional(),
 });
 export type ContextDoc = z.infer<typeof ContextDoc>;
 
@@ -70,6 +87,9 @@ export const ContextDocPreview = z.object({
   size_bytes: z.number().int(),
   used_by: z.number().int(),
   used_by_agents: z.array(ContextUsedByAgent),
+  source: ContextDocSource,
+  editable: z.boolean(),
+  version: z.number().int().optional(),
 });
 export type ContextDocPreview = z.infer<typeof ContextDocPreview>;
 
@@ -90,6 +110,34 @@ export const ContextAttachmentsInput = z.object({
   paths: z.array(z.string()),
 });
 export type ContextAttachmentsInput = z.infer<typeof ContextAttachmentsInput>;
+
+/**
+ * Store-file write bodies. Deliberately loose on `path`/`content`: the domain
+ * owns `invalid_path` (422) and `doc_too_large` (413), so a shape error here
+ * must not pre-empt them.
+ */
+/** POST /repos/:id/context/files — no `path` creates `.devdigest/specs/untitled.md` with `suffix`. */
+export const ContextFileCreateInput = z.object({
+  path: z.string().optional(),
+  content: z.string().optional(),
+  on_conflict: z.enum(['fail', 'suffix']).optional(),
+});
+export type ContextFileCreateInput = z.infer<typeof ContextFileCreateInput>;
+
+/** PUT /repos/:id/context/files?path= */
+export const ContextFileSaveInput = z.object({
+  content: z.string(),
+  base_version: z.number().int(),
+});
+export type ContextFileSaveInput = z.infer<typeof ContextFileSaveInput>;
+
+/** POST /repos/:id/context/files/rename */
+export const ContextFileRenameInput = z.object({
+  path: z.string(),
+  new_path: z.string(),
+  base_version: z.number().int(),
+});
+export type ContextFileRenameInput = z.infer<typeof ContextFileRenameInput>;
 
 export const ProjectContextDocStatus = z.enum([
   'included',
@@ -113,6 +161,8 @@ export const ProjectContextTraceDoc = z.object({
   origin: ProjectContextOrigin,
   tokens: z.number().int(),
   status: ProjectContextDocStatus,
+  /** Absent on traces written before store files = `repo`. */
+  source: ContextDocSource.optional(),
   /** The text as sent — only for `included` documents. */
   text: z.string().optional(),
 });
