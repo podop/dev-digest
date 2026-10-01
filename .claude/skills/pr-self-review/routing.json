@@ -56,6 +56,10 @@
     {
       "skills": ["typescript-expert"],
       "include": ["e2e/**/*.ts"]
+    },
+    {
+      "skills": ["typescript-expert", "security"],
+      "include": ["mcp/src/**/*.ts"]
     }
   ],
   "content_rules": [

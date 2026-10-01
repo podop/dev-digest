@@ -47,6 +47,8 @@ export interface IndexState extends IndexResult {
   /** True when the layer is running on the ripgrep fallback. */
   degraded?: boolean;
   degradedReason?: DegradedReason;
+  /** Files dropped by the walk's MAX_INDEXED_FILES bound (`stats.bounded`); > 0 = repo too large. */
+  bounded?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -73,6 +75,7 @@ export interface BlastCallerRow {
 
 export interface BlastResult {
   changedSymbols: BlastChangedSymbol[];
+  /** Rank-desc; at most MAX_CALLERS_PER_SYMBOL per `viaSymbol` (persistent path). */
   callers: BlastCallerRow[];
   /** "METHOD /path" (via extractEndpoints / file_facts) — flat union. */
   impactedEndpoints: string[];

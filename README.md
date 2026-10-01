@@ -15,6 +15,7 @@ aliases, not published modules):
 | `client/`        | `@devdigest/web`            | Next.js 15 web app (the studio)                       | 3000 |
 | `reviewer-core/` | `@devdigest/reviewer-core`  | Pure review engine: diff → prompt → LLM → findings    | —    |
 | `e2e/`           | `@devdigest/e2e`            | Deterministic browser e2e (agent-browser)             | —    |
+| `mcp/`           | `@devdigest/mcp`            | `devdigest-mcp`: stdio MCP server for Claude Code ([README](mcp/README.md)) | stdio |
 | `server/src/vendor/shared` | `@devdigest/shared` | Zod contracts shared across every package             | —    |
 
 `repo-intel` (the codebase indexer that powers the **Indexed** badge and feeds
@@ -130,7 +131,10 @@ cd ../client && pnpm install && pnpm dev               # web on :3000
 
 `server/`: `dev` · `build` · `db:migrate` · `db:seed` · `db:generate` · `test` (`test:unit` · `test:integration`) · `typecheck` · `lint` · `arch:check`
 `client/`: `dev` · `build` · `start` · `test` · `typecheck` · `lint`
-`reviewer-core/` · `e2e/` (npm): `test` · `typecheck` · `lint`
+`reviewer-core/` · `e2e/` · `mcp/` (npm): `test` · `typecheck` · `lint`
+
+MCP server: separate, not started by `./scripts/dev.sh` — see
+[`mcp/README.md`](mcp/README.md) → Run.
 
 Toolchain is pinned: `.nvmrc` (Node 22) and each `package.json`'s `engines` /
 `packageManager`. Lint is [Biome](https://biomejs.dev) (linter only, one root
@@ -148,6 +152,7 @@ path filter — full strategy in **[`TESTING.md`](TESTING.md)**.
 | server integration (real Postgres) | `server-integration.yml` | yes |
 | reviewer-core (engine) | `reviewer-core.yml` | no |
 | e2e web (browser flows) | `e2e-web.yml` | yes |
+| mcp (InMemoryTransport, fake API) | `mcp.yml` | no |
 | shared-contract drift | `shared-drift.yml` | no |
 | web e2e (agent-browser, real stack) | `e2e-web.yml` | yes |
 

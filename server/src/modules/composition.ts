@@ -1,4 +1,5 @@
 import { buildAgentsModule } from './agents/composition.js';
+import { buildBlastModule } from './blast/composition.js';
 import { buildConventionsModule } from './conventions/composition.js';
 import { buildIntentModule } from './intent/composition.js';
 import { buildPollingModule } from './polling/composition.js';
@@ -34,4 +35,5 @@ export const moduleFactories = {
   conventions: buildConventionsModule,
   intent: buildIntentModule,
   smartDiff: buildSmartDiffModule,
+  blast: buildBlastModule,
 };

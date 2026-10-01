@@ -165,8 +165,24 @@ export interface CommitFilesPayload {
   files: CommitFile[];
 }
 
+/** A merged PR with the paths it changed (the first page of its files, de-duplicated). */
+export interface MergedPrSummary {
+  number: number;
+  title: string;
+  author: string;
+  /** ISO timestamp. */
+  merged_at: string;
+  files: string[];
+}
+
 export interface GitHubClient {
   listPullRequests(repo: RepoRef): Promise<PrMeta[]>;
+  /**
+   * Merged PRs among the `limit` most recently updated closed PRs (newest
+   * update first), each with its changed paths — for "prior PRs touching these
+   * files". Reads only the first page of each PR's files.
+   */
+  listMergedPullRequests(repo: RepoRef, opts: { limit: number }): Promise<MergedPrSummary[]>;
   getPullRequest(repo: RepoRef, n: number): Promise<PrDetail>;
   postReview(repo: RepoRef, n: number, review: GitHubReviewPayload): Promise<{ id: string }>;
   /** List inline review comments on a PR (for the "Files changed" tab). */

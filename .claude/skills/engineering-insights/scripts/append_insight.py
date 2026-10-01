@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[4]
-PACKAGES = ("server", "client", "reviewer-core", "e2e")
+PACKAGES = ("server", "client", "reviewer-core", "e2e", "mcp")
 SECTIONS = (
     "What Works",
     "What Doesn't Work",

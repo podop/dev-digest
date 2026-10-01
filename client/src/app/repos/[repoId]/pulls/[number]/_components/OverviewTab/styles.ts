@@ -6,6 +6,14 @@ export const s = {
     flexDirection: "column",
     gap: 20,
   } satisfies CSSProperties,
+  /* Intent + Blast radius side by side (mockup: 1fr 1fr, gap 16); each column needs
+     ~420px, so below ~2 columns' worth of width the cards stack. */
+  cards: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
+    gap: 16,
+    alignItems: "start",
+  } satisfies CSSProperties,
   descriptionBox: {
     border: "1px solid var(--border)",
     borderRadius: 8,

@@ -10,6 +10,7 @@
 - Adding/changing a route, plugin or env var → read `README.md` (DI flow, API map, env table)
 - Changing what gets sent to the model → read `README.md#review-context-non-obvious`
 - Touching indexing, repo map, ranking → read `src/modules/repo-intel/README.md`
+- Touching blast radius / PR history (`modules/blast`, repo-intel blast read) → read `docs/blast-radius.md`
 - Refactoring a module to the onion layout → read `docs/onion-migration.md` (baseline per module, steps)
 - Adding/moving a module, route, use case, repository or adapter → skill `onion-architecture`;
   check layers with `pnpm arch:check`

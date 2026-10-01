@@ -42,6 +42,7 @@ export function toIndexState(row: IndexStateRow): IndexState {
     degradedReason: isDegraded
       ? ((stats.degradedReason as DegradedReason | undefined) ?? 'index_failed')
       : undefined,
+    bounded: typeof stats.bounded === 'number' ? stats.bounded : undefined,
   };
 }
 

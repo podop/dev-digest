@@ -39,7 +39,7 @@ REPO = SKILL_DIR.parent.parent.parent
 ROUTING = SKILL_DIR / "routing.json"
 
 # Packages that own a typecheck/lint script; order is the report order.
-PACKAGES = ["client", "server", "reviewer-core", "e2e"]
+PACKAGES = ["client", "server", "reviewer-core", "e2e", "mcp"]
 
 
 def git(*args: str, cwd: Path = REPO, env: dict[str, str] | None = None) -> str:
@@ -61,9 +61,12 @@ def matches(path: str, patterns: list[str]) -> bool:
     for pat in patterns:
         if fnmatch.fnmatch(path, pat):
             return True
-        # `a/**` should also match `a/b`; fnmatch handles that, but `**/x.ts`
-        # must match a top-level `x.ts` too.
+        # `a/**` should also match `a/b`; fnmatch handles that, but `**` must
+        # also match zero directories: `**/x.ts` a top-level `x.ts`, and
+        # `a/**/*.ts` a file directly in a/ (e.g. mcp/src/api.ts, e2e/run.ts).
         if pat.startswith("**/") and fnmatch.fnmatch(path, pat[3:]):
+            return True
+        if "/**/" in pat and fnmatch.fnmatch(path, pat.replace("/**/", "/")):
             return True
     return False
 

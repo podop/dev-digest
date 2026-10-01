@@ -89,7 +89,13 @@ export function PrDetailView({ repoId, number }: PrDetailViewProps) {
         />
         <div style={s.body}>
           {tab === "overview" && (
-            <OverviewTab prId={prId} prBody={pr.body} repoFullName={repoFullName} headSha={pr.head_sha} />
+            <OverviewTab
+              prId={prId}
+              repoId={repoId}
+              prBody={pr.body}
+              repoFullName={repoFullName}
+              headSha={pr.head_sha}
+            />
           )}
           {tab === "findings" && (
             <FindingsTab

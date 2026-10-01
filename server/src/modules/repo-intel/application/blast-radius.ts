@@ -7,38 +7,54 @@
  *   - persistent (T3): symbols / resolved references / file_rank / file_facts
  *     straight from Postgres — no clone parsing on the hot path;
  *   - degraded fallback: the ripgrep CodeIndex over the clone, re-reading the
- *     caller files for endpoints. Always tagged `degraded: true`.
+ *     caller files for endpoints. Always tagged `degraded: true` with the reason
+ *     (flag_off | index_failed | no_data …).
+ *
+ * A usable-but-incomplete index keeps its data and is tagged `index_partial`
+ * (or `repo_too_large` when the walk truncated at MAX_INDEXED_FILES).
  */
 import type { CodeSymbol, RepoRef } from '@devdigest/shared';
 import { MAX_CALLERS_PER_SYMBOL } from '../constants.js';
 import type { FullSymbolRow } from '../domain/model.js';
 import { enclosingFromRows, enclosingSymbolName } from '../domain/rules.js';
-import type { BlastCallerRow, BlastChangedSymbol, BlastResult } from '../types.js';
+import type { BlastCallerRow, BlastChangedSymbol, BlastResult, DegradedReason, IndexState } from '../types.js';
 import type { QueryDeps } from './ports.js';
 
-const EMPTY_DEGRADED: Readonly<BlastResult> = {
-  changedSymbols: [],
-  callers: [],
-  impactedEndpoints: [],
-  degraded: true,
-  reason: 'no_data',
-};
+function emptyDegraded(reason: DegradedReason): BlastResult {
+  return { changedSymbols: [], callers: [], impactedEndpoints: [], degraded: true, reason };
+}
+
+/** Degraded flag + reason for a USABLE (full/partial) index; none when it is complete. */
+function usableIndexFlags(state: IndexState): Pick<BlastResult, 'degraded' | 'reason'> {
+  if ((state.bounded ?? 0) > 0) return { degraded: true, reason: 'repo_too_large' };
+  if (state.status === 'partial') return { degraded: true, reason: 'index_partial' };
+  return { degraded: false };
+}
+
+/** Why an UNUSABLE index (failed / degraded row) falls back to ripgrep. */
+function unusableIndexReason(state: IndexState): DegradedReason {
+  if (state.status === 'failed') return 'index_failed';
+  return state.degradedReason ?? 'no_data';
+}
+
+type PersistentOutcome = { blast: BlastResult } | { fallback: DegradedReason };
 
 export async function getBlastRadius(
   deps: QueryDeps,
   repoId: string,
   changedFiles: string[],
 ): Promise<BlastResult> {
-  if (deps.enabled && changedFiles.length > 0) {
-    const persistent = await persistentBlast(deps, repoId, changedFiles);
-    if (persistent) return persistent;
-  }
-  return degradedBlast(deps, repoId, changedFiles);
+  if (!deps.enabled) return degradedBlast(deps, repoId, changedFiles, 'flag_off');
+  if (changedFiles.length === 0) return degradedBlast(deps, repoId, changedFiles, 'no_data');
+  const outcome = await persistentBlast(deps, repoId, changedFiles);
+  if ('blast' in outcome) return outcome.blast;
+  return degradedBlast(deps, repoId, changedFiles, outcome.fallback);
 }
 
 /**
- * Persistent-index blast. Returns `null` when the index isn't usable (caller
- * falls back to ripgrep). Callers are PRECISE: only references whose
+ * Persistent-index blast. Returns `{ fallback: reason }` when the index isn't
+ * usable (caller falls back to ripgrep, tagged with that reason). A partial or
+ * bounded index keeps its data but is flagged degraded. Callers are PRECISE: only references whose
  * `decl_file` resolved to a changed file count — an ambiguous (NULL decl_file)
  * reference is not asserted as a caller.
  */
@@ -46,10 +62,12 @@ async function persistentBlast(
   deps: QueryDeps,
   repoId: string,
   changedFiles: string[],
-): Promise<BlastResult | null> {
+): Promise<PersistentOutcome> {
   const { reader } = deps;
   const state = await reader.tryGetIndexState(repoId);
-  if (!state || (state.status !== 'full' && state.status !== 'partial')) return null;
+  if (!state) return { fallback: 'no_data' };
+  if (state.status !== 'full' && state.status !== 'partial') return { fallback: unusableIndexReason(state) };
+  const flags = usableIndexFlags(state);
 
   // Changed symbols = declared in a changed file. Skip the qualified
   // `Class.method` dual-emit (the bare form already covers the name).
@@ -67,7 +85,7 @@ async function persistentBlast(
     nameSet.add(s.name);
   }
   if (nameSet.size === 0) {
-    return { changedSymbols, callers: [], impactedEndpoints: [], degraded: false };
+    return { blast: { changedSymbols, callers: [], impactedEndpoints: [], ...flags } };
   }
 
   const callerRows = await reader.getResolvedCallers(repoId, changedFiles, [...nameSet]);
@@ -93,21 +111,35 @@ async function persistentBlast(
   }
   callers.sort((a, b) => b.rank - a.rank);
 
-  // Precomputed facts per caller file, so consumers can attribute endpoints
-  // and crons to the changed symbol whose callers live in that file.
+  // Fan-out cap PER changed symbol: keep the top MAX_CALLERS_PER_SYMBOL callers
+  // of each `viaSymbol` (rank desc); the result keeps the overall rank order.
+  const perSymbol = new Map<string, number>();
+  const keptCallers = callers.filter((c) => {
+    const n = perSymbol.get(c.viaSymbol) ?? 0;
+    if (n >= MAX_CALLERS_PER_SYMBOL) return false;
+    perSymbol.set(c.viaSymbol, n + 1);
+    return true;
+  });
+  const keptFiles = [...new Set(keptCallers.map((c) => c.file))];
+
+  // Precomputed facts per KEPT caller file, so consumers can attribute endpoints
+  // and crons to the changed symbol whose callers live in that file — and no
+  // endpoint is reported through a caller that was dropped by the cap.
   const endpoints = new Set<string>();
   const factsByFile: Record<string, { endpoints: string[]; crons: string[] }> = {};
-  for (const f of await reader.getFileFacts(repoId, callerFiles)) {
+  for (const f of await reader.getFileFacts(repoId, keptFiles)) {
     factsByFile[f.filePath] = { endpoints: f.endpoints, crons: f.crons };
     for (const e of f.endpoints) endpoints.add(e);
   }
 
   return {
-    changedSymbols,
-    callers: callers.slice(0, MAX_CALLERS_PER_SYMBOL),
-    impactedEndpoints: [...endpoints],
-    factsByFile,
-    degraded: false,
+    blast: {
+      changedSymbols,
+      callers: keptCallers,
+      impactedEndpoints: [...endpoints],
+      factsByFile,
+      ...flags,
+    },
   };
 }
 
@@ -116,9 +148,10 @@ async function degradedBlast(
   deps: QueryDeps,
   repoId: string,
   changedFiles: string[],
+  reason: DegradedReason,
 ): Promise<BlastResult> {
   const repo = await deps.reader.getRepoBasics(repoId);
-  if (!repo || !repo.clonePath || changedFiles.length === 0) return { ...EMPTY_DEGRADED };
+  if (!repo || !repo.clonePath || changedFiles.length === 0) return emptyDegraded(reason);
   const root = repo.clonePath;
   const ref: RepoRef = { owner: repo.owner, name: repo.name };
   const changedSet = new Set(changedFiles);
@@ -127,7 +160,7 @@ async function degradedBlast(
   try {
     allSymbols = await deps.codeIndex.symbols(ref);
   } catch {
-    return { ...EMPTY_DEGRADED };
+    return emptyDegraded(reason);
   }
 
   // changed symbols = declared in any changed file (dedup by name+file).
@@ -169,5 +202,5 @@ async function degradedBlast(
     }
   }
 
-  return { changedSymbols, callers, impactedEndpoints: [...endpoints], degraded: true, reason: 'no_data' };
+  return { changedSymbols, callers, impactedEndpoints: [...endpoints], degraded: true, reason };
 }
