@@ -2,7 +2,7 @@ import type { GitClient, Repo } from '@devdigest/shared';
 import { NotFoundError } from '../../platform/errors.js';
 import { githubCloneUrl, parseRepoUrl } from './helpers.js';
 import { CLONE_JOB_KIND, CLONE_DEPTH } from './constants.js';
-import { INDEX_JOB_KIND, REFRESH_JOB_KIND } from '../repo-intel/index.js';
+import { INDEX_JOB_KIND, RESYNC_JOB_KIND } from '../repo-intel/index.js';
 
 /**
  * F1 — repos service. Business logic for the Repositories feature:
@@ -96,20 +96,26 @@ export class RepoService {
     return this.deps.repos.list(workspaceId);
   }
 
-  /** Re-fetch the clone for an existing repo (enqueues a fresh `clone` job). */
+  /**
+   * Bring an existing repo up to date with GitHub. A cloned repo gets ONE resync
+   * job (fetch + reset to origin/<default_branch>, then an incremental reindex):
+   * the clone job's bare `fetch` only moves origin/<branch>, so the worktree that
+   * the indexer and Project Context read never advanced. A repo with no clone yet
+   * gets the clone job, which enqueues the full index itself.
+   */
   async refresh(workspaceId: string, id: string): Promise<{ status: 'refreshing' }> {
     const repo = await this.deps.repos.getById(workspaceId, id);
     if (!repo) throw new NotFoundError('Repo not found');
+    if (repo.clone_path) {
+      await this.deps.jobs.enqueue(workspaceId, RESYNC_JOB_KIND, { repoId: repo.id });
+      return { status: 'refreshing' };
+    }
     await this.deps.jobs.enqueue(workspaceId, CLONE_JOB_KIND, {
       repoId: repo.id,
       owner: repo.owner,
       name: repo.name,
       url: githubCloneUrl(repo.full_name),
     } satisfies CloneJobPayload);
-    // Also enqueue an incremental refresh — ordering is safe: it is a no-op
-    // when HEAD didn't move, and picks up the new HEAD once the clone settles.
-    // Best-effort, like the post-clone index.
-    await this.tryEnqueue(workspaceId, REFRESH_JOB_KIND, { repoId: repo.id, owner: repo.owner, name: repo.name });
     return { status: 'refreshing' };
   }
 

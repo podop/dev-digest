@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { Repo } from '@devdigest/shared';
 import { RepoService, type ReposStore } from '../src/modules/repos/service.js';
 import { CLONE_JOB_KIND } from '../src/modules/repos/constants.js';
-import { INDEX_JOB_KIND, REFRESH_JOB_KIND } from '../src/modules/repo-intel/constants.js';
+import { INDEX_JOB_KIND, RESYNC_JOB_KIND } from '../src/modules/repo-intel/constants.js';
 
 const repo: Repo = {
   id: 'r1',
@@ -16,13 +16,14 @@ const repo: Repo = {
   created_by: 'u1',
 };
 
-function setup(opts: { failKinds?: string[] } = {}) {
+function setup(opts: { failKinds?: string[]; clonePath?: string | null } = {}) {
+  const current: Repo = { ...repo, clone_path: opts.clonePath ?? null };
   const enqueued: Array<{ kind: string; payload: unknown }> = [];
   const clonePaths: string[] = [];
   const repos: ReposStore = {
     findByFullName: async () => undefined,
     list: async () => [repo],
-    getById: async (ws, id) => (ws === 'ws1' && id === 'r1' ? repo : undefined),
+    getById: async (ws, id) => (ws === 'ws1' && id === 'r1' ? current : undefined),
     insert: async () => repo,
     workspaceIdFor: async () => 'ws1',
     updateClonePath: async (_id, path) => {
@@ -75,8 +76,8 @@ describe('RepoService (ports faked)', () => {
     expect(failing.clonePaths).toEqual(['/clones/acme/widgets']);
   });
 
-  it('refresh re-clones from the https URL and best-effort enqueues an incremental refresh', async () => {
-    const { service, enqueued } = setup({ failKinds: [REFRESH_JOB_KIND] });
+  it('refresh of a repo with no clone yet enqueues only the clone (it enqueues the index itself)', async () => {
+    const { service, enqueued } = setup();
     await expect(service.refresh('ws1', 'r1')).resolves.toEqual({ status: 'refreshing' });
     expect(enqueued).toEqual([
       {
@@ -85,5 +86,11 @@ describe('RepoService (ports faked)', () => {
       },
     ]);
     await expect(service.refresh('other-ws', 'r1')).rejects.toMatchObject({ code: 'not_found' });
+  });
+
+  it('refresh of a cloned repo enqueues ONE resync (advances the worktree), never a bare-fetch clone', async () => {
+    const { service, enqueued } = setup({ clonePath: '/clones/acme/widgets' });
+    await expect(service.refresh('ws1', 'r1')).resolves.toEqual({ status: 'refreshing' });
+    expect(enqueued).toEqual([{ kind: RESYNC_JOB_KIND, payload: { repoId: 'r1' } }]);
   });
 });
