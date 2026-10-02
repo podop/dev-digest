@@ -23,7 +23,7 @@ import { SEED_PR_482_PATCHES } from '../src/db/seed-diff.js';
 import { changedRanges } from '../src/modules/brief/domain/input.js';
 import { normalizeBrief } from '../src/modules/brief/domain/normalize.js';
 import { BriefLlmOutput } from '../src/modules/brief/domain/prompt.js';
-import { GENERATION_TIMEOUT_MS, PROMPT_VERSION } from '../src/modules/brief/domain/constants.js';
+import { GENERATION_TIMEOUT_MS, LLM_MAX_OUTPUT_TOKENS, PROMPT_VERSION } from '../src/modules/brief/domain/constants.js';
 import { ConflictError, ExternalServiceError, NotFoundError, ValidationError } from '../src/platform/errors.js';
 
 const SHA = 'a'.repeat(40);
@@ -145,6 +145,10 @@ const doc = (path: string, status: SpecDocResult['status'] = 'included'): SpecDo
 describe('constants', () => {
   it('pins the generation budget to 120 s (NFR6)', () => {
     expect(GENERATION_TIMEOUT_MS).toBe(120_000);
+  });
+
+  it('pins the output budget to 8 000 tokens (reasoning models spend part of it thinking)', () => {
+    expect(LLM_MAX_OUTPUT_TOKENS).toBe(8_000);
   });
 });
 

@@ -14,7 +14,9 @@ export const BRIEF_LANGUAGE = 'English';
 
 /** NFR1: total estimated input, and the model's output budget. */
 export const INPUT_MAX_TOKENS = 8_000;
-export const LLM_MAX_OUTPUT_TOKENS = 2_000;
+/** 8 000 (was 2 000): a reasoning model's thinking counts toward max_tokens, and
+ *  deepseek-v4-pro used all 2 000 before finishing the JSON on both attempts. */
+export const LLM_MAX_OUTPUT_TOKENS = 8_000;
 /** FR1: one re-ask on an invalid structured response (`maxRetries` = reprompts). */
 export const LLM_MAX_RETRIES = 1;
 /** NFR6: a generation completes or fails within this wall-clock budget. */

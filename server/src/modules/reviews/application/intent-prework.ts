@@ -28,7 +28,7 @@ export async function resolveIntentPrework(
   emit: (kind: RunEventKind, msg: string, data?: unknown) => void,
   /** Aborts only once every run sharing this pre-work has been cancelled — a
    *  single cancel must not starve the others (server/specs/05-intent-layer.md,
-   *  "Budget"). Combined with the service's own 30s budget internally. */
+   *  "Budget"). Combined with the service's own 120s budget internally. */
   signal?: AbortSignal,
 ): Promise<IntentPreworkResult> {
   if (!intentResolver) return {};

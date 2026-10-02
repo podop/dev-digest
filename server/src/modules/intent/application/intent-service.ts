@@ -130,7 +130,7 @@ type EmitFn = (kind: RunEventKind, msg: string, data?: unknown) => void;
 
 /**
  * One shared derivation for a `prId:hash` key, joined by every concurrent
- * caller. `controller` aborts on the 30s budget OR once every ATTACHED
+ * caller. `controller` aborts on the 120s budget OR once every ATTACHED
  * participant's own signal has aborted (`abortedCount === participantsCount`)
  * — a caller with no signal never contributes to `abortedCount`, so in that
  * case only the budget can end the flight. `listeners` fans the derivation's
@@ -197,10 +197,17 @@ export class IntentService {
       () => controller.abort(new Error(`intent derivation exceeded its ${INTENT_BUDGET_MS}ms budget`)),
       INTENT_BUDGET_MS,
     );
-    const promise = this.derive(input, key, broadcast, controller.signal).finally(() => {
-      clearTimeout(timeout);
-      this.inflight.delete(flightKey);
-    });
+    const promise = this.derive(input, key, broadcast, controller.signal)
+      // The LLM SDK rejects an aborted call with its own generic text ("The user
+      // aborted a request."), hiding WHY we aborted — surface our reason instead
+      // (the budget overrun, or the callers' own abort reason).
+      .catch((err: unknown) => {
+        throw controller.signal.aborted ? controller.signal.reason : err;
+      })
+      .finally(() => {
+        clearTimeout(timeout);
+        this.inflight.delete(flightKey);
+      });
     const flight: Flight = { promise, controller, listeners, participantsCount: 0, abortedCount: 0 };
     this.inflight.set(flightKey, flight);
     return flight;

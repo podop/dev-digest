@@ -29,9 +29,12 @@ export const INTENT_TEXT_MAX_CHARS = 500;
 export const SCOPE_MAX_ITEMS = 10;
 export const SCOPE_ITEM_MAX_CHARS = 240;
 
-/** Wall-clock budget for one derivation (server/specs/05-intent-layer.md). */
-export const INTENT_BUDGET_MS = 30_000;
-export const LLM_MAX_OUTPUT_TOKENS = 800;
+/** Wall-clock budget for one derivation (server/specs/05-intent-layer.md). 120 s
+ *  (was 30 s) so slower reasoning models can finish; a review run waits for it. */
+export const INTENT_BUDGET_MS = 120_000;
+/** 5 000 (was 800): a reasoning model's thinking counts toward max_tokens and cut
+ *  the JSON short (deepseek-pro, 2026-10-02). */
+export const LLM_MAX_OUTPUT_TOKENS = 5_000;
 export const LLM_MAX_RETRIES = 1;
 
 /** Bumping this forces every cached row to miss on the next review (cache key input). */

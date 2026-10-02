@@ -68,7 +68,7 @@ the model).
 A failure (no API key, provider error, timeout, budget exceeded) never fails
 the review: the executor logs `info` `warning: intent unavailable — …`
 (`data.warning='intent_unavailable'`) and the review runs without intent.
-Budget: 30 s, `AbortController`-bound; only aborts when every queued run of the
+Budget: 120 s (raised from 30 s on 2026-10-02 for slower reasoning models), `AbortController`-bound; only aborts when every queued run of the
 shared pre-work is cancelled.
 
 ## Call sequence
@@ -78,7 +78,7 @@ shared pre-work is cancelled.
    `IntentService.resolveForReview`: resolve feature model → parse links →
    compute key → read `pr_intent` → hit: log `PR intent ready (cached,
    confidence=…)`; miss: fetch tickets/docs, build the prompt, classify
-   (temp 0, maxRetries 1, 800 out tokens max), clamp arrays, cap confidence,
+   (temp 0, maxRetries 1, 5 000 out tokens max — raised from 800 on 2026-10-02 for reasoning models), clamp arrays, cap confidence,
    upsert with usage, log sources/usage/cost. Any throw → warning, intent
    undefined — the rest of the run is unaffected.
 3. Per agent: `reviewPullRequest({..., intent})` renders `## PR intent` →

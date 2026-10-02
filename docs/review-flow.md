@@ -91,7 +91,7 @@ sequenceDiagram
             INT->>INT: computeConfidence (code, not the model)
             INT->>DB: upsert pr_intent (usage billed HERE, not agent_runs)
         end
-        alt derivation fails/times out (30s budget)
+        alt derivation fails/times out (120s budget)
             INT-->>BUS: info: warning: intent unavailable — …
         end
     end
