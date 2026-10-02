@@ -136,6 +136,7 @@ export async function runFullIndex(deps: IndexerDeps, payload: IndexPayload): Pr
   // repo-map) never see a wiped-but-not-yet-refilled index, and a crash
   // mid-write leaves the previous index intact.
   await deps.tx.run(async ({ index }) => {
+    await index.lockRepo(repoId);
     // Delete-then-insert keeps the UNIQUE constraint happy and is idempotent.
     await index.deleteAllForRepo(repoId);
     await index.insertSymbols(buf.symbols);

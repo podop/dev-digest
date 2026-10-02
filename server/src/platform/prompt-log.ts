@@ -15,10 +15,16 @@ import { estimateTokens, PROMPT_SECTION_NAMES, type PromptSectionName, type Prom
 
 /**
  * Section names logged by callers that build their own messages instead of
- * going through reviewer-core's `assemblePrompt` (intent, conventions) — the
+ * going through reviewer-core's `assemblePrompt` (intent, conventions, brief) — the
  * server-only additions to `PROMPT_SECTION_NAMES` below.
  */
-const SERVER_ONLY_SECTION_NAMES = ['intent_sources', 'repository_sample'] as const;
+const SERVER_ONLY_SECTION_NAMES = [
+  'intent_sources',
+  'repository_sample',
+  'changed_files',
+  'findings',
+  'linked_issue',
+] as const;
 
 export type PromptLogSectionName = PromptSectionName | (typeof SERVER_ONLY_SECTION_NAMES)[number];
 
@@ -68,8 +74,8 @@ export interface PromptLogVerbose {
 }
 
 export interface PromptLogEntry {
-  feature: 'review' | 'intent' | 'conventions';
-  /** review = runId; intent = `intent:<prId>:<hash[0..12]>`; conventions = scanId. */
+  feature: 'review' | 'intent' | 'conventions' | 'brief';
+  /** review = runId; intent = `intent:<prId>:<hash[0..12]>`; conventions = scanId; brief = `brief:<prId>:<head[0..12]>`. */
   correlationId: string;
   provider: string;
   model: string;

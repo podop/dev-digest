@@ -131,45 +131,50 @@ export class OctokitGitHubClient implements GitHubClient {
   }
 
   async listMergedPullRequests(repo: RepoRef, opts: { limit: number }): Promise<MergedPrSummary[]> {
-    return withRetry(() =>
+    // Retry + timeout PER REQUEST: a transient failure on one listFiles call replays only
+    // that call, never the list or the files already read.
+    const res = await withRetry(() =>
       withTimeout(
-        (async () => {
-          const res = await this.octokit.rest.pulls.list({
-            owner: repo.owner,
-            repo: repo.name,
-            state: 'closed',
-            sort: 'updated',
-            direction: 'desc',
-            per_page: Math.min(Math.max(opts.limit, 1), PAGE_SIZE),
-          });
-          const merged = res.data.filter((pr) => pr.merged_at);
-          const out: MergedPrSummary[] = [];
-          for (let i = 0; i < merged.length; i += MERGED_FILES_CONCURRENCY) {
-            const batch = await Promise.all(
-              merged.slice(i, i + MERGED_FILES_CONCURRENCY).map(async (pr) => {
-                const { data: files } = await this.octokit.rest.pulls.listFiles({
-                  owner: repo.owner,
-                  repo: repo.name,
-                  pull_number: pr.number,
-                  per_page: PAGE_SIZE,
-                });
-                return {
-                  number: pr.number,
-                  title: pr.title,
-                  author: pr.user?.login ?? 'unknown',
-                  merged_at: pr.merged_at as string,
-                  // A file<->symlink type change is listed twice: one path, one entry.
-                  files: [...new Set(files.map((f) => f.filename))],
-                };
-              }),
-            );
-            out.push(...batch);
-          }
-          return out;
-        })(),
-        DETAIL_TIMEOUT,
+        this.octokit.rest.pulls.list({
+          owner: repo.owner,
+          repo: repo.name,
+          state: 'closed',
+          sort: 'updated',
+          direction: 'desc',
+          per_page: Math.min(Math.max(opts.limit, 1), PAGE_SIZE),
+        }),
+        TIMEOUT,
       ),
     );
+    const merged = res.data.filter((pr) => pr.merged_at);
+    const out: MergedPrSummary[] = [];
+    for (let i = 0; i < merged.length; i += MERGED_FILES_CONCURRENCY) {
+      const batch = await Promise.all(
+        merged.slice(i, i + MERGED_FILES_CONCURRENCY).map(async (pr) => {
+          const { data: files } = await withRetry(() =>
+            withTimeout(
+              this.octokit.rest.pulls.listFiles({
+                owner: repo.owner,
+                repo: repo.name,
+                pull_number: pr.number,
+                per_page: PAGE_SIZE,
+              }),
+              TIMEOUT,
+            ),
+          );
+          return {
+            number: pr.number,
+            title: pr.title,
+            author: pr.user?.login ?? 'unknown',
+            merged_at: pr.merged_at as string,
+            // A file<->symlink type change is listed twice: one path, one entry.
+            files: [...new Set(files.map((f) => f.filename))],
+          };
+        }),
+      );
+      out.push(...batch);
+    }
+    return out;
   }
 
   async getPullRequest(repo: RepoRef, n: number): Promise<PrDetail> {

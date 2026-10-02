@@ -9,18 +9,6 @@ import { s } from "../../styles";
 import { approxTokens, formatApproxTokens, isFromInteractive } from "../../helpers";
 import { PromptModalBody } from "../PromptModalBody";
 
-const miniBtnStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: 4,
-  borderRadius: 5,
-  border: "1px solid var(--border)",
-  background: "var(--bg-elevated)",
-  color: "var(--text-muted)",
-  cursor: "pointer",
-};
-
 /** Weight of THIS block only — it sits outside the label button, so the
     toggle's accessible name stays the block name. */
 const tokenChipStyle: React.CSSProperties = {
@@ -64,7 +52,7 @@ export function PromptBlock({ label, text, color }: { label: string; text: strin
             title={t("trace.prompt.copy")}
             aria-label={t("trace.prompt.copy")}
             onClick={copy}
-            style={miniBtnStyle}
+            style={s.miniBtn}
           >
             {copied ? <Icon.Check size={12} /> : <Icon.Copy size={12} />}
           </button>
@@ -73,7 +61,7 @@ export function PromptBlock({ label, text, color }: { label: string; text: strin
             title={t("trace.prompt.fullscreen")}
             aria-label={t("trace.prompt.fullscreen")}
             onClick={() => setFull(true)}
-            style={miniBtnStyle}
+            style={s.miniBtn}
           >
             <Icon.ExternalLink size={12} />
           </button>

@@ -37,7 +37,9 @@ def git(root, *args):
 
 
 def counts(path):
-    return path.split("/", 1)[0] in PACKAGES and not path.endswith("/INSIGHTS.md")
+    # specs are written by specreator, not code: they never need an INSIGHTS wrap-up
+    return (path.split("/", 1)[0] in PACKAGES and not path.endswith("/INSIGHTS.md")
+            and "/specs/" not in path)
 
 
 def snapshot(root):

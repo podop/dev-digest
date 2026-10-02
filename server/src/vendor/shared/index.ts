@@ -4,16 +4,22 @@
  * Exports (Zod schemas + inferred TS types):
  *  - contracts/findings   Review, Finding, Severity, Verdict, FindingAction, trifecta
  *  - contracts/brief      Intent, BlastRadius, Risks, PrHistory, SmartDiff, PrBrief
- *  - contracts/knowledge  Conformance, Onboarding, EvalRun/EvalCase, MemoryItem,
+ *  - contracts/knowledge  Conformance, EvalRun/EvalCase, MemoryItem,
  *                         Skill/CommunitySkill, ConventionCandidate, Agent
  *  - contracts/trace      RunTrace, RunEvent, RunLogLine (single-document trace)
- *  - contracts/platform   Settings, ConnTestResult, Repo, PrMeta/PrDetail, SpecFile, …
+ *  - contracts/platform   Settings, ConnTestResult, Repo, PrMeta/PrDetail, …
+ *  - contracts/project-context  ContextDoc, ContextList, ContextAttachments, RunTrace.project_context
+ *  - contracts/onboarding  OnboardingTour, OnboardingTourState (GET/POST /repos/:id/onboarding)
  *  - adapters             adapter interfaces + ModelInfo
  *  - constants/feature-models  zod-free FEATURE_MODELS registry (re-exported by
  *                         contracts/platform; import the subpath from bundles
  *                         that must stay zod-free)
  *  - constants/skills     zod-free skill limits + name regex (re-exported by
  *                         contracts/knowledge; same subpath rule)
+ *  - constants/project-context  zod-free Project Context limits + default glob
+ *                         (re-exported by contracts/project-context)
+ *  - constants/onboarding  zod-free Onboarding Tour limits + section ids
+ *                         (re-exported by contracts/onboarding)
  *
  * Feature agents (A1–A6) and F2 import everything from here. The barrel is
  * stable — feature agents EXTEND with new files, they do not edit existing ones.
@@ -29,4 +35,6 @@ export * from './contracts/why.js';
 export * from './contracts/eval-ci.js';
 export * from './contracts/observability.js';
 export * from './contracts/productionize.js';
+export * from './contracts/project-context.js';
+export * from './contracts/onboarding.js';
 export * from './adapters.js';

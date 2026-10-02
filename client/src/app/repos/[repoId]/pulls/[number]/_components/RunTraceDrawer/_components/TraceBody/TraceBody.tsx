@@ -14,13 +14,16 @@ import { s } from "../../styles";
 import { TraceSection } from "../TraceSection";
 import { ToolCallRow } from "../ToolCallRow";
 import { PromptBlock } from "../PromptBlock";
+import { ProjectContextBlock } from "../ProjectContextBlock";
 import { FindingsSection } from "../FindingsSection";
+import { SpecsRead } from "../SpecsRead";
 import { Row, Stat } from "../atoms";
 
 export function TraceBody({ trace, findings }: { trace: RunTrace; findings: FindingRecord[] }) {
   const t = useTranslations("runs");
   const stats = trace.stats;
   const toolKeys = toolCallKeys(trace.tool_calls);
+  const projectContext = trace.project_context;
   return (
     <>
       <TraceSection icon="Settings" title={t("trace.configuration")}>
@@ -40,15 +43,7 @@ export function TraceBody({ trace, findings }: { trace: RunTrace; findings: Find
           </Row>
           <Row label={t("trace.config.specsRead")}>
             <div style={s.specsWrap}>
-              {trace.specs_read.length === 0 ? (
-                <span style={s.specsNone}>{t("trace.config.none")}</span>
-              ) : (
-                trace.specs_read.map((sp) => (
-                  <span key={sp} className="mono" style={s.spec}>
-                    {sp}
-                  </span>
-                ))
-              )}
+              <SpecsRead trace={trace} />
             </div>
           </Row>
           {trace.skills_used != null && (
@@ -101,6 +96,9 @@ export function TraceBody({ trace, findings }: { trace: RunTrace; findings: Find
         )}
         {trace.prompt_assembly.repo_map != null && (
           <PromptBlock label={t("trace.prompt.repoMap")} text={trace.prompt_assembly.repo_map} color={PROMPT_COLORS.repoMap} />
+        )}
+        {projectContext != null && projectContext.docs.length > 0 && (
+          <ProjectContextBlock context={projectContext} />
         )}
         {trace.prompt_assembly.specs != null && (
           <PromptBlock label={t("trace.prompt.specs")} text={trace.prompt_assembly.specs} color={PROMPT_COLORS.specs} />

@@ -292,6 +292,14 @@ export interface GitClient {
    * missing/oversize object — callers fall back to `GitHubClient.getFileContent`.
    */
   readFileAt(repo: RepoRef, sha: string, path: string, opts?: { maxBytes?: number }): Promise<FileAtRef>;
+  /**
+   * The commit a PR's base branch should be read at: `merge-base(origin/<baseRef>,
+   * head)` when both are in the clone, else the tip of `origin/<baseRef>` (then
+   * `<baseRef>`), else null. Never fetches. `baseRef` is a branch name and `head`
+   * a commit sha; anything else (or an unresolvable pair) resolves to null rather
+   * than throwing. Returns the full 40-char sha.
+   */
+  resolveBaseCommit(repo: RepoRef, baseRef: string, head: string): Promise<string | null>;
   clonePathFor(repo: RepoRef): string;
 }
 

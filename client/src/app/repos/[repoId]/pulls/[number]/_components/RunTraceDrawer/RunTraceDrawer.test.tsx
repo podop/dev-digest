@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { renderWithProviders, screen, cleanup } from "@/test/render";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { renderWithProviders, screen, cleanup, within } from "@/test/render";
 import { mockFetch } from "@/test/fetch-mock";
 import type { RunTrace } from "@devdigest/shared";
 
@@ -90,6 +90,55 @@ describe("A5 Run Trace drawer (smoke)", () => {
     expect(screen.queryByRole("button", { name: "Skills (dynamic)" })).toBeNull();
     expect(screen.queryByText("~3 tokens")).toBeNull();
     expect(screen.getByRole("button", { name: "System" })).toBeInTheDocument();
+  });
+
+  it("lists project-context documents with status; included ones open to the exact text sent", async () => {
+    const { user } = renderDrawer({
+      ...TRACE,
+      project_context: {
+        budget_tokens: 16000,
+        tokens_total: 1200,
+        docs: [
+          { path: "docs/architecture.md", doc_type: "docs", origin: { kind: "agent" }, tokens: 800, status: "included", text: "api must not import <db> directly" },
+          { path: "specs/auth.md", doc_type: "specs", origin: { kind: "skill", skill_id: "sk1", skill_name: "secret-gate" }, tokens: 400, status: "included", text: "Tokens expire in 1h" },
+          { path: "docs/gone.md", doc_type: "docs", origin: { kind: "agent" }, tokens: 0, status: "missing" },
+        ],
+      },
+    });
+    // Configuration → Specs read: included paths with their tokens, a skipped one with its status.
+    const specsRead = (await screen.findByText("Specs read")).parentElement as HTMLElement;
+    expect(within(specsRead).getByText(/docs\/architecture\.md/)).toHaveTextContent("docs/architecture.md · ~800 tok");
+    expect(within(specsRead).getByText(/specs\/auth\.md/)).toHaveTextContent("specs/auth.md · ~400 tok");
+    expect(within(specsRead).getByText(/docs\/gone\.md/)).toHaveTextContent("docs/gone.md missing");
+
+    await user.click(screen.getByRole("button", { name: /Prompt assembly/ }));
+    expect(screen.getByText("Project context · attached specs")).toBeInTheDocument();
+    expect(screen.getByText("skill secret-gate")).toBeInTheDocument();
+    expect(screen.getAllByText("missing")).toHaveLength(2); // Specs read + the block
+    // A missing document has nothing to open.
+    expect(screen.queryByRole("button", { name: "docs/gone.md" })).toBeNull();
+
+    const arch = screen.getByRole("button", { name: "docs/architecture.md" });
+    expect(arch).toHaveAttribute("aria-expanded", "false");
+    await user.click(arch);
+    expect(arch).toHaveAttribute("aria-expanded", "true");
+    // Untrusted text is shown verbatim as text, never as markup.
+    expect(screen.getByText("api must not import <db> directly")).toBeInTheDocument();
+    expect(screen.queryByText("Tokens expire in 1h")).toBeNull();
+
+    // Copy puts the exact included text on the clipboard; a missing document has no copy action.
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    await user.click(screen.getByRole("button", { name: "Copy specs/auth.md" }));
+    expect(writeText).toHaveBeenCalledWith("Tokens expire in 1h");
+    expect(screen.queryByRole("button", { name: "Copy docs/gone.md" })).toBeNull();
+  });
+
+  it("an old trace lists its specs_read paths and has no project-context block", async () => {
+    const { user } = renderDrawer({ ...TRACE, specs_read: ["specs/old.md"] });
+    expect(await screen.findByText("specs/old.md")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Prompt assembly/ }));
+    expect(screen.queryByText("Project context · attached specs")).toBeNull();
   });
 
   it("switches to the live log tab", async () => {

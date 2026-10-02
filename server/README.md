@@ -187,6 +187,57 @@ Read-only: one `repo-intel` facade `getBlastRadius` call per request, no re-pars
 `degraded`/`reason` pass through (degraded = unknown, not "no impact");
 `MAX_CALLERS_PER_SYMBOL` is applied per `viaSymbol` in the facade. Also used by MCP `get_blast_radius`.
 
+### Project Context (`modules/project-context`, spec [`../specs/2026-10-01-project-context.md`](../specs/2026-10-01-project-context.md))
+
+| Method | Path | Result |
+|---|---|---|
+| GET | `/repos/:id/context` | `ContextList` = store files first (`source: 'store'`, `editable`, `version`; listed even when `not_cloned`), then the `.md` files of the clone matching the globs (`source: 'repo'`; `docs[]` with type, size, tokens, `used_by`), `tokens_total`, `clone_status` (`not_cloned` without a clone), `truncated` when the clone list is cut at 500 |
+| GET | `/repos/:id/context/doc?path=` | `ContextDocPreview` = content + `used_by_agents` (`via` direct / skill), `source` / `editable` / `version`; a store file is served before the clone; 400 `invalid_path`, 404 `repo_not_found` / `doc_not_found`, 413 `doc_too_large` (> 256 KB) |
+| POST | `/repos/:id/context/files` | create a store file (`{ path?, content?, on_conflict?: 'fail' \| 'suffix' }`, body optional; no path → `.devdigest/specs/untitled.md` with suffix) → 201 `ContextDocPreview`; 404 `repo_not_found`, 409 `path_exists` (store or clone), 413 `doc_too_large`, 422 `invalid_path` / `invalid_content` (NUL) / `too_many_files` (500). `bodyLimit` 2 MiB |
+| PUT | `/repos/:id/context/files?path=` | `{ content, base_version }` → 200 at the new version; 403 `read_only` (a clone file), 404 `doc_not_found`, 409 `stale_version` (`details.current_version`), 413 |
+| POST | `/repos/:id/context/files/rename` | `{ path, new_path, base_version }` → 200 at the new path; attachments of this repo (agents and skills) move with it, keeping their position, in one transaction; 403 / 404 / 409 `path_exists` · `stale_version` / 422 `invalid_path` |
+| DELETE | `/repos/:id/context/files?path=` | 204; attachments stay (the document is `missing` for runs); 403 `read_only`, 404 |
+| GET / PUT | `/agents/:id/context` (`?repoId=` on GET) | ordered attached paths of an agent in one repo; PUT replaces the whole list in one transaction |
+| GET / PUT | `/skills/:id/context` | same for a skill |
+
+Repo documents are derived from the clone on each call, never stored; attachments store only paths
+(`agent_context_docs`, `skill_context_docs`, per repo, ordered). Store files live in `context_files` (unique
+`(repo_id, path)`, `version` +1 per save or rename; `ContextFilesService`): paths are `.devdigest/specs/**.md`
+(`checkStorePath`), never touch the file system, and a path the clone already holds stays a read-only repo
+document. Every write logs one content-free line through `req.log`. Attaching never bumps an agent/skill version. PUT errors: 404
+`agent_not_found` / `skill_not_found` / `repo_not_found` (workspace checks first), 422 `invalid_path` /
+`duplicate_path` / `too_many_paths` (> 50). Symlinks are never listed or read, `node_modules`, `.git`, `dist`,
+`build`, `coverage`, `.next`, `out`, `vendor` are never entered. `used_by` counts distinct agents that attach a
+path directly or link a skill that does (enabled or not). No LLM call.
+
+**In a run** (`ProjectContextService.resolveForRun`, reached from `reviews` only through a port): the agent's
+documents, then each enabled skill's (a path already listed is not repeated); a store file is read from the
+database (latest save, trace `source: 'store'`, even with no base commit), everything else with
+`GitClient.readFileAt` at `GitClient.resolveBaseCommit(repo, pr.base, pr.headSha)` — the merge-base, else the tip
+of the base branch; never the clone's working tree, never a fetch. Each document gets a status in
+`RunTrace.project_context` (`included` / `missing` / `too_large` > 256 KB / `unreadable` / `over_budget`; text only
+for included ones); the budget is 16 000 estimated tokens, cut at the first document that would pass it. Included
+texts go to reviewer-core as `specs: {path, text}[]` (untrusted, `## Project context`). Any failure degrades to "no
+documents" and a `warning: project context unavailable` log line; no attachments → no log line, no trace key, the
+prompt is byte-identical to before.
+
+### Onboarding Tour (`modules/onboarding`, spec [`../specs/2026-10-01-onboarding-generator.md`](../specs/2026-10-01-onboarding-generator.md))
+
+| Method | Path | Result |
+|---|---|---|
+| GET | `/repos/:id/onboarding` | `OnboardingTourState`: `{status:'none'}`, or `{status:'ready', stale, stale_reason?, tour}`; stale = the index moved to another commit or `PROMPT_VERSION` changed (`index_changed`/`prompt_changed`) |
+| POST | `/repos/:id/onboarding` | generate synchronously (≤ 120 s), store and return `OnboardingTourReady` (`stale:false`); no body |
+
+One structured LLM call (the workspace's `onboarding` feature model, `maxRetries: 1`) over the repo-intel index
+(repo map, top files by rank, critical paths, `listIndexedFiles`) and at most four root files (README,
+`package.json` scripts, a compose file, `.env.example` variable names only) read with `git show` at the INDEXED
+commit; everything repo-derived is wrapped as untrusted. Every path in the answer is checked against the indexed
+files (folders only in first tasks) and the counts are clamped before anything is stored (`onboarding.json`, one
+row per repo, replaced on success; a failed run keeps the previous tour). Errors: 404 `repo_not_found`, 409
+`generation_in_progress` (one run per repo, in memory), 422 `index_not_ready` / `provider_not_configured`, 502
+`generation_failed`. One log line per run (`repoId`, provider, model, tokens, cost, duration, dropped counts,
+outcome), never repo text.
+
 ## Environment
 
 `server/.env` (copied from `.env.example`):
@@ -205,6 +256,7 @@ Read-only: one `repo-intel` facade `getBlastRadius` call per request, no re-pars
 | `LLM_PROVIDER_OVERRIDE` | — | **dev/e2e only**: `mock` → every provider is the deterministic mock (`src/adapters/llm/mock.ts`, fixed review grounded on the seeded PR #482); refused with `NODE_ENV=production`, loud warning at boot |
 | `LLM_MOCK_DELAY_MS` | `0` | latency of each mock LLM call (abortable), so the live-run UI is observable |
 | `PROMPT_LOG_VERBOSE` | — | **dev only**: adds identifiers (file paths, ticket/doc refs — never prompt content) to the structured `prompt_assembled` log line; refused with `NODE_ENV=production`; silently OFF outside development or when `API_HOST` isn't loopback (boot warns once when that happens) |
+| `PROJECT_CONTEXT_GLOBS` | `**/{specs,docs,insights}/**/*.md` | globs of the repo markdown docs Project Context lists and agents/skills may attach; comma-separated (commas inside `{a,b}` stay part of the glob) |
 | `DEVDIGEST_CLONE_DIR` | `./clones` | imported-repo checkouts (git-ignored) |
 | `LOG_LEVEL` | `info` (`silent` in test) | pino level |
 | `NODE_ENV` | `development` | `test` → silent logs + global rate-limit disabled |

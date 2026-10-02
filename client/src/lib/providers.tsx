@@ -11,6 +11,7 @@ import {
 import { ThemeProvider } from "./theme";
 import { RepoProvider } from "./repo-context";
 import { ToastProvider, notify } from "./toast";
+import { LeaveGuardProvider } from "./leave-guard";
 import { ApiError } from "./api";
 import { isQuietError } from "./query-meta";
 
@@ -51,7 +52,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={qc}>
       <ThemeProvider>
         <ToastProvider>
-          <RepoProvider>{children}</RepoProvider>
+          <RepoProvider>
+            <LeaveGuardProvider>{children}</LeaveGuardProvider>
+          </RepoProvider>
         </ToastProvider>
       </ThemeProvider>
     </QueryClientProvider>

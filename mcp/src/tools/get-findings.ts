@@ -3,7 +3,18 @@ import type { ReviewRecord } from '@devdigest/shared';
 import { z } from 'zod';
 import type { DevDigestApi } from '../api.js';
 import { ToolError } from '../errors.js';
-import { CompactFindingSchema, SEVERITIES, severityRank, toCompactFinding, toVerdict, trimToBudget, VerdictSchema } from '../present.js';
+import {
+  CompactFindingSchema,
+  SEVERITIES,
+  severityRank,
+  toCompactFinding,
+  toVerdict,
+  trimToBudget,
+  untrustedError,
+  UNTRUSTED_TEXT_NOTE,
+  UntrustedTextField,
+  VerdictSchema,
+} from '../present.js';
 import type { ResolvedPull } from '../resolve.js';
 import { resolvePull, resolveRepo } from '../resolve.js';
 import { guarded, ok, type OutputOf, PrArgs, type ToolDeps } from './shared.js';
@@ -14,6 +25,7 @@ const ReviewView = VerdictSchema.extend({
 });
 
 const Output = {
+  ...UntrustedTextField,
   repo: z.string(),
   pr_number: z.number().int(),
   pr_title: z.string(),
@@ -59,6 +71,7 @@ export function registerGetFindings(server: McpServer, deps: ToolDeps): void {
       });
 
       const payload: OutputOf<typeof Output> = {
+        untrusted_text: UNTRUSTED_TEXT_NOTE,
         repo: repo.full_name,
         pr_number,
         pr_title: pr.title,
@@ -114,7 +127,7 @@ async function reviewOfRun(
   }
   throw new ToolError(
     `run_${run.status}`,
-    `Run ${runId} ended as "${run.status}"${run.error ? `: ${run.error}` : ''} and produced no findings — do not report the PR as clean.`,
+    `Run ${runId} ended as "${run.status}"${run.error ? `: ${untrustedError(run.error)}` : ''} and produced no findings — do not report the PR as clean.`,
     'Call run_agent_on_pr again to start a new review.',
   );
 }

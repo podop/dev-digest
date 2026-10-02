@@ -52,6 +52,13 @@ export interface IndexStateWriter {
 
 /** Writes of ONE (re)index, bound to its transaction. */
 export interface IndexWriter {
+  /**
+   * Serialize reindexes of one repo: blocks until every other open reindex
+   * transaction of `repoId` has committed. Call it FIRST in the transaction —
+   * otherwise two overlapping jobs (clone → full index ‖ refresh → slice) both
+   * delete before either commits, and the later insert hits the symbols UNIQUE key.
+   */
+  lockRepo(repoId: string): Promise<void>;
   deleteAllForRepo(repoId: string): Promise<void>;
   deleteForFiles(repoId: string, paths: string[]): Promise<void>;
   insertSymbols(rows: IndexerSymbolRow[]): Promise<void>;

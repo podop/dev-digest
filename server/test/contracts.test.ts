@@ -9,11 +9,24 @@ import {
   SmartDiff,
   SmartDiffRole,
   Conformance,
-  Onboarding,
+  OnboardingTour,
+  OnboardingTourState,
   EvalRun,
   MemoryItem,
   RunTrace,
   RunStats,
+  ContextList,
+  ContextDoc,
+  ContextDocPreview,
+  ContextAttachments,
+  ContextFileCreateInput,
+  ContextFileSaveInput,
+  ContextFileRenameInput,
+  ProjectContextTraceDoc,
+  PROJECT_CONTEXT_STORE_ROOT,
+  PROJECT_CONTEXT_STORE_MAX_FILES,
+  PROJECT_CONTEXT_STORE_MAX_DEPTH,
+  PROJECT_CONTEXT_STORE_SEGMENT_RE,
   Settings,
   Repo,
   PrDetail,
@@ -138,18 +151,13 @@ describe('AI contracts parse fixtures', () => {
     expect(SmartDiffRole.parse('docs')).toBe('docs');
   });
 
-  it('Conformance / Onboarding / EvalRun / MemoryItem', () => {
+  it('Conformance / EvalRun / MemoryItem', () => {
     expect(() =>
       Conformance.parse({
         spec_id: 's1',
         spec_title: 'Spec',
         items: [{ requirement: 'r', status: 'implemented' }],
         completeness_pct: 80,
-      }),
-    ).not.toThrow();
-    expect(() =>
-      Onboarding.parse({
-        sections: [{ kind: 'architecture', title: 'T', body: 'b', links: [] }],
       }),
     ).not.toThrow();
     expect(() =>
@@ -189,6 +197,116 @@ describe('AI contracts parse fixtures', () => {
     expect(trace.tool_calls).toHaveLength(1);
     // A trace written before cost tracking has no cost_usd key — still valid.
     expect(trace.stats.cost_usd).toBeUndefined();
+    // ...and one written before Project Context has no project_context key.
+    expect(trace.project_context).toBeUndefined();
+  });
+
+  it('RunTrace carries project_context docs (included + skipped, both origins)', () => {
+    const trace = RunTrace.parse({
+      config: { agent: 'Security Reviewer', model: 'gpt-4.1' },
+      stats: { duration_ms: 1, tokens_in: 1, tokens_out: 1, findings: 0, grounding: '0/0 passed' },
+      prompt_assembly: { system: 's', user: 'u' },
+      tool_calls: [],
+      raw_output: '{}',
+      memory_pulled: [],
+      specs_read: ['docs/a.md'],
+      log: [],
+      project_context: {
+        budget_tokens: 16000,
+        tokens_total: 10,
+        docs: [
+          { path: 'docs/a.md', doc_type: 'docs', origin: { kind: 'agent' }, tokens: 10, status: 'included', text: 'hello' },
+          {
+            path: 'specs/b.md',
+            doc_type: 'specs',
+            origin: { kind: 'skill', skill_id: 's1', skill_name: 'security' },
+            tokens: 0,
+            status: 'missing',
+          },
+        ],
+      },
+    });
+    expect(trace.project_context?.docs).toHaveLength(2);
+    expect(trace.project_context?.docs[1]?.text).toBeUndefined();
+    expect(() =>
+      RunTrace.parse({
+        config: { agent: 'a', model: 'm' },
+        stats: { duration_ms: 1, tokens_in: 1, tokens_out: 1, findings: 0, grounding: 'x' },
+        prompt_assembly: { system: 's', user: 'u' },
+        tool_calls: [],
+        raw_output: '{}',
+        memory_pulled: [],
+        specs_read: [],
+        log: [],
+        project_context: {
+          budget_tokens: 1,
+          tokens_total: 0,
+          docs: [{ path: 'a.md', doc_type: 'docs', origin: { kind: 'agent' }, tokens: 0, status: 'bogus' }],
+        },
+      }),
+    ).toThrow();
+  });
+
+  it('Project Context list, preview and attachment shapes parse', () => {
+    const doc = {
+      path: 'docs/a.md',
+      name: 'a.md',
+      doc_type: 'docs',
+      size_bytes: 40,
+      tokens: 10,
+      updated_at: '2026-10-01T00:00:00.000Z',
+      used_by: 2,
+      source: 'repo',
+      editable: false,
+    };
+    const list = ContextList.parse({ clone_status: 'ready', globs: ['**/docs/**/*.md'], docs: [doc], tokens_total: 10 });
+    expect(list.truncated).toBeUndefined();
+    expect(ContextList.parse({ clone_status: 'not_cloned', globs: [], docs: [], tokens_total: 0, truncated: true }).truncated).toBe(true);
+    const preview = ContextDocPreview.parse({
+      ...doc,
+      content: '# a',
+      used_by_agents: [{ id: 'a1', name: 'Sec', via: 'skill', skill_name: 'security' }, { id: 'a2', name: 'Perf', via: 'direct' }],
+    });
+    expect(preview.used_by_agents).toHaveLength(2);
+    expect(ContextAttachments.parse({ repo_id: 'r1', paths: ['docs/b.md', 'docs/a.md'] }).paths[0]).toBe('docs/b.md');
+  });
+
+  it('Project Context store docs carry source/editable/version; old trace docs still parse', () => {
+    const storeDoc = {
+      path: '.devdigest/specs/a.md',
+      name: 'a.md',
+      doc_type: 'specs',
+      size_bytes: 10,
+      tokens: 3,
+      updated_at: '2026-10-01T00:00:00.000Z',
+      used_by: 0,
+      source: 'store',
+      editable: true,
+      version: 1,
+    };
+    expect(ContextDoc.parse(storeDoc).version).toBe(1);
+    expect(ContextDoc.parse({ ...storeDoc, source: 'repo', editable: false, version: undefined }).version).toBeUndefined();
+    expect(() => ContextDoc.parse({ ...storeDoc, source: 'cloud' })).toThrow();
+    expect(() => ContextDoc.parse({ ...storeDoc, source: undefined })).toThrow();
+    const preview = ContextDocPreview.parse({ ...storeDoc, content: '# a', used_by_agents: [] });
+    expect(preview.source).toBe('store');
+    expect(preview.editable).toBe(true);
+
+    const traceDoc = { path: 'docs/a.md', doc_type: 'docs', origin: { kind: 'agent' }, tokens: 4, status: 'included' };
+    expect(ProjectContextTraceDoc.parse(traceDoc).source).toBeUndefined(); // older trace = repo
+    expect(ProjectContextTraceDoc.parse({ ...traceDoc, source: 'store' }).source).toBe('store');
+
+    expect(ContextFileCreateInput.parse({}).on_conflict).toBeUndefined();
+    expect(ContextFileCreateInput.parse({ path: 'x', content: 'y', on_conflict: 'suffix' }).on_conflict).toBe('suffix');
+    expect(() => ContextFileCreateInput.parse({ on_conflict: 'overwrite' })).toThrow();
+    expect(ContextFileSaveInput.parse({ content: '', base_version: 1 }).base_version).toBe(1);
+    expect(() => ContextFileSaveInput.parse({ content: 'x' })).toThrow();
+    expect(ContextFileRenameInput.parse({ path: 'a', new_path: 'b', base_version: 2 }).new_path).toBe('b');
+    expect(PROJECT_CONTEXT_STORE_ROOT).toBe('.devdigest/specs/');
+    expect(PROJECT_CONTEXT_STORE_MAX_FILES).toBe(500);
+    expect(PROJECT_CONTEXT_STORE_MAX_DEPTH).toBe(5);
+    expect(PROJECT_CONTEXT_STORE_SEGMENT_RE.test('a-b_c.1')).toBe(true);
+    expect(PROJECT_CONTEXT_STORE_SEGMENT_RE.test('a b')).toBe(false);
   });
 
   it('RunTrace stats carry cost_usd (number or null)', () => {
@@ -235,5 +353,68 @@ describe('platform DTOs', () => {
         commits: [],
       }),
     ).not.toThrow();
+  });
+});
+
+describe('OnboardingTour contract', () => {
+  const tour = () => ({
+    repo_id: 'r1',
+    generated_at: '2026-10-01T10:00:00.000Z',
+    indexed_sha: 'abc123',
+    files_indexed: 120,
+    provider: 'anthropic',
+    model: 'claude-sonnet-4',
+    tokens_in: 9000,
+    tokens_out: 1200,
+    cost_usd: null,
+    prompt_version: 1,
+    language: 'en' as const,
+    architecture: {
+      summary: 'A Fastify API over Postgres.',
+      nodes: [
+        { id: 'api', label: 'API', kind: 'entry' as const },
+        { id: 'db', label: 'Postgres', kind: 'store' as const },
+      ],
+      edges: [{ from: 'api', to: 'db' }],
+    },
+    critical_paths: [{ path: 'server/src/app.ts', reason: 'Bootstraps the API.' }],
+    run_steps: [{ command: './scripts/dev.sh', comment: 'Boots everything' }],
+    reading_path: [],
+    first_tasks: [{ title: 'Add a test', path: 'server/src/modules', complexity: 'low' as const }],
+  });
+
+  it('parses a valid tour and both state shapes', () => {
+    expect(OnboardingTour.parse(tour()).architecture.nodes).toHaveLength(2);
+    expect(OnboardingTourState.parse({ status: 'none' })).toEqual({ status: 'none' });
+    const ready = OnboardingTourState.parse({
+      status: 'ready',
+      stale: true,
+      stale_reason: 'index_changed',
+      tour: tour(),
+    });
+    expect(ready.status === 'ready' && ready.stale_reason).toBe('index_changed');
+  });
+
+  it('rejects 13 nodes', () => {
+    const t = tour();
+    t.architecture.nodes = Array.from({ length: 13 }, (_, i) => ({
+      id: `n${i}`,
+      label: `N${i}`,
+      kind: 'module' as const,
+    }));
+    expect(OnboardingTour.safeParse(t).success).toBe(false);
+  });
+
+  it('rejects an unknown stale reason and a non-en language', () => {
+    expect(
+      OnboardingTourState.safeParse({ status: 'ready', stale: true, stale_reason: 'x', tour: tour() }).success,
+    ).toBe(false);
+    expect(OnboardingTour.safeParse({ ...tour(), language: 'de' }).success).toBe(false);
+  });
+
+  it('rejects the old {sections} shape', () => {
+    const old = { sections: [{ kind: 'architecture', title: 'T', body: 'b', links: [] }] };
+    expect(OnboardingTour.safeParse(old).success).toBe(false);
+    expect(OnboardingTourState.safeParse(old).success).toBe(false);
   });
 });

@@ -227,23 +227,6 @@ export const PrCommentInput = z.object({
 });
 export type PrCommentInput = z.infer<typeof PrCommentInput>;
 
-// ---- Project Context ----
-export const SpecFile = z.object({
-  path: z.string(),
-  content: z.string().nullish(),
-  size: z.number().int().nullish(),
-  updated_at: z.string().nullish(),
-});
-export type SpecFile = z.infer<typeof SpecFile>;
-
-export const IndexStatus = z.object({
-  status: z.enum(['idle', 'cloning', 'parsing', 'embedding', 'done', 'error']),
-  pct: z.number().min(0).max(100),
-  message: z.string().nullish(),
-  chunks_indexed: z.number().int().nullish(),
-});
-export type IndexStatus = z.infer<typeof IndexStatus>;
-
 /**
  * Repo-intel index state — GET /repos/:id/index-state (JSON of the server's
  * repo-intel `IndexState`). The UI badge + resync completion-poll read it:

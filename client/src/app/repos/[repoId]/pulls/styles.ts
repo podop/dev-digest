@@ -60,7 +60,8 @@ export const s = {
   filterActions: {
     marginLeft: "auto",
     display: "flex",
-    alignItems: "center",
+    // stretch, not center: the sm Refresh button takes the taller Sort select's height
+    alignItems: "stretch",
     gap: 12,
   } satisfies CSSProperties,
   pageHeader: {

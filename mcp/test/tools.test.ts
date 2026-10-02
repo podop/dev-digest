@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ToolError } from '../src/errors.js';
-import { MAX_RESPONSE_CHARS } from '../src/present.js';
+import { MAX_RESPONSE_CHARS, UNTRUSTED_TEXT_NOTE } from '../src/present.js';
 import { agent, blast, connect, convention, fakeApi, fakeClock, finding, review, runSummary, text } from './helpers.js';
 
 const PR_ARGS = { repo: 'podop/dev-digest', pr_number: 3 };
@@ -22,6 +22,28 @@ describe('tool catalog', () => {
       expect(Object.keys(t.annotations ?? {}).sort(), t.name).toEqual(['destructiveHint', 'idempotentHint', 'openWorldHint', 'readOnlyHint']);
     }
     expect(byName.run_agent_on_pr?.inputSchema.required).toEqual(expect.arrayContaining(['repo', 'pr_number', 'agent']));
+  });
+
+  it('marks PR-derived text as untrusted on every tool that carries it (schema + payload)', async () => {
+    const client = await connect(fakeApi());
+    const { tools } = await client.listTools();
+    for (const name of ['get_findings', 'get_conventions', 'get_blast_radius', 'run_agent_on_pr']) {
+      const props = tools.find((t) => t.name === name)?.outputSchema?.properties as Record<string, { const?: string }> | undefined;
+      expect(props?.untrusted_text?.const, name).toBe(UNTRUSTED_TEXT_NOTE);
+    }
+    const calls = [
+      ['get_findings', PR_ARGS],
+      ['get_conventions', { repo: 'podop/dev-digest' }],
+      ['get_blast_radius', PR_ARGS],
+      ['run_agent_on_pr', { ...PR_ARGS, agent: 'Security Reviewer' }],
+    ] as const;
+    for (const [name, args] of calls) {
+      const res = await client.callTool({ name, arguments: { ...args } });
+      expect(res.isError, name).toBeFalsy();
+      expect((res.structuredContent as { untrusted_text?: string }).untrusted_text, name).toBe(UNTRUSTED_TEXT_NOTE);
+      // ...and in the text channel, which is all a client without outputSchema support reads.
+      expect(text(res), `${name} text`).toContain(UNTRUSTED_TEXT_NOTE);
+    }
   });
 
   it('rejects an unknown argument on every tool (strict input schemas)', async () => {
@@ -68,8 +90,9 @@ describe('tool catalog', () => {
     // category, scan status) cost ~150 chars there and are never in the startup context.
     // Measured 11 830 with get_blast_radius's real outputSchema (the stub's was ~1 000 chars
     // smaller), 12 348 with its omitted_symbols/endpoints/groups fields; it only counts in
-    // outputSchema, which is never in the startup context.
-    expect(JSON.stringify(tools).length).toBeLessThanOrEqual(12_400);
+    // outputSchema, which is never in the startup context. The untrusted_text literal adds
+    // ~175 chars to each of the four tools that carry repo/PR-derived text.
+    expect(JSON.stringify(tools).length).toBeLessThanOrEqual(13_100);
   });
 });
 
@@ -115,6 +138,7 @@ describe('run_agent_on_pr', () => {
     expect(res.isError).toBe(true);
     expect(text(res)).toContain('[run_failed]');
     expect(text(res)).toContain('No API key for openrouter');
+    expect(text(res)).toContain('untrusted run error text');
     expect(text(res)).toContain('Next step:');
   });
 
@@ -302,9 +326,10 @@ describe('get_blast_radius', () => {
 
     expect(res.isError).toBeFalsy();
     expect(getBlastRadius).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000003', expect.anything());
-    expect(res.structuredContent).toEqual({ repo: 'podop/dev-digest', pr_number: 3, ...blast(), degraded: false, omitted_callers: 0 });
+    expect(res.structuredContent).toEqual({ untrusted_text: UNTRUSTED_TEXT_NOTE, repo: 'podop/dev-digest', pr_number: 3, ...blast(), degraded: false, omitted_callers: 0 });
     const out = text(res);
     expect(out).toContain('1 changed symbol · 3 callers · 2 endpoints · 1 cron');
+    expect(out).toContain(UNTRUSTED_TEXT_NOTE);
     expect(out).toContain('rateLimit <- publicRouter (src/router.ts:23)');
     expect(out).toContain('endpoints: GET /public, POST /webhooks');
     expect(out).toContain('crons: nightly-sweep');
@@ -375,6 +400,7 @@ describe('get_blast_radius', () => {
     expect(res.isError).toBeFalsy();
     expect(res.structuredContent).toMatchObject({ degraded: true, reason: 'no_data', downstream: [] });
     expect(text(res)).toContain('DEGRADED (no_data)');
+    expect(text(res)).toContain(UNTRUSTED_TEXT_NOTE);
     expect(text(res)).toContain("NOT 'no impact'");
     expect((res.structuredContent as { next_step: string }).next_step).toContain('Resync');
   });

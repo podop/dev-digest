@@ -172,4 +172,8 @@ export interface RepoIntel {
     opts?: { exclude?: string[] },
   ): Promise<string[]>;
   getCriticalPaths(repoId: string): Promise<string[][]>;
+
+  // --- Onboarding: the verified-path universe -----------------------------
+  /** EVERY indexed file path (one `file_rank` row each), rank DESC, tests included. `[]` when degraded. */
+  listIndexedFiles(repoId: string): Promise<string[]>;
 }

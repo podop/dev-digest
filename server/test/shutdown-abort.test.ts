@@ -62,6 +62,26 @@ describe('JobRunner abort + shutdown', () => {
     expect(updates.at(-1)).toMatchObject({ status: 'failed' });
   });
 
+  it('a failed job nobody awaits stays a failed row, not a process-level unhandledRejection', async () => {
+    const { db, updates } = fakeDb();
+    const jobs = new JobRunner(db, { retries: 0 });
+    jobs.register('boom', async () => {
+      throw new Error('duplicate key');
+    });
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      await jobs.enqueue('ws', 'boom', {}); // fire-and-forget, like every module caller
+      await jobs.onIdle();
+      await new Promise((r) => setTimeout(r, 10)); // let Node report unhandled rejections
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+    expect(unhandled).toEqual([]);
+    expect(updates.at(-1)).toMatchObject({ status: 'failed', error: 'duplicate key' });
+  });
+
   it('shutdown aborts running handlers, waits for idle and refuses new jobs', async () => {
     const { db } = fakeDb();
     const jobs = new JobRunner(db, { timeoutMs: 60_000, retries: 3 });

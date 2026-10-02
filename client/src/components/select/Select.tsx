@@ -21,6 +21,7 @@ export function Select<V extends string>({
   mono = true,
   "aria-label": ariaLabel,
   disabled,
+  formatValue,
 }: {
   value: V;
   onChange?: (v: V) => void;
@@ -28,6 +29,8 @@ export function Select<V extends string>({
   mono?: boolean;
   "aria-label"?: string;
   disabled?: boolean;
+  /** Trigger text for the current option's label (e.g. "Sort: Newest"); the list keeps the bare labels. */
+  formatValue?: (label: string) => string;
 }) {
   const normalized = React.useMemo(() => normalizeOptions(options), [options]);
   const {
@@ -64,7 +67,7 @@ export function Select<V extends string>({
       className={mono ? "mono" : undefined}
       style={s.trigger(disabled)}
     >
-      <span style={s.value(!normalized.some((o) => o.value === value))}>{currentLabel}</span>
+      <span style={s.value(!normalized.some((o) => o.value === value))}>{formatValue ? formatValue(currentLabel) : currentLabel}</span>
       <Icon.ChevronsUpDown size={14} style={s.chevron} />
       {open &&
         !disabled &&

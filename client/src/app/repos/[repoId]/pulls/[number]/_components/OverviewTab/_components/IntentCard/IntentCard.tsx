@@ -1,9 +1,11 @@
 /* IntentCard — the PR's derived intent (server/specs/05-intent-layer.md):
    plain-text intent, change-type chip, confidence badge, inferred/stale hints,
-   in/out-of-scope columns, sources (client-built links), model/cost, Refresh.
+   in/out-of-scope columns, a `children` slot under them, sources (client-built links),
+   model/cost, Refresh.
    Empty state (no derivation yet) offers a "Derive now" CTA. */
 "use client";
 
+import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Button, EmptyState, ErrorState, Icon, Skeleton } from "@devdigest/ui";
 import { ApiError } from "@/lib/api";
@@ -16,9 +18,11 @@ export interface IntentCardProps {
   prId: string;
   repoFullName: string | null;
   headSha: string | null;
+  /** Slot rendered under the scope columns (also under the "not derived yet" and the load-error states). */
+  children?: ReactNode;
 }
 
-export function IntentCard({ prId, repoFullName, headSha }: IntentCardProps) {
+export function IntentCard({ prId, repoFullName, headSha, children }: IntentCardProps) {
   const t = useTranslations("prReview");
   const tc = useTranslations("common");
   const { data, isLoading, isError, error, refetch } = usePrIntent(prId);
@@ -31,26 +35,32 @@ export function IntentCard({ prId, repoFullName, headSha }: IntentCardProps) {
   // MutationCache — client/INSIGHTS.md — so this is the only error surface here).
   if (isError) {
     return (
-      <ErrorState
-        title={t("intent.error.title")}
-        body={error instanceof ApiError ? error.message : t("intent.error.body")}
-        onRetry={() => refetch()}
-        retryLabel={tc("actions.retry")}
-      />
+      <div style={s.emptyStack}>
+        <ErrorState
+          title={t("intent.error.title")}
+          body={error instanceof ApiError ? error.message : t("intent.error.body")}
+          onRetry={() => refetch()}
+          retryLabel={tc("actions.retry")}
+        />
+        {children}
+      </div>
     );
   }
 
   const intent = data?.intent ?? null;
   if (!intent) {
     return (
-      <EmptyState
-        icon="Target"
-        title={t("intent.empty.title")}
-        body={t("intent.empty.body")}
-        cta={t("intent.empty.cta")}
-        ctaLoading={refresh.isPending}
-        onCta={() => refresh.mutate()}
-      />
+      <div style={s.emptyStack}>
+        <EmptyState
+          icon="Target"
+          title={t("intent.empty.title")}
+          body={t("intent.empty.body")}
+          cta={t("intent.empty.cta")}
+          ctaLoading={refresh.isPending}
+          onCta={() => refresh.mutate()}
+        />
+        {children}
+      </div>
     );
   }
 
@@ -85,6 +95,8 @@ export function IntentCard({ prId, repoFullName, headSha }: IntentCardProps) {
           {intent.out_of_scope.length > 0 && <ScopeBlock inScope={false} label={t("intent.outOfScope")} lines={intent.out_of_scope} />}
         </div>
       )}
+
+      {children}
 
       {intent.sources && intent.sources.length > 0 && (
         <div style={s.sourcesBlock}>

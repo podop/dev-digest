@@ -38,6 +38,11 @@ export class RepoIntelRepository extends RepoIntelReadRepository implements Inde
     return this.transaction(work);
   }
 
+  /** Transaction-scoped advisory lock per repo (released on commit/rollback). */
+  async lockRepo(repoId: string): Promise<void> {
+    await this.db.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`repo-intel:${repoId}`}, 0))`);
+  }
+
   /** Wipe every symbol + reference row of a repo (full-index reset). */
   async deleteAllForRepo(repoId: string): Promise<void> {
     await this.db.delete(t.symbols).where(eq(t.symbols.repoId, repoId));

@@ -95,6 +95,28 @@ export const s = {
     overflow: "auto",
   } satisfies CSSProperties,
 
+  // ---- ProjectContextBlock ----
+  ctxHead: { display: "flex", alignItems: "center", gap: 10, padding: "8px 12px" } satisfies CSSProperties,
+  ctxTitle: { fontSize: 13, fontWeight: 600 } satisfies CSSProperties,
+  ctxTokens: { marginLeft: "auto", fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" } satisfies CSSProperties,
+  ctxItem: { borderTop: "1px solid var(--border)" } satisfies CSSProperties,
+  ctxItemHead: { display: "flex", alignItems: "center", gap: 10, padding: "8px 12px" } satisfies CSSProperties,
+  ctxPath: { ...buttonReset, fontSize: 12, color: "var(--text-primary)", wordBreak: "break-all" } satisfies CSSProperties,
+  ctxPathStatic: { fontSize: 12, color: "var(--text-muted)", wordBreak: "break-all" } satisfies CSSProperties,
+  ctxMeta: { marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--text-muted)" } satisfies CSSProperties,
+  ctxPre: {
+    margin: 0,
+    padding: "12px 14px",
+    fontSize: 12,
+    lineHeight: 1.55,
+    color: "var(--text-primary)",
+    background: "var(--code-bg)",
+    borderTop: "1px solid var(--border)",
+    whiteSpace: "pre-wrap",
+    maxHeight: 360,
+    overflow: "auto",
+  } satisfies CSSProperties,
+
   // ---- Stat ----
   stat: {
     flex: 1,
@@ -113,6 +135,18 @@ export const s = {
   specsWrap: { display: "flex", gap: 6, flexWrap: "wrap" } satisfies CSSProperties,
   specsNone: { color: "var(--text-muted)" } satisfies CSSProperties,
   spec: { fontSize: 12, color: "var(--text-secondary)" } satisfies CSSProperties,
+  specTokens: { color: "var(--text-muted)" } satisfies CSSProperties,
+  miniBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 4,
+    borderRadius: 5,
+    border: "1px solid var(--border)",
+    background: "var(--bg-elevated)",
+    color: "var(--text-muted)",
+    cursor: "pointer",
+  } satisfies CSSProperties,
   statsRow: { display: "flex", gap: 10 } satisfies CSSProperties,
   rawPre: {
     margin: 0,

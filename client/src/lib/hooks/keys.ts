@@ -23,8 +23,13 @@ export const repoKeys = {
   list: () => [...repoKeys.all, "list"] as const,
   detail: (repoId: Id) => [...repoKeys.all, "detail", repoId] as const,
   pulls: (repoId: Id) => [...repoKeys.detail(repoId), "pulls"] as const,
+  /** Project Context list of a repo (GET /repos/:id/context); also the prefix of its doc previews. */
   context: (repoId: Id) => [...repoKeys.detail(repoId), "context"] as const,
+  /** One document preview (GET /repos/:id/context/doc?path=). */
+  contextDoc: (repoId: Id, path: Id) => [...repoKeys.context(repoId), "doc", path] as const,
   intelState: (repoId: Id) => [...repoKeys.detail(repoId), "intel-state"] as const,
+  /** Onboarding tour of a repo (GET/POST /repos/:id/onboarding). */
+  onboarding: (repoId: Id) => [...repoKeys.detail(repoId), "onboarding"] as const,
 };
 
 export const prKeys = {
@@ -41,6 +46,8 @@ export const prKeys = {
   smartDiff: (prId: Id) => [...prKeys.detail(prId), "smart-diff"] as const,
   /** GET /pulls/:id/blast (server/specs/07-blast-radius.md) — an index read; a resync invalidates it. */
   blast: (prId: Id) => [...prKeys.detail(prId), "blast"] as const,
+  /** GET /pulls/:id/brief (specs/2026-10-01-pr-brief.md) — written only by its own POST; not run-scoped, a run changes the banner (reviews), not the stored brief text. */
+  brief: (prId: Id) => [...prKeys.detail(prId), "brief"] as const,
   /** GET /pulls/:id/history — previously merged PRs touching the same files. */
   history: (prId: Id) => [...prKeys.detail(prId), "history"] as const,
 };
@@ -57,6 +64,10 @@ export const agentKeys = {
   skillsAll: () => [...agentKeys.all, "skills"] as const,
   /** The ordered skill links of one agent (GET /agents/:id/skills). */
   skills: (id: Id) => [...agentKeys.skillsAll(), id] as const,
+  /** The ordered Project Context paths of one agent in one repo (GET /agents/:id/context). */
+  context: (id: Id, repoId: Id) => [...agentKeys.contextAll(), id, repoId] as const,
+  /** Prefix of every agent's Project Context paths (a store-file rename rewrites them all). */
+  contextAll: () => [...agentKeys.all, "context"] as const,
 };
 
 /** Filters of the community catalog search (GET /skills/community). */
@@ -78,6 +89,10 @@ export const skillKeys = {
   /** Prefix of every skill's "used by" list (agent links change them all). */
   agentsAll: () => [...skillKeys.all, "agents"] as const,
   agents: (id: Id) => [...skillKeys.agentsAll(), id] as const,
+  /** The ordered Project Context paths of one skill in one repo (GET /skills/:id/context). */
+  context: (id: Id, repoId: Id) => [...skillKeys.contextAll(), id, repoId] as const,
+  /** Prefix of every skill's Project Context paths (a store-file rename rewrites them all). */
+  contextAll: () => [...skillKeys.all, "context"] as const,
   community: (f: CommunitySkillFilters) =>
     [...skillKeys.all, "community", f.q ?? "", f.tag ?? "", f.lang ?? ""] as const,
 };

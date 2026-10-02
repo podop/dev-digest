@@ -8,7 +8,7 @@ description: >
   / CANNOT_VERIFY verdict — plus the changed files no plan item explains. Read-only; may
   re-run the plan's hermetic "Done when" commands. Not for general code review or advice,
   architecture/security audits, or fixing anything.
-model: opus
+model: sonnet
 effort: high
 tools: Read, Grep, Glob, Bash
 disallowedTools: Write, Edit, NotebookEdit, Skill
@@ -63,6 +63,11 @@ Split the plan and spec into numbered items, quoting each (≤1 line):
 - `Contracts & migrations` (each item, incl. shared-copy sync / new migration);
 - `Out of scope` (each item — violated → `FAIL-wrong`);
 - every acceptance criterion of the spec: `AC1…ACn`.
+
+Read only the spec sections you itemize: in a dated spec (specreator template) that is
+"Out of scope" (each line is an `OOS` row), "Contracts" (context for the ACs) and
+"Acceptance criteria" — `grep -n '^## ' <spec>` then `sed -n` those ranges. A legacy
+`NN-*.md` spec: read it whole. Struck-through ACs (`~~AC3~~`) are not rows.
 
 ## Step 2 — evidence per item
 

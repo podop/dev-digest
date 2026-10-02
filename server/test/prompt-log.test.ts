@@ -221,6 +221,7 @@ describe('S4 — review wiring: reviewPullRequest onPrompt → PromptLog', () =>
     'SENTINEL_REPOMAP',
     'SENTINEL_SKILL',
     'SENTINEL_SPEC',
+    'SENTINEL_SPEC_PATH',
   ];
 
   it('logs provider/model/runId, never the sections’ content, verbose on AND off', async () => {
@@ -246,7 +247,7 @@ describe('S4 — review wiring: reviewPullRequest onPrompt → PromptLog', () =>
         callers: 'SENTINEL_CALLERS',
         repoMap: 'SENTINEL_REPOMAP',
         skills: ['SENTINEL_SKILL'],
-        specs: ['SENTINEL_SPEC'],
+        specs: [{ path: 'docs/SENTINEL_SPEC_PATH.md', text: 'SENTINEL_SPEC' }],
         onPrompt: (e) =>
           promptLog.assembled({
             feature: 'review',

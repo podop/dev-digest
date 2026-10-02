@@ -46,6 +46,7 @@
     "tabs": {
       "config": "Config",
       "skills": "Skills",
+      "context": "Context",
       "evals": "Evals",
       "stats": "Stats",
       "ci": "CI"
@@ -112,5 +113,17 @@
     "confirm": "Delete agent",
     "deleting": "Deleting…",
     "deleted": "Deleted \"{name}\""
+  },
+  "context": {
+    "noRepoTitle": "No repository selected",
+    "noRepoBody": "Pick a repository in the sidebar to attach its documents to this agent.",
+    "loadError": "Couldn’t load the attached documents",
+    "title": "Project context",
+    "badge": "{attached} of {total} attached",
+    "hint": "Order matters — earlier docs appear earlier in the assembled <code>## Project context</code> block. Toggle to attach.",
+    "total": "≈ {tokens, number} tokens total",
+    "fromSkills": "incl. {tokens, number} from skills",
+    "injected": "Injected as an untrusted block (<code>## Project context</code>) into every run.",
+    "overBudget": "Exceeds the {budget, number} token run budget — later documents will be skipped."
   }
 }

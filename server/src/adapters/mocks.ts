@@ -282,6 +282,8 @@ export interface MockGitOptions {
   head?: string;
   /** Head `currentHead()` returns AFTER `sync()` runs — simulates fetch+reset advancing HEAD. */
   syncedHead?: string;
+  /** What `resolveBaseCommit()` returns (null = unresolvable); defaults to `head`. */
+  baseCommit?: string | null;
 }
 
 export class MockGitClient implements GitClient {
@@ -325,6 +327,9 @@ export class MockGitClient implements GitClient {
   }
   async readFile(_repo: RepoRef, path: string): Promise<string> {
     return this.opts.files?.[path] ?? '';
+  }
+  async resolveBaseCommit(): Promise<string | null> {
+    return this.opts.baseCommit !== undefined ? this.opts.baseCommit : (this.opts.head ?? 'a1b2c3d4');
   }
   async readFileAt(_repo: RepoRef, _sha: string, path: string): Promise<FileAtRef> {
     const content = this.opts.files?.[path];

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { z } from 'zod';
 import { homedir } from 'node:os';
 import { join, isAbsolute, resolve } from 'node:path';
+import { PROJECT_CONTEXT_DEFAULT_GLOBS } from '@devdigest/shared';
 
 /**
  * Central, zod-validated environment config. Loaded once at startup.
@@ -72,7 +73,32 @@ const EnvSchema = z.object({
   // OFF outside development or off loopback (loadConfig warns via
   // `promptLogVerboseDisabledReason`, server.ts logs it once at boot).
   PROMPT_LOG_VERBOSE: z.string().optional(),
+  // Project Context (server/specs → specs/2026-10-01-project-context.md): globs of
+  // the repo markdown docs the Project Context screen lists and agents/skills may
+  // attach. Comma-separated; commas inside `{a,b}` are part of the glob. Unset or
+  // empty → the default `**/{specs,docs,insights}/**/*.md`.
+  PROJECT_CONTEXT_GLOBS: z.string().optional(),
 });
+
+/** Split a glob list on commas outside `{…}`; blank entries are dropped. */
+export function parseGlobList(raw: string | undefined): string[] {
+  if (!raw) return [];
+  const out: string[] = [];
+  let depth = 0;
+  let cur = '';
+  for (const ch of raw) {
+    if (ch === '{') depth++;
+    else if (ch === '}') depth = Math.max(0, depth - 1);
+    if (ch === ',' && depth === 0) {
+      out.push(cur);
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  out.push(cur);
+  return out.map((g) => g.trim()).filter((g) => g.length > 0);
+}
 
 /** 127.0.0.0/8, `::1`, or `localhost` — the interfaces the API may safely bind
  *  to without authentication (see API_HOST above). */
@@ -112,6 +138,8 @@ export type AppConfig = {
   reviewMapConcurrency?: number;
   /** Kill switch for the intent layer (server/specs/05-intent-layer.md). Default true. */
   reviewIntentEnabled: boolean;
+  /** Globs of listable Project Context documents (PROJECT_CONTEXT_GLOBS). Never empty. */
+  projectContextGlobs: readonly string[];
   /** DEV/E2E ONLY — 'mock' routes every LLM provider to the deterministic mock. */
   llmProviderOverride?: 'mock';
   /** Latency of each mock LLM call (ms); only used with llmProviderOverride. */
@@ -133,6 +161,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   const promptLogVerbose =
     promptLogVerboseRequested && parsed.NODE_ENV === 'development' && isLoopbackHost(parsed.API_HOST);
+  const projectContextGlobs = parseGlobList(parsed.PROJECT_CONTEXT_GLOBS);
   const cloneDirRaw =
     parsed.DEVDIGEST_CLONE_DIR ?? join(homedir(), '.devdigest', 'workspace');
   const cloneDir = isAbsolute(cloneDirRaw) ? cloneDirRaw : resolve(process.cwd(), cloneDirRaw);
@@ -149,6 +178,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     embeddingsEnabled: parsed.EMBEDDINGS_ENABLED === 'true',
     repoIntelEnabled: parsed.REPO_INTEL_ENABLED !== 'false',
     reviewIntentEnabled: parsed.REVIEW_INTENT_ENABLED !== 'false',
+    projectContextGlobs: projectContextGlobs.length > 0 ? projectContextGlobs : PROJECT_CONTEXT_DEFAULT_GLOBS,
     promptLogVerboseRequested,
     promptLogVerbose,
     ...(parsed.REVIEW_MAP_CONCURRENCY !== undefined ? { reviewMapConcurrency: parsed.REVIEW_MAP_CONCURRENCY } : {}),

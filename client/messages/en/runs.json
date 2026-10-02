@@ -33,6 +33,7 @@
       "provider": "Provider",
       "memoryPulled": "Memory pulled",
       "specsRead": "Specs read",
+      "specTokens": "~{tokens} tok",
       "items": "{count, plural, one {# item} other {# items}}",
       "none": "none",
       "skills": "Skills"
@@ -63,6 +64,21 @@
       "result": "result",
       "previewTruncated": "(preview truncated)",
       "ms": "{ms}ms"
+    },
+    "projectContext": {
+      "title": "Project context · attached specs",
+      "tokens": "~{tokens} / {budget} tokens",
+      "docTokens": "~{tokens} tokens",
+      "copy": "Copy {path}",
+      "viaAgent": "agent",
+      "viaSkill": "skill {name}",
+      "status": {
+        "included": "included",
+        "missing": "missing",
+        "too_large": "too large",
+        "over_budget": "over budget",
+        "unreadable": "unreadable"
+      }
     }
   },
   "drawer": {

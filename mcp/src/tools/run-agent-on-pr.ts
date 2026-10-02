@@ -1,12 +1,13 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { ToolError } from '../errors.js';
-import { toVerdict, VerdictSchema } from '../present.js';
+import { toVerdict, untrustedError, UNTRUSTED_TEXT_NOTE, UntrustedTextField, VerdictSchema } from '../present.js';
 import { resolveAgent, resolvePull, resolveRepo } from '../resolve.js';
 import { isRunning, waitForRun } from '../run-review.js';
 import { guarded, ok, PrArgs, type ToolDeps, type ToolExtra } from './shared.js';
 
 const RunResult = {
+  ...UntrustedTextField,
   repo: z.string(),
   pr_number: z.number().int(),
   run_id: z.string(),
@@ -47,7 +48,7 @@ export function registerRunAgentOnPr(server: McpServer, deps: ToolDeps): void {
         throw new ToolError('run_not_started', 'DevDigest accepted the request but created no run.', 'Check the API log; then call run_agent_on_pr again.');
       }
 
-      const base = { repo: repo.full_name, pr_number, run_id: runId, agent: agent.name };
+      const base = { untrusted_text: UNTRUSTED_TEXT_NOTE, repo: repo.full_name, pr_number, run_id: runId, agent: agent.name } as const;
       let run: Awaited<ReturnType<typeof waitForRun>>;
       try {
         run = await waitForRun(deps, pr.id, runId, deadline, extra);
@@ -67,7 +68,7 @@ export function registerRunAgentOnPr(server: McpServer, deps: ToolDeps): void {
       if (run.status !== 'done') {
         throw new ToolError(
           `run_${run.status}`,
-          `Review run ${runId} (${agent.name}) ended as "${run.status}"${run.error ? `: ${run.error}` : ''}. No findings were produced — do not report the PR as clean.`,
+          `Review run ${runId} (${agent.name}) ended as "${run.status}"${run.error ? `: ${untrustedError(run.error)}` : ''}. No findings were produced — do not report the PR as clean.`,
           run.status === 'cancelled'
             ? 'The run was cancelled in DevDigest; call run_agent_on_pr again if a review is still wanted.'
             : 'Fix the cause if it is a config problem (e.g. missing LLM key in DevDigest Settings), then call run_agent_on_pr again.',

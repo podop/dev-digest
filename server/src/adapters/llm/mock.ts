@@ -28,6 +28,9 @@ import { ExternalServiceError } from '../../platform/errors.js';
  *   does not exist, which the gate drops (mockConventionsFor).
  * - `IntentClassification` (intent layer) returns MOCK_INTENT_CLASSIFICATION —
  *   a plausible intent/scope/change_type for the seeded PR #482 review.
+ * - `PrBriefLlm` (PR brief) returns MOCK_PR_BRIEF — risks and focus items on the
+ *   seeded PR #482 paths and hunks; on another PR the paths are dropped by the
+ *   brief's grounding (the brief is then stored with no risks and no focus).
  * - Other structured schemas have no fixture → ExternalServiceError (the
  *   feature under test fails loudly instead of receiving invented data).
  * - `delayMs` makes each call take that long (abortable by the run's signal),
@@ -107,6 +110,47 @@ export const CONVENTION_EXTRACTION_SCHEMA = 'ConventionExtraction';
 
 /** Schema name of the intent layer's classification call (modules/intent). */
 export const INTENT_CLASSIFICATION_SCHEMA = 'IntentClassification';
+
+/** Schema name of the PR brief call (modules/brief). */
+export const PR_BRIEF_SCHEMA = 'PrBriefLlm';
+
+/**
+ * Fixture for the PR brief, matched to the seeded PR #482 (paths and hunks of
+ * db/seed-diff.ts), so the flow works with `LLM_PROVIDER_OVERRIDE=mock`.
+ */
+export const MOCK_PR_BRIEF = {
+  summary:
+    '[mock LLM] Adds a token-bucket rate limiter in front of the public webhook endpoints and moves its limits into the config.',
+  risks: [
+    {
+      kind: 'security',
+      title: 'Rate-limit key trusts a client-controlled header',
+      explanation: 'The bucket key comes from `X-Forwarded-For`, so a client can dodge the limiter by sending a new value on every request.',
+      severity: 'high',
+      file_refs: ['src/middleware/ratelimit.ts:6-9'],
+    },
+    {
+      kind: 'perf',
+      title: 'Per-user query inside a loop',
+      explanation: 'Each user triggers its own `orgs` query, so the list endpoint now issues one query per row.',
+      severity: 'medium',
+      file_refs: ['src/api/users.ts:45-50'],
+    },
+    {
+      kind: 'data',
+      title: 'Live-looking key committed in the config',
+      explanation: 'A `stripeKey` literal is added to `config.ts`; check that it is a placeholder and not a real secret.',
+      severity: 'low',
+      file_refs: ['src/config.ts:12'],
+    },
+  ],
+  review_focus: [
+    { file: 'src/middleware/ratelimit.ts', line: 7, reason: 'The bucket key is taken from a spoofable header.' },
+    { file: 'src/api/public/webhooks.ts', line: 4, reason: 'Where the limiter is attached to the public routes.' },
+    { file: 'src/api/users.ts', line: 46, reason: 'New per-user query in the loop.' },
+    { file: 'src/config.ts', line: 12, reason: 'A key-looking literal enters the config.' },
+  ],
+};
 
 /**
  * Fixture for the intent layer (server/specs/05-intent-layer.md), matched to
@@ -201,7 +245,9 @@ export class MockReviewLLMProvider implements LLMProvider {
           ? mockConventionsFor(req.messages)
           : req.schemaName === INTENT_CLASSIFICATION_SCHEMA
             ? MOCK_INTENT_CLASSIFICATION
-            : undefined;
+            : req.schemaName === PR_BRIEF_SCHEMA
+              ? MOCK_PR_BRIEF
+              : undefined;
     if (fixture === undefined) {
       throw new ExternalServiceError(`Mock LLM provider has no fixture for structured output '${req.schemaName}'`);
     }

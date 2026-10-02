@@ -28,6 +28,7 @@ export const STATUS_BY_KIND: Readonly<Record<ErrorKind, number>> = {
   forbidden: 403,
   not_found: 404,
   conflict: 409,
+  payload_too_large: 413,
   validation: 422,
   internal: 500,
   config: 500,

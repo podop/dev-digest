@@ -46,6 +46,13 @@ rule can reach, and it would silently review nothing.
 Only for the packages in the plan. These are cheap, reproducible and never
 hallucinate, so they run before any model call. Each failure is **CRITICAL**.
 
+Reuse the gates cache first: `./scripts/gates.sh --show` (after `/implement` it usually
+exists for the current state). A gate that passed for this exact state counts as run —
+cite it as `gates <state>:<id>`. No report → `./scripts/gates.sh --packages <plan
+packages> --only root:drift,<pkg>:typecheck,<pkg>:lint,server:arch` (add the test ids
+only with `--tests`). Run by hand only what `gates.sh`
+does not cover: `server:missing-migration` and `repo:secret-scan`.
+
 | Gate id | Command | Meaning |
 |---|---|---|
 | `<pkg>:typecheck` | `cd <pkg> && pnpm typecheck` (`npm` in `reviewer-core`, `e2e`, `mcp`) | must be clean |

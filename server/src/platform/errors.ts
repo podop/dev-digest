@@ -22,6 +22,7 @@ export type ErrorKind =
   | 'forbidden'
   | 'not_found'
   | 'conflict'
+  | 'payload_too_large'
   | 'config'
   | 'external_service'
   | 'internal';
@@ -95,6 +96,14 @@ export class NotFoundError extends AppError {
 export class ConflictError extends AppError {
   override readonly kind = 'conflict';
   constructor(message = 'Conflict', details?: unknown, code = 'conflict') {
+    super(code, message, undefined, details);
+  }
+}
+
+/** The requested resource is larger than the API will return (→ 413). */
+export class PayloadTooLargeError extends AppError {
+  override readonly kind = 'payload_too_large';
+  constructor(message = 'Payload too large', details?: unknown, code = 'payload_too_large') {
     super(code, message, undefined, details);
   }
 }
