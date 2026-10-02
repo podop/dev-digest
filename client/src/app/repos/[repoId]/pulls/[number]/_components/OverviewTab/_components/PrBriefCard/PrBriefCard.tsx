@@ -1,67 +1,65 @@
-/* PrBriefCard — the PR Brief on top of Overview (specs/2026-10-01-pr-brief.md §9):
-   skeleton while loading/generating, an explanation + Generate button before the first
-   brief, and with a brief: banner (verdict, score, summary, refresh), notes for missing
-   inputs / stale / failed generation. All model-written text is rendered as plain text. */
+/* PrBriefCard — the top of Overview (specs/2026-10-01-pr-brief.md §9): a "PR Brief" label and
+   under it skeleton while loading/generating, an explanation + Generate button before the first
+   brief, and with a brief the banner (verdict, score, summary, refresh) plus notes for missing
+   inputs / stale / failed generation. Risk areas and Review focus live in their own cards.
+   The generate mutation is owned by OverviewTab (three cards read one brief), so this card
+   gets its state as props. All model-written text is rendered as plain text. */
 "use client";
 
+import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import { Button, ErrorState, Icon, Skeleton } from "@devdigest/ui";
+import { Button, ErrorState, SectionLabel, Skeleton } from "@devdigest/ui";
 import { ApiError } from "@/lib/api";
-import { useGenerateBrief, usePrBrief, usePrReviews } from "@/lib/hooks";
+import { usePrBrief, usePrReviews } from "@/lib/hooks";
 import { BriefBanner } from "./_components/BriefBanner";
-import { FocusList } from "./_components/FocusList";
-import { RiskList } from "./_components/RiskList";
 import { SKELETON_HEIGHT } from "./constants";
 import { bannerStats, isBriefStale } from "./helpers";
 import { s } from "./styles";
-import { useOpenInDiff } from "./useOpenInDiff";
 
 export interface PrBriefCardProps {
   prId: string;
-  repoId: string;
-  /** PR number as in the route (for the Files changed deep-links). */
-  number: string;
-  /** Paths of the PR's changed files — the only files a reference may open. */
-  changedPaths: readonly string[];
   /** Head SHA of the PR as the page shows it. */
   headSha: string | null;
+  /** A generate/refresh POST is in flight. */
+  generating: boolean;
+  /** Error of the last generate POST (null when none / since cleared). */
+  generateError: unknown;
+  onGenerate: () => void;
 }
 
-export function PrBriefCard({ prId, repoId, number, changedPaths, headSha }: PrBriefCardProps) {
+export function PrBriefCard({ prId, headSha, generating, generateError, onGenerate }: PrBriefCardProps) {
   const t = useTranslations("brief");
   const { data, isLoading, isError, error, refetch } = usePrBrief(prId);
   const { data: reviews } = usePrReviews(prId);
-  const generate = useGenerateBrief(prId);
-  const diffLinks = useOpenInDiff({ repoId, number, changedPaths });
 
-  if (isLoading) return <Skeleton height={SKELETON_HEIGHT} />;
+  if (isLoading) {
+    return (
+      <BriefSection busy={false}>
+        <Skeleton height={SKELETON_HEIGHT} />
+      </BriefSection>
+    );
+  }
 
   if (isError) {
     return (
-      <ErrorState
-        title={t("error.title")}
-        body={error instanceof ApiError ? error.message : t("error.body")}
-        onRetry={() => refetch()}
-        retryLabel={t("retry")}
-      />
+      <BriefSection busy={false}>
+        <ErrorState
+          title={t("error.title")}
+          body={error instanceof ApiError ? error.message : t("error.body")}
+          onRetry={() => refetch()}
+          retryLabel={t("retry")}
+        />
+      </BriefSection>
     );
   }
 
   const brief = data?.brief ?? null;
-  const generating = generate.isPending;
-  const failure = generate.isError
-    ? generate.error instanceof ApiError
-      ? t("error.generateFailed", { message: generate.error.message })
-      : t("error.generateFailedGeneric")
-    : null;
-  const regenerate = () => generate.mutate();
-
-  const header = (
-    <div style={s.header}>
-      <Icon.Sparkles size={16} style={s.headerIcon} />
-      <span style={s.headerTitle}>{t("title")}</span>
-    </div>
-  );
+  const failure =
+    generateError == null
+      ? null
+      : generateError instanceof ApiError
+        ? t("error.generateFailed", { message: generateError.message })
+        : t("error.generateFailedGeneric");
   const errorNote = failure && (
     <p role="alert" style={s.errorNote}>
       {failure}
@@ -70,39 +68,41 @@ export function PrBriefCard({ prId, repoId, number, changedPaths, headSha }: PrB
 
   if (generating) {
     return (
-      <section style={s.card} aria-label={t("title")} aria-busy="true">
-        {header}
-        <p style={s.explanation}>{t("generating")}</p>
-        <Skeleton height={SKELETON_HEIGHT} />
-        <div>
-          <Button kind="primary" icon="Sparkles" disabled loading>
-            {brief ? t("refresh") : t("empty.cta")}
-          </Button>
+      <BriefSection busy>
+        <div style={s.card}>
+          <p style={s.explanation}>{t("generating")}</p>
+          <Skeleton height={SKELETON_HEIGHT} />
+          <div>
+            <Button kind="primary" icon="Sparkles" disabled loading>
+              {brief ? t("refresh") : t("empty.cta")}
+            </Button>
+          </div>
         </div>
-      </section>
+      </BriefSection>
     );
   }
 
   if (!brief) {
     return (
-      <section style={s.card} aria-label={t("title")}>
-        {header}
-        <p style={s.explanation}>{t("empty.body")}</p>
-        {errorNote}
-        <div>
-          <Button kind="primary" icon="Sparkles" onClick={regenerate}>
-            {t("empty.cta")}
-          </Button>
+      <BriefSection busy={false}>
+        <div style={s.card}>
+          <h3 style={s.emptyTitle}>{t("unavailable")}</h3>
+          <p style={s.explanation}>{t("empty.body")}</p>
+          {errorNote}
+          <div>
+            <Button kind="primary" icon="Sparkles" onClick={onGenerate}>
+              {t("empty.cta")}
+            </Button>
+          </div>
         </div>
-      </section>
+      </BriefSection>
     );
   }
 
   const stale = isBriefStale(data?.stale ?? false, brief.head_sha, headSha);
 
   return (
-    <section style={s.card} aria-label={t("title")}>
-      {header}
+    <BriefSection busy={false}>
       <BriefBanner
         summary={brief.summary}
         stats={bannerStats(reviews)}
@@ -110,7 +110,7 @@ export function PrBriefCard({ prId, repoId, number, changedPaths, headSha }: PrB
         tokensOut={brief.tokens_out}
         costUsd={brief.cost_usd}
         stale={stale}
-        onRefresh={regenerate}
+        onRefresh={onGenerate}
       />
       {(stale || errorNote || brief.missing_inputs.length > 0) && (
         <div style={s.notes}>
@@ -126,8 +126,17 @@ export function PrBriefCard({ prId, repoId, number, changedPaths, headSha }: PrB
           })}
         </div>
       )}
-      <RiskList risks={brief.risks.risks} {...diffLinks} />
-      <FocusList items={brief.review_focus} {...diffLinks} />
+    </BriefSection>
+  );
+}
+
+/** The "PR BRIEF" label over whatever the brief area shows. */
+function BriefSection({ busy, children }: { busy: boolean; children: ReactNode }) {
+  const t = useTranslations("brief");
+  return (
+    <section aria-label={t("title")} aria-busy={busy || undefined}>
+      <SectionLabel icon="FileText">{t("title")}</SectionLabel>
+      <div style={s.body}>{children}</div>
     </section>
   );
 }

@@ -1,5 +1,5 @@
 import type { PrMeta } from "@/lib/types";
-import { DEFAULT_SORT, DEFAULT_STATUS, OPEN_STATUSES, SORT_ORDERS, type PullsSort } from "./constants";
+import { DEFAULT_SORT, DEFAULT_STATUS, OPEN_STATUSES, RISK_WEIGHTS, SORT_ORDERS, type PullsSort } from "./constants";
 
 type RawParam = string | string[] | undefined;
 
@@ -28,14 +28,39 @@ export function pullsHref(repoId: string, { status, sort }: PullsSearch): string
 }
 
 const updatedAt = (p: PrMeta) => Date.parse(p.updated_at ?? "") || 0;
+const newestFirst = (a: PrMeta, b: PrMeta) => updatedAt(b) - updatedAt(a);
+const findingsTotal = ({ findings_counts: c }: PrMeta) => (c ? c.CRITICAL + c.WARNING + c.SUGGESTION : null);
+const riskOf = ({ findings_counts: c }: PrMeta) =>
+  c ? c.CRITICAL * RISK_WEIGHTS.CRITICAL + c.WARNING * RISK_WEIGHTS.WARNING + c.SUGGESTION * RISK_WEIGHTS.SUGGESTION : null;
 
-/** PRs matching the status filter and the free-text query (title or #number), sorted by last update. */
+/** Descending by `key`; PRs without a value (never reviewed) sink to the bottom. */
+const byDesc =
+  (key: (p: PrMeta) => number | null | undefined) =>
+  (a: PrMeta, b: PrMeta): number => {
+    const ka = key(a);
+    const kb = key(b);
+    if (ka == null || kb == null) return ka == null ? (kb == null ? 0 : 1) : -1;
+    return kb - ka;
+  };
+
+const COMPARE: Record<PullsSort, (a: PrMeta, b: PrMeta) => number> = {
+  newest: newestFirst,
+  oldest: (a, b) => updatedAt(a) - updatedAt(b),
+  // Not `score`: it covers only the latest review, while findings_counts (the FINDINGS
+  // column) sums every agent's latest review.
+  risk: byDesc(riskOf),
+  findings: byDesc(findingsTotal),
+  largest: byDesc((p) => p.additions + p.deletions),
+};
+
+/** PRs matching the status filter and the free-text query (title or #number), sorted by `sort`
+ *  (ties fall back to newest first). */
 export function filterPulls(pulls: readonly PrMeta[], { status, sort }: PullsSearch, query: string): PrMeta[] {
   const q = query.trim().toLowerCase();
   return pulls
     .filter((p) => status === "all" || p.status === status)
     .filter((p) => !q || p.title.toLowerCase().includes(q) || String(p.number).includes(q))
-    .sort((a, b) => (sort === "oldest" ? updatedAt(a) - updatedAt(b) : updatedAt(b) - updatedAt(a)));
+    .sort((a, b) => COMPARE[sort](a, b) || newestFirst(a, b));
 }
 
 /** Header counters: open PRs, those still waiting for review, and merged ones. */

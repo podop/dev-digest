@@ -3,7 +3,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import type { PrIntentResponse } from "@devdigest/shared";
 import { renderWithProviders, screen, cleanup, within } from "@/test/render";
-import { mockFetch } from "@/test/fetch-mock";
+import { mockFetch, jsonResponse } from "@/test/fetch-mock";
 import { IntentCard } from "./IntentCard";
 
 const INTENT: PrIntentResponse = {
@@ -58,5 +58,38 @@ describe("IntentCard", () => {
     mockFetch({ "GET /pulls/pr-1/intent": { intent: null, stale: false } satisfies PrIntentResponse });
     renderWithProviders(<IntentCard prId="pr-1" repoFullName="acme/api" headSha="abc" />);
     expect(await screen.findByRole("button", { name: /derive/i })).toBeInTheDocument();
+  });
+
+  it("renders its children slot under the scope columns, also before the first derivation", async () => {
+    mockFetch({ "GET /pulls/pr-1/intent": INTENT });
+    const first = renderWithProviders(
+      <IntentCard prId="pr-1" repoFullName="acme/api" headSha="abc">
+        <p>Slot content</p>
+      </IntentCard>,
+    );
+    const card = await screen.findByRole("region", { name: "PR intent" });
+    const slot = within(card).getByText("Slot content");
+    expect(within(card).getByText("Out of scope").compareDocumentPosition(slot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    first.unmount();
+
+    mockFetch({ "GET /pulls/pr-1/intent": { intent: null, stale: false } satisfies PrIntentResponse });
+    renderWithProviders(
+      <IntentCard prId="pr-1" repoFullName="acme/api" headSha="abc">
+        <p>Slot content</p>
+      </IntentCard>,
+    );
+    expect(await screen.findByRole("button", { name: /derive/i })).toBeInTheDocument();
+    expect(screen.getByText("Slot content")).toBeInTheDocument();
+  });
+
+  it("still renders its children slot when loading the intent fails", async () => {
+    mockFetch({ "GET /pulls/pr-1/intent": jsonResponse({ error: { code: "internal", message: "boom" } }, 500) });
+    renderWithProviders(
+      <IntentCard prId="pr-1" repoFullName="acme/api" headSha="abc">
+        <p>Slot content</p>
+      </IntentCard>,
+    );
+    expect(await screen.findByText("boom")).toBeInTheDocument();
+    expect(screen.getByText("Slot content")).toBeInTheDocument();
   });
 });

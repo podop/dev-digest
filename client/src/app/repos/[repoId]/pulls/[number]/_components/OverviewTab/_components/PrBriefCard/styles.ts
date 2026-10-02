@@ -11,21 +11,18 @@ export const s = {
     gap: 16,
     minWidth: 0,
   } satisfies CSSProperties,
-  header: {
+  body: {
     display: "flex",
-    alignItems: "center",
-    gap: 8,
-    flexWrap: "wrap",
+    flexDirection: "column",
+    gap: 10,
+    minWidth: 0,
   } satisfies CSSProperties,
-  headerIcon: { color: "var(--text-muted)" } satisfies CSSProperties,
-  headerTitle: {
-    fontSize: 11,
-    fontWeight: 700,
-    letterSpacing: "0.07em",
-    textTransform: "uppercase",
-    color: "var(--text-muted)",
+  emptyTitle: {
+    margin: 0,
+    fontSize: 14,
+    fontWeight: 600,
+    color: "var(--text)",
   } satisfies CSSProperties,
-  headerRight: { marginLeft: "auto" } satisfies CSSProperties,
   explanation: {
     margin: 0,
     fontSize: 13.5,

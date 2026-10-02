@@ -12,6 +12,7 @@ export const s = {
     gap: 14,
     minWidth: 0,
   } satisfies CSSProperties,
+  emptyStack: { display: "flex", flexDirection: "column", gap: 14, minWidth: 0 } satisfies CSSProperties,
   header: {
     display: "flex",
     alignItems: "center",

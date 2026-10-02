@@ -115,10 +115,14 @@
     "refreshing": "Refreshing…",
     "filterPlaceholder": "Filter pull requests…",
     "sort": {
-      "newest": "Sort: Newest",
-      "oldest": "Sort: Oldest"
+      "newest": "Newest",
+      "oldest": "Oldest",
+      "risk": "Highest risk",
+      "findings": "Most findings",
+      "largest": "Largest"
     },
     "sortLabel": "Sort",
+    "sortValue": "Sort: {label}",
     "columns": {
       "pullRequest": "Pull request",
       "author": "Author",

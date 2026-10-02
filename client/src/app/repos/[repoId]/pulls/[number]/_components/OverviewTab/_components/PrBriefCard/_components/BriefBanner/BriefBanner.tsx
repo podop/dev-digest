@@ -43,14 +43,14 @@ export function BriefBanner({ summary, stats, tokensIn, tokensOut, costUsd, stal
             </Badge>
           )}
           <Button
-            kind={stale ? "primary" : "ghost"}
+            kind={stale ? "primary" : "tertiary"}
             size="sm"
             icon="RefreshCw"
             onClick={onRefresh}
             style={s.refresh}
-          >
-            {t("refresh")}
-          </Button>
+            aria-label={t("refresh")}
+            title={t("refresh")}
+          />
         </div>
         <p style={s.summary}>{summary}</p>
       </div>
