@@ -29,7 +29,9 @@ export const s = {
   popup: (position: PopupPosition): CSSProperties => ({
     position: "fixed",
     left: position.left,
-    width: position.width,
+    // min, not fixed: the list may grow to fit its longest label (fixed + left ⇒ shrink-to-fit,
+    // capped at the viewport, where optionLabel's ellipsis takes over).
+    minWidth: position.width,
     top: position.top,
     bottom: position.bottom,
     maxHeight: position.maxHeight,

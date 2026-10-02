@@ -25,6 +25,19 @@ describe("Select", () => {
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 
+  it("formatValue changes only the trigger text; the options keep their bare labels", async () => {
+    const user = userEvent.setup();
+    render(
+      <Select value="openai" options={OPTIONS} formatValue={(label) => `Provider: ${label}`} aria-label="Provider" />,
+    );
+    const combobox = screen.getByRole("combobox", { name: "Provider" });
+    expect(combobox).toHaveTextContent("Provider: openai");
+
+    await user.click(combobox);
+    expect(screen.getByRole("option", { name: "openai" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Provider: openai" })).not.toBeInTheDocument();
+  });
+
   it("ArrowDown x2 + Enter picks openrouter; Escape closes with no call and keeps focus on the combobox", async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();

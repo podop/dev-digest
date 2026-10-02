@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { Chip, Button, TextInput } from "@devdigest/ui";
 import { Select } from "@/components/select";
 import { STATUS_FILTERS } from "../../constants";
+import { SORT_ORDERS } from "../PullsView/constants";
 import { s } from "../../styles";
 
 export function FilterBar({
@@ -31,10 +32,7 @@ export function FilterBar({
   refreshing: boolean;
 }) {
   const t = useTranslations("prReview");
-  const sortOptions = [
-    { value: "newest", label: t("list.sort.newest") },
-    { value: "oldest", label: t("list.sort.oldest") },
-  ];
+  const sortOptions = SORT_ORDERS.map((value) => ({ value, label: t(`list.sort.${value}`) }));
   return (
     <div style={s.filterBar}>
       <div style={s.filterChips}>
@@ -50,7 +48,14 @@ export function FilterBar({
         ))}
       </div>
       <div style={s.filterActions}>
-        <Select value={sort} onChange={onSort} options={sortOptions} mono={false} aria-label={t("list.sortLabel")} />
+        <Select
+          value={sort}
+          onChange={onSort}
+          options={sortOptions}
+          formatValue={(label) => t("list.sortValue", { label })}
+          mono={false}
+          aria-label={t("list.sortLabel")}
+        />
         <Button
           kind="secondary"
           size="sm"
