@@ -6,9 +6,9 @@ export const s = {
     gap: 18,
     alignItems: "flex-start",
     padding: 16,
-    borderRadius: 10,
+    borderRadius: 8,
     border: "1px solid var(--border)",
-    background: "var(--bg-surface)",
+    background: "var(--bg-elevated)",
   } satisfies CSSProperties,
   iconBox: (bg: string, color: string): CSSProperties => ({
     width: 40,

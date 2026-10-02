@@ -1,12 +1,11 @@
 /* PrBriefCard — empty/generating/error/stale states and the missing-inputs note, through the
    real TanStack hooks with a stubbed fetch. */
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import type { PrBrief, PrBriefResponse, ReviewRecord } from "@devdigest/shared";
 import { renderWithProviders, screen, cleanup, within, waitFor } from "@/test/render";
 import { mockFetch, jsonResponse } from "@/test/fetch-mock";
+import { useGenerateBrief } from "@/lib/hooks";
 import { PrBriefCard } from "./PrBriefCard";
-
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 afterEach(cleanup);
 
@@ -31,7 +30,15 @@ const BRIEF: PrBrief = {
 const withBrief = (over: Partial<PrBrief> = {}, stale = false): PrBriefResponse => ({ brief: { ...BRIEF, ...over }, stale });
 const NO_REVIEWS: ReviewRecord[] = [];
 
-const renderCard = (headSha: string | null = "abc") => renderWithProviders(<PrBriefCard prId="pr-1" repoId="r1" number="7" changedPaths={[]} headSha={headSha} />);
+/** The generate mutation lives in OverviewTab; this harness owns it the same way. */
+function Harness({ headSha }: { headSha: string | null }) {
+  const generate = useGenerateBrief("pr-1");
+  return (
+    <PrBriefCard prId="pr-1" headSha={headSha} generating={generate.isPending} generateError={generate.error} onGenerate={() => generate.mutate()} />
+  );
+}
+
+const renderCard = (headSha: string | null = "abc") => renderWithProviders(<Harness headSha={headSha} />);
 
 describe("PrBriefCard", () => {
   it("offers Generate brief, shows a skeleton with disabled button while the POST runs, then the brief", async () => {
@@ -46,8 +53,10 @@ describe("PrBriefCard", () => {
     });
     const { user } = renderCard();
 
-    const card = await screen.findByRole("region", { name: "PR Brief" });
-    expect(within(card).getByText(/One model call is made with the Risk Brief model/)).toBeInTheDocument();
+    expect(await screen.findByText(/One model call is made with the Risk Brief model/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Brief not available yet." })).toBeInTheDocument();
+    const card = screen.getByRole("region", { name: "PR Brief" });
+    expect(within(card).getByText("PR Brief")).toBeInTheDocument();
     await user.click(within(card).getByRole("button", { name: "Generate brief" }));
 
     await waitFor(() => expect(screen.getByRole("region", { name: "PR Brief" })).toHaveAttribute("aria-busy", "true"));
