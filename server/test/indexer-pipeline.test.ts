@@ -52,6 +52,7 @@ function makeRepoStub(opts: {
   const stub = {
     getRepoBasics: async () => opts.basics,
     tryGetIndexState: async () => state,
+    lockRepo: async () => {},
     deleteAllForRepo: async () => {
       symbols.length = 0;
       references.length = 0;

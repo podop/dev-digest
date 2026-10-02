@@ -116,6 +116,7 @@ export async function runIncremental(deps: IndexerDeps, payload: IndexPayload): 
   }
 
   const status = await deps.tx.run(async ({ index }): Promise<IndexStatus> => {
+    await index.lockRepo(repoId);
     await index.deleteForFiles(repoId, changed);
     await index.insertSymbols(buf.symbols);
     await index.insertReferences(buf.references);

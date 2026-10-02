@@ -118,6 +118,11 @@ export class JobRunner {
         throw err;
       }
     }) as Promise<void>;
+    // Most callers fire and forget (the outcome is in the jobs row). An unobserved
+    // rejection would reach process 'unhandledRejection', which close-with-grace
+    // treats as fatal — one failed background job took the whole API down. Marking
+    // it handled here still lets a caller that awaits `done` see the rejection.
+    done.catch(() => undefined);
 
     return { id: jobId, done };
   }
