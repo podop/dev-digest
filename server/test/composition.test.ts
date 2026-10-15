@@ -22,6 +22,7 @@ describe('Container composition root', () => {
       'agents',
       'blast',
       'brief',
+      'ci',
       'conventions',
       'evals',
       'intent',

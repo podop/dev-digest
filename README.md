@@ -58,6 +58,11 @@ drops hallucinated line references), and persists structured findings with a
 severity and score. All local; the only outbound calls are to GitHub (PR data)
 and the LLM (via OpenRouter).
 
+**Export to CI:** the studio can export an agent to a repository's GitHub Actions (a PR with the
+manifest, skills, `agent-runner` bundle and a hardened workflow). The workflow uploads a result
+artifact; **Refresh** in the studio pulls it back (the studio is local, GitHub never calls it).
+Details: [`docs/export-to-ci.md`](docs/export-to-ci.md).
+
 Each package has its own README with deeper diagrams:
 [`client`](client/README.md) (UI route map) ·
 [`server`](server/README.md) (API map) ·

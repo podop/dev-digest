@@ -24,6 +24,8 @@ import type {
   GitCommit,
   FileAtRef,
   MergedPrSummary,
+  WorkflowRunSummary,
+  RunArtifactSummary,
   CodeIndex,
   CodeMatch,
   CodeSymbol,
@@ -149,6 +151,12 @@ export interface MockGitHubOptions {
   files?: Record<string, string>;
   /** Merged PRs returned by listMergedPullRequests (default none). */
   mergedPulls?: MergedPrSummary[];
+  /** Runs returned by listWorkflowRuns (default none). */
+  workflowRuns?: WorkflowRunSummary[];
+  /** Artifacts returned by listRunArtifacts, keyed by run id (default none). */
+  artifacts?: Record<number, RunArtifactSummary[]>;
+  /** Artifact ZIP bytes returned by downloadArtifact, keyed by artifact id (default null). */
+  artifactBytes?: Record<number, Uint8Array | null>;
 }
 
 export class MockGitHubClient implements GitHubClient {
@@ -269,6 +277,26 @@ export class MockGitHubClient implements GitHubClient {
   async getFileContent(_repo: RepoRef, path: string, ref: string): Promise<FileAtRef | null> {
     const content = this.opts.files?.[`${path}@${ref}`] ?? this.opts.files?.[path];
     return content === undefined ? null : { path, content, size: content.length };
+  }
+
+  async listWorkflowRuns(
+    _repo: RepoRef,
+    _workflowFile: string,
+    _opts: { perPage: number },
+  ): Promise<WorkflowRunSummary[]> {
+    return this.opts.workflowRuns ?? [];
+  }
+
+  async listRunArtifacts(_repo: RepoRef, runId: number): Promise<RunArtifactSummary[]> {
+    return this.opts.artifacts?.[runId] ?? [];
+  }
+
+  async downloadArtifact(
+    _repo: RepoRef,
+    artifactId: number,
+    _opts: { maxBytes: number },
+  ): Promise<Uint8Array | null> {
+    return this.opts.artifactBytes?.[artifactId] ?? null;
   }
 }
 

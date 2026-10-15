@@ -8,6 +8,8 @@ repo's server, its DI graph, and its Postgres instance.
 embedded as `.devdigest/runner/index.js` in the exported `devdigest/ci` PR, and
 executed by the target repo's workflow as `node .devdigest/runner/index.js`.
 
+Export flow, workflow security rules and ingest: [`../docs/export-to-ci.md`](../docs/export-to-ci.md).
+
 ## What it does
 
 1. **Loads + validates** the checked-in manifest `.devdigest/agents/<slug>.yaml`
@@ -95,12 +97,21 @@ there is no `SecretsProvider` / DI graph to inject from (see `CLAUDE.md`).
 | `GITHUB_EVENT_PATH` | auto (GHA) | `pull_request` event payload (title/body/fork) |
 | `DEVDIGEST_DIR` | no | override the `.devdigest` dir (default: `cwd/.devdigest`) |
 | `DEVDIGEST_RESULT_PATH` | no | override artifact path (default: `cwd/devdigest-result.json`) |
-| `DEVDIGEST_POST_AS` | no | `github_review` (default) \| `pr_comment` \| `none` |
+| `DEVDIGEST_POST_AS` | no | `github_review` (default) \| `pr_comment` \| `none` (set by the generated workflow) |
+| `DEVDIGEST_AGENT` | no | agent slug: load `<dir>/agents/<slug>.yaml` and ignore other manifests (`^[a-z0-9][a-z0-9-]{0,39}$`); unset = the directory must hold exactly one manifest |
+| `PR_HEAD_SHA` | no | PR head commit; written to the artifact as `commit_sha` (studio ingest verifies it) |
+| `GITHUB_REPOSITORY_ID`, `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT` | auto (GHA) | written to the artifact as integers (null when absent) |
 
 ¹ Falls back to `pull_request.number` from the event payload if `PR_NUMBER` is unset.
 
 Secrets are never logged and never written to `devdigest-result.json` or any
 posted comment.
+
+The runner prints one `[agent-runner] trace …` line (manifest version, model, skill
+slugs, commit SHA, runner version) before the review. The artifact is `version: "2"`:
+the version-1 counts plus `commit_sha`, `repository`, `repository_id`, `run_id`,
+`run_attempt`, `model`, `manifest_version`, `skills` and `blockers` — counts and
+metadata only, never finding text.
 
 ## Exit codes
 

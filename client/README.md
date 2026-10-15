@@ -28,7 +28,8 @@ flowchart TD
   ONB["/onboarding<br/>add repo"] -->|"POST /repos"| API[("Fastify API")]
   PULLS --> PR["/pulls/:number<br/>review detail<br/>(overview · diff · findings)"]
 
-  AGENTS["/agents"] --> AGENT["/agents/:id<br/>editor (config · skills)"]
+  AGENTS["/agents"] --> AGENT["/agents/:id<br/>editor (config · skills · evals · CI)"]
+  CIRUNS["/ci-runs<br/>CI runs + Refresh"]
   SKILLS["/skills<br/>grid"] --> SKILL["/skills/:id<br/>list sidebar + editor (config · preview · versions · stats · evals)"]
   CONV["/repos/:repoId/conventions<br/>rules + create-skill modal"]
   CTX["/repos/:repoId/context<br/>spec / doc / insight markdown, view-only"]
@@ -45,8 +46,13 @@ flowchart TD
   CTX -->|"/repos/:id/context · /repos/:id/context/doc?path="| API
   TOUR -->|"GET · POST /repos/:id/onboarding · /repos/:id/index-state"| API
   EVAL -->|"GET /eval/dashboard · /agents/:id/eval/dashboard · /agents/:id/eval-runs · /eval-runs/:id · /eval-runs/compare<br/>POST /agents/:id/eval-runs · /eval-runs/run-all"| API
+  AGENT -->|"CI tab: /agents/:id/ci-installations · /ci/runs · POST /ci/refresh · POST /agents/:id/export-ci"| API
+  CIRUNS -->|"GET /ci/runs · POST /ci/refresh"| API
   SETTINGS -->|"/settings · /providers"| API
 ```
+
+The agent editor's **CI** tab and the Export wizard, and the `/ci-runs` page, are described in
+[`../docs/export-to-ci.md`](../docs/export-to-ci.md) (hooks: `src/lib/hooks/ci.ts`).
 
 Cross-cutting chrome lives in `src/components/app-shell` (nav, breadcrumbs,
 `g`-then-key shortcuts). Pages are thin; feature logic sits in colocated

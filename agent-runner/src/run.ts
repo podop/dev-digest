@@ -6,7 +6,7 @@ import { loadSkillBodies } from './skills.js';
 import { resolvePrContext, type CiEnv } from './context.js';
 import { parseUnifiedDiff, stripIgnoredFiles } from './diff.js';
 import { fetchPrDiff, postGithubReview, postPrComment, type FetchLike } from './github.js';
-import { buildResultArtifact } from './artifact.js';
+import { buildResultArtifact, intOrNull, RUNNER_VERSION } from './artifact.js';
 import { RunnerError } from './errors.js';
 
 /**
@@ -49,6 +49,8 @@ export interface RunCiDeps {
   readDir?: typeof readdirSync;
   writeFile?: typeof writeFileSync;
   now?: () => number;
+  /** Sink for the job-log trace header (default `console.log`). */
+  log?: (line: string) => void;
   /**
    * Override diff retrieval (tests supply a fixture diff directly instead of
    * hitting the GitHub API). Defaults to `fetchPrDiff` via the GitHub REST API.
@@ -87,14 +89,26 @@ export async function runCi(deps: RunCiDeps): Promise<RunCiResult> {
   const now = deps.now ?? Date.now;
   const fetchImpl = deps.fetchImpl ?? fetch;
   const fetchDiffImpl = deps.fetchDiff ?? fetchPrDiff;
+  const log = deps.log ?? ((line: string) => console.log(line));
 
   try {
     // 1. Load + validate the manifest BEFORE it is used for anything (AC-20).
-    const manifest = loadManifest(deps.devdigestDir, { readFile, readDir });
+    const manifest = loadManifest(
+      deps.devdigestDir,
+      { readFile, readDir },
+      deps.env.DEVDIGEST_AGENT || undefined,
+    );
     const skills = loadSkillBodies(deps.devdigestDir, manifest.skills, readFile);
 
     // 2. Resolve CI context (PR number/title/body/repo) from env + event payload.
     const ctx = resolvePrContext(deps.env, readFile);
+
+    // Trace header (FR18): manifest/model/skills/commit/runner only — no env values.
+    const commitSha = deps.env.PR_HEAD_SHA || null;
+    log(
+      `[agent-runner] trace manifest_version=${manifest.version ?? 'none'} model=${manifest.model} ` +
+        `skills=${manifest.skills.join(',') || 'none'} commit=${commitSha ?? 'unknown'} runner=${RUNNER_VERSION}`,
+    );
 
     const githubToken = deps.env.GITHUB_TOKEN;
     if (deps.postAs !== 'none' && !githubToken) {
@@ -145,6 +159,15 @@ export async function runCi(deps: RunCiDeps): Promise<RunCiResult> {
       durationMs,
       agent: manifest.name,
       prNumber: ctx.prNumber,
+      commitSha,
+      repository: `${ctx.owner}/${ctx.repo}`,
+      repositoryId: intOrNull(deps.env.GITHUB_REPOSITORY_ID),
+      runId: intOrNull(deps.env.GITHUB_RUN_ID),
+      runAttempt: intOrNull(deps.env.GITHUB_RUN_ATTEMPT),
+      model: manifest.model,
+      manifestVersion: manifest.version ?? null,
+      skills: manifest.skills,
+      blockers,
     });
     writeFile(deps.resultPath, `${JSON.stringify(artifact, null, 2)}\n`);
 

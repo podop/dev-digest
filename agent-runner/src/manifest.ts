@@ -21,10 +21,27 @@ export interface FsDeps {
   readDir?: typeof readdirSync;
 }
 
-/** Find the single agent manifest file under `<devdigestDir>/agents/`. */
-export function findManifestPath(devdigestDir: string, deps: FsDeps = {}): string {
-  const readDir = deps.readDir ?? readdirSync;
+/** Shape of a `DEVDIGEST_AGENT` value — the slug the studio derived at export (FR8). */
+const AGENT_SLUG = /^[a-z0-9][a-z0-9-]{0,39}$/;
+
+/**
+ * Find the agent manifest file under `<devdigestDir>/agents/`. With `agent`
+ * (env `DEVDIGEST_AGENT`) it is `<agent>.yaml` and other manifests are ignored;
+ * without it the directory must hold exactly one manifest.
+ */
+export function findManifestPath(
+  devdigestDir: string,
+  deps: FsDeps = {},
+  agent?: string,
+): string {
   const agentsDir = path.join(devdigestDir, 'agents');
+  if (agent) {
+    if (!AGENT_SLUG.test(agent)) {
+      throw new RunnerError(`DEVDIGEST_AGENT must match ${AGENT_SLUG} (got: ${JSON.stringify(agent)})`);
+    }
+    return path.join(agentsDir, `${agent}.yaml`);
+  }
+  const readDir = deps.readDir ?? readdirSync;
   let entries: string[];
   try {
     entries = readDir(agentsDir) as unknown as string[];
@@ -77,7 +94,11 @@ export function loadAgentManifest(manifestPath: string, deps: FsDeps = {}): Agen
 }
 
 /** Convenience: locate + load + validate in one call. */
-export function loadManifest(devdigestDir: string, deps: FsDeps = {}): AgentManifest {
-  const manifestPath = findManifestPath(devdigestDir, deps);
+export function loadManifest(
+  devdigestDir: string,
+  deps: FsDeps = {},
+  agent?: string,
+): AgentManifest {
+  const manifestPath = findManifestPath(devdigestDir, deps, agent);
   return loadAgentManifest(manifestPath, deps);
 }

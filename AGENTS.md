@@ -34,6 +34,7 @@ API and web run on the host).
 ## Read when
 - Change spans packages or you need the big picture → read `README.md` (Architecture)
 - Touching the review flow end to end (import → run → findings UI) → read `docs/review-flow.md`
+- Touching Export to CI (export PR, workflow rules, result ingest, CI tab, `/ci-runs`) → read `docs/export-to-ci.md`
 - Writing, moving or splitting tests, or editing CI → read `TESTING.md`
 - Editing built-in agent prompts or model choice → read `docs/agent-prompts/README.md`
 - Every task, right after the user's request and before planning/editing → read the
