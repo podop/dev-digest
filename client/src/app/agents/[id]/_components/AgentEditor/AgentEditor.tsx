@@ -1,6 +1,6 @@
 /* AgentEditor — the agent's tabs: Config (model + system prompt), Skills
    (linked skills + their order), Context (attached repo documents) and Evals
-   (eval cases + run metrics). Later lessons add Stats/CI. The tab lives in ?tab= (resolved by the route). */
+   (eval cases + run metrics) and CI (export to GitHub Actions + CI runs). The tab lives in ?tab= (resolved by the route). */
 "use client";
 
 import React from "react";
@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { Tabs } from "@devdigest/ui";
 import type { Agent } from "@devdigest/shared";
 import { ConfigTab } from "./_components/ConfigTab";
+import { CiTab } from "./_components/CiTab";
 import { ContextTab } from "./_components/ContextTab";
 import { EvalsTab } from "./_components/EvalsTab";
 import { SkillsTab } from "./_components/SkillsTab";
@@ -26,7 +27,8 @@ export function AgentEditor({ agent, tab, onTab }: { agent: Agent; tab: string; 
         {tab === "skills" && <SkillsTab key={agent.id} agent={agent} />}
         {tab === "context" && <ContextTab key={agent.id} agent={agent} />}
         {tab === "evals" && <EvalsTab key={agent.id} agent={agent} />}
-        {tab !== "skills" && tab !== "context" && tab !== "evals" && <ConfigTab key={agent.id} agent={agent} />}
+        {tab === "ci" && <CiTab key={agent.id} agent={agent} />}
+        {tab !== "skills" && tab !== "context" && tab !== "evals" && tab !== "ci" && <ConfigTab key={agent.id} agent={agent} />}
       </div>
     </div>
   );

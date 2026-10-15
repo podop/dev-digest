@@ -156,6 +156,15 @@ the sample (configs + repo-intel top 12, or a walk of the clone) and checks ever
 cited line against the clone. A rule without verified evidence is dropped and listed in
 `scan.dropped`. `LLM_PROVIDER_OVERRIDE=mock` gives a key-free scan.
 
+### Export to CI (`modules/ci`, spec [`../specs/export-to-ci.md`](../specs/export-to-ci.md), module notes [`src/modules/ci/README.md`](src/modules/ci/README.md), flow [`../docs/export-to-ci.md`](../docs/export-to-ci.md))
+
+| Method | Path | Result |
+|---|---|---|
+| POST | `/agents/:id/export-ci` | 200 `CiExport` for `action: "files"` (nothing written) · 201 for `open_pr` (commit on `devdigest/ci` + PR); 409 `ci_slug_conflict` · 422 `workflow_insecure` (`details.rule`) / `github_permission_denied` / `unsupported_*` / `invalid_triggers` |
+| GET | `/agents/:id/ci-installations` | `{installations}` with each last run |
+| GET | `/ci/runs` | `{runs}` newest first; `?agent_id`, `?limit` 1–200 |
+| POST | `/ci/refresh` | pull-based ingest of CI results from GitHub → `CiRefreshResult` |
+
 ### Evals (`modules/evals`, spec [`specs/eval-pipeline.md`](../specs/eval-pipeline.md))
 
 | Method | Path | Result |

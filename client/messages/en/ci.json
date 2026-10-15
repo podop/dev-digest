@@ -19,7 +19,12 @@
       "source": "Source",
       "findings": "Findings",
       "cost": "Cost",
-      "status": "Status"
+      "status": "Status",
+      "repository": "Repository",
+      "agent": "Agent",
+      "verdict": "Verdict",
+      "duration": "Duration",
+      "run": "Run"
     },
     "view": "View",
     "status": {
@@ -27,6 +32,14 @@
       "noFindings": "No findings",
       "failed": "Failed",
       "running": "Running"
+    },
+    "refreshResult": "{count, plural, one {# new run} other {# new runs}} ingested",
+    "degradedBanner": "Some repositories could not be refreshed:",
+    "loadError": "Could not load CI runs",
+    "agentDeleted": "(deleted agent)",
+    "verdict": {
+      "passed": "Passed",
+      "blocked": "Blocked"
     }
   },
   "exportWizard": {
@@ -72,7 +85,36 @@
     "installCardTitle": "Open a PR with these files",
     "installCardBody": "DevDigest opens a PR in {repo} titled “Add DevDigest CI review” with the {count} generated files.",
     "ownerRepo": "owner/repo",
-    "secretNote": "Add {key} to the repo's Actions secrets before the workflow runs."
+    "secretNote": "Add {key} to the repo's Actions secrets before the workflow runs.",
+    "close": "Close",
+    "targetLabel": "Target",
+    "connectRepoFirst": "Connect a repository first",
+    "reposLoadError": "Could not load repositories",
+    "unknownError": "Something went wrong.",
+    "failedRule": "Failed rule: {rule}",
+    "edited": "edited",
+    "resetToGenerated": "Reset to generated",
+    "workflowEditorLabel": "Workflow file contents",
+    "bundleNote": "Runner bundle ({size}) — added as is, not shown here.",
+    "triggerRequired": "Select at least one trigger",
+    "optionsLockedNotice": "The workflow was edited, so these options are locked. Use “Reset to generated” in Preview to change them.",
+    "secretsTitle": "Secrets expected",
+    "secrets": {
+      "OPENROUTER_API_KEY": "Add it to the repo's Actions secrets",
+      "GITHUB_TOKEN": "Provided by Actions"
+    },
+    "checkName": "DevDigest Review · {slug}",
+    "requiredCheckNote": "Blocking merges needs “Fail CI on” on the agent plus a required status check named {check} in the repository's branch protection.",
+    "installMethodLabel": "Install method",
+    "methodZip": "Copy files as a zip",
+    "methodZipBody": "Downloads {name} with the same files at their repo paths. Nothing is written to GitHub.",
+    "zipDone": "Downloaded {name}.",
+    "successTitle": "Pull request ready",
+    "viewPr": "View pull request",
+    "nextStepsTitle": "Next steps",
+    "nextAddSecret": "Add {key} to the repository's Actions secrets first — the check on the new pull request fails until it exists.",
+    "nextMerge": "Merge the pull request.",
+    "nextRequiredCheck": "To block merges, set the required status check {check}."
   },
   "ciTab": {
     "heading": "Continuous Integration",
@@ -82,7 +124,27 @@
     "update": "Update CI",
     "noRepo": "Connect a repository first",
     "empty": "Not deployed to CI yet. Use “Publish to CI” to open a PR that adds the workflow + agent config.",
-    "installed": "installed {date}"
+    "installed": "installed {date}",
+    "activeIn": "Active in {count, plural, one {# repo} other {# repos}}",
+    "addToCi": "Add to CI",
+    "addRepository": "+ Add repository",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing…",
+    "refreshResult": "{count, plural, one {# new run} other {# new runs}} ingested",
+    "degradedBanner": "Some repositories could not be refreshed:",
+    "notDeployed": "Not deployed to CI yet",
+    "notDeployedBody": "Use “Add to CI” to open a PR that adds this agent's workflow to a repository.",
+    "installationsLoadError": "Could not load CI installations",
+    "target": "GitHub Actions",
+    "noRunsYet": "No runs yet",
+    "deployedVersion": "v{version}",
+    "outdated": "outdated",
+    "recentRuns": "Recent CI runs",
+    "runsLoadError": "Could not load CI runs",
+    "noRuns": "No CI runs yet",
+    "failOnLabel": "Fail CI on",
+    "failOnNote": "CI uses the new value only after you press “Update” on a repository.",
+    "updateRow": "Update"
   },
   "publishDialog": {
     "title": "Publish to CI",
@@ -101,6 +163,7 @@
     "close": "Close"
   },
   "page": {
-    "crumb": "CI Runs"
+    "crumb": "CI Runs",
+    "metaTitle": "CI Runs"
   }
 }

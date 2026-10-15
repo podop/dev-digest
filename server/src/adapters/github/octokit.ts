@@ -14,6 +14,8 @@ import type {
   IssueMeta,
   FileAtRef,
   MergedPrSummary,
+  WorkflowRunSummary,
+  RunArtifactSummary,
 } from '@devdigest/shared';
 import { withRetry, withTimeout } from '../../platform/resilience.js';
 
@@ -514,5 +516,78 @@ export class OctokitGitHubClient implements GitHubClient {
       if ((err as { status?: number })?.status === 404) return null;
       throw err;
     }
+  }
+
+  async listWorkflowRuns(
+    repo: RepoRef,
+    workflowFile: string,
+    opts: { perPage: number },
+  ): Promise<WorkflowRunSummary[]> {
+    const res = await withRetry(() =>
+      withTimeout(
+        this.octokit.rest.actions.listWorkflowRuns({
+          owner: repo.owner,
+          repo: repo.name,
+          workflow_id: workflowFile,
+          event: 'pull_request',
+          status: 'completed',
+          per_page: opts.perPage,
+        }),
+        TIMEOUT,
+      ),
+    );
+    return res.data.workflow_runs.map((r) => ({
+      id: r.id,
+      run_attempt: r.run_attempt ?? 1,
+      head_sha: r.head_sha,
+      path: r.path,
+      event: r.event,
+      conclusion: r.conclusion,
+      html_url: r.html_url,
+      repository_id: r.repository.id,
+      pr_numbers: (r.pull_requests ?? []).map((p) => p.number),
+      created_at: r.created_at,
+    }));
+  }
+
+  async listRunArtifacts(repo: RepoRef, runId: number): Promise<RunArtifactSummary[]> {
+    const res = await withRetry(() =>
+      withTimeout(
+        this.octokit.rest.actions.listWorkflowRunArtifacts({
+          owner: repo.owner,
+          repo: repo.name,
+          run_id: runId,
+          per_page: PAGE_SIZE,
+        }),
+        TIMEOUT,
+      ),
+    );
+    return res.data.artifacts.map((a) => ({
+      id: a.id,
+      name: a.name,
+      size_in_bytes: a.size_in_bytes,
+      expired: a.expired,
+      created_at: a.created_at ?? '',
+    }));
+  }
+
+  async downloadArtifact(
+    repo: RepoRef,
+    artifactId: number,
+    opts: { maxBytes: number },
+  ): Promise<Uint8Array | null> {
+    const res = await withRetry(() =>
+      withTimeout(
+        this.octokit.rest.actions.downloadArtifact({
+          owner: repo.owner,
+          repo: repo.name,
+          artifact_id: artifactId,
+          archive_format: 'zip',
+        }),
+        TIMEOUT,
+      ),
+    );
+    const bytes = new Uint8Array(res.data as ArrayBuffer);
+    return bytes.byteLength > opts.maxBytes ? null : bytes;
   }
 }

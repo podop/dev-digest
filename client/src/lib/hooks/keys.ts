@@ -150,3 +150,20 @@ export const evalKeys = {
   /** GET /eval/dashboard (all agents). */
   overview: () => [...evalKeys.all, "overview"] as const,
 };
+
+/** Export to CI (specs/export-to-ci.md). Installations and runs are plain lists; the
+ *  generated-files preview is keyed by everything that changes the files. */
+export const ciKeys = {
+  all: ["ci"] as const,
+  /** Prefix of every CI runs list (GET /ci/runs). */
+  runsAll: () => [...ciKeys.all, "runs"] as const,
+  /** GET /ci/runs?agent_id=&limit= — `agentId` null = every agent. */
+  runs: (agentId: Id, limit?: number) => [...ciKeys.runsAll(), agentId ?? null, limit ?? null] as const,
+  /** Prefix of every agent's installations list. */
+  installationsAll: () => [...ciKeys.all, "installations"] as const,
+  /** GET /agents/:id/ci-installations. */
+  installations: (agentId: Id) => [...ciKeys.installationsAll(), agentId] as const,
+  /** POST /agents/:id/export-ci { action: "files" } — the wizard's Preview. */
+  exportFiles: (agentId: Id, repo: Id, triggers: readonly string[], postAs: Id) =>
+    [...ciKeys.all, "export-files", agentId, repo, [...triggers].sort().join(","), postAs] as const,
+};

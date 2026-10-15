@@ -3,7 +3,7 @@ import { CiResultArtifact } from '@devdigest/shared';
 import { RunnerError } from './errors.js';
 
 /** Runner version string embedded in every artifact (informational only). */
-export const RUNNER_VERSION = '1';
+export const RUNNER_VERSION = '2';
 
 export interface BuildResultArtifactInput {
   findings: Finding[];
@@ -11,6 +11,23 @@ export interface BuildResultArtifactInput {
   durationMs: number;
   agent: string;
   prNumber: number;
+  /** Provenance the studio verifies on ingest (counts and metadata only, never finding text). */
+  commitSha: string | null;
+  repository: string;
+  repositoryId: number | null;
+  runId: number | null;
+  runAttempt: number | null;
+  model: string;
+  manifestVersion: number | null;
+  skills: string[];
+  blockers: number;
+}
+
+/** Parse a CI-provided integer env value; anything else is null. */
+export function intOrNull(value: string | undefined): number | null {
+  if (value === undefined || !/^\d+$/.test(value)) return null;
+  const n = Number(value);
+  return Number.isSafeInteger(n) ? n : null;
 }
 
 function severityCounts(findings: Finding[]): { critical: number; warning: number; suggestion: number } {
@@ -41,6 +58,15 @@ export function buildResultArtifact(input: BuildResultArtifactInput): CiResultAr
     agent: input.agent,
     version: RUNNER_VERSION,
     pr_number: input.prNumber,
+    commit_sha: input.commitSha,
+    repository: input.repository,
+    repository_id: input.repositoryId,
+    run_id: input.runId,
+    run_attempt: input.runAttempt,
+    model: input.model,
+    manifest_version: input.manifestVersion,
+    skills: input.skills,
+    blockers: input.blockers,
   };
   const result = CiResultArtifact.safeParse(candidate);
   if (!result.success) {
