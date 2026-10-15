@@ -22,3 +22,12 @@ export const CALLERS_LIMIT = 10;
 
 /** A changed file at/above this rank percentile counts as "hot" (top 5%). */
 export const HOT_FILE_PERCENTILE = 95;
+
+/** Most agents one review request may name (`agentIds`); also the cap of REVIEW_AGENT_CONCURRENCY. */
+export const MAX_AGENT_IDS = 20;
+
+/** Newest multi-agent runs a list read returns (default and maximum). */
+export const MULTI_AGENT_LIST_LIMIT = 20;
+
+/** Done runs per agent an estimate averages over. */
+export const ESTIMATE_SAMPLE_SIZE = 10;

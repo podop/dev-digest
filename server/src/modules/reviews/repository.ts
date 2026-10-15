@@ -81,6 +81,11 @@ export class ReviewRepository implements ReviewStore, AgentSkillsReader {
     return runRepo.createAgentRun(this.db, values);
   }
 
+  /** Parent row of a multi-agent batch; returns its id. */
+  createMultiAgentRun(workspaceId: string, prId: string): Promise<string> {
+    return runRepo.createMultiAgentRun(this.db, workspaceId, prId);
+  }
+
   /** agent_run_skills: the skills in the run's prompt at their exact version. */
   recordRunSkills(runId: string, skills: readonly ReviewSkill[]): Promise<void> {
     return runRepo.recordRunSkills(this.db, runId, skills);

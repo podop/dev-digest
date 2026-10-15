@@ -15,3 +15,4 @@ export * from "./project-context";
 export * from "./onboarding";
 export * from "./brief";
 export * from "./evals";
+export * from "./multi-agent";

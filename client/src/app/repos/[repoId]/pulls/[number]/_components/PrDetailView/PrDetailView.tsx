@@ -20,7 +20,7 @@ import { PrDetailSkeleton } from "../PrDetailSkeleton";
 import { OverviewTab } from "../OverviewTab";
 import { FindingsTab } from "../FindingsTab";
 import { DiffTab } from "../DiffTab";
-import { RunTraceDrawer } from "../RunTraceDrawer";
+import { RunTraceDrawer } from "@/components/run-trace-drawer";
 import { countFindings, findPrId } from "./helpers";
 import { usePrDetailSearch } from "./usePrDetailSearch";
 import { s } from "./styles";
