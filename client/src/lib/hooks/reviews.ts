@@ -7,7 +7,7 @@ import React from "react";
 import { useQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api, API_BASE } from "../api";
 import { notify } from "../toast";
-import { prKeys, RUN_SCOPED_PR_KEYS } from "./keys";
+import { multiAgentKeys, prKeys, RUN_SCOPED_PR_KEYS } from "./keys";
 import { EMPTY_RUN_EVENTS, RunEventsStore, mergeRunEvents } from "./run-events-store";
 import type {
   ActiveRun,
@@ -131,6 +131,8 @@ export interface RunReviewInput {
   prId: string;
   agentId?: string;
   all?: boolean;
+  /** Explicit agent set; 2+ ids create a multi-agent run (response `multi_agent_run_id`). */
+  agentIds?: string[];
 }
 
 /** Start a review. The new runs show up in the PR's active runs (→ live SSE),
@@ -138,12 +140,16 @@ export interface RunReviewInput {
 export function useRunReview() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ prId, agentId, all }: RunReviewInput) =>
+    mutationFn: ({ prId, agentId, all, agentIds }: RunReviewInput) =>
       api.post<ReviewRunResponse>(`/pulls/${prId}/review`, {
         ...(agentId ? { agentId } : {}),
         ...(all ? { all } : {}),
+        ...(agentIds?.length ? { agentIds } : {}),
       }),
-    onSuccess: (_d, { prId }) => invalidateRunScoped(qc, prId),
+    onSuccess: (_d, { prId }) => {
+      invalidateRunScoped(qc, prId);
+      qc.invalidateQueries({ queryKey: multiAgentKeys.all });
+    },
   });
 }
 

@@ -317,7 +317,7 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     const agent = await createAgent(app);
     const started = await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } });
     expect(started.statusCode).toBe(200);
-    expect(Object.keys(started.json()).sort()).toEqual(['pr_id', 'reviews', 'runs']);
+    expect(Object.keys(started.json()).sort()).toEqual(['multi_agent_run_id', 'pr_id', 'reviews', 'runs']);
     const runId = started.json().runs[0].run_id;
     await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
 

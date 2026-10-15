@@ -87,7 +87,7 @@ flowchart TB
     polling["polling<br/>/repos/:id/poll"]
   end
   subgraph Review["Review & runs"]
-    reviews["reviews<br/>/pulls/:id/review · /reviews · /findings/:id/(accept|dismiss)<br/>/runs/:id/(events|trace)"]
+    reviews["reviews<br/>/pulls/:id/review · /reviews · /findings/:id/(accept|dismiss|learn)<br/>/runs/:id/(events|trace) · /runs/estimates<br/>/multi-agent-runs/:id · /repos/:id/multi-agent-runs"]
     intent["intent<br/>/pulls/:id/intent · /pulls/:id/intent/refresh"]
     smartDiff["smart-diff<br/>/pulls/:id/smart-diff"]
   end
@@ -105,6 +105,20 @@ flowchart TB
   end
   HEALTH["/health (liveness) · /health/ready (DB ping → 200/503)"]
 ```
+
+### Multi-agent review (`modules/reviews`, spec [`../specs/multi-agent-review.md`](../specs/multi-agent-review.md))
+
+| Method | Path | Result |
+|---|---|---|
+| POST | `/pulls/:id/review` | body is exactly one of `{agentId}` · `{all:true}` · `{agentIds}` (1–20 uuids, deduplicated; anything else → 400 `invalid_run_request`, unknown agent → 404). **2+ distinct `agentIds`** create a `multi_agent_runs` parent first and link every `agent_runs` row to it; response carries `multi_agent_run_id` (else `null`). 10 req/min |
+| GET | `/multi-agent-runs/:id` | `MultiAgentRun`: one column per agent run, run totals, findings grouped by location (`conflicts`); derived per call, no LLM; 404 `multi_agent_run_not_found` |
+| GET | `/repos/:id/multi-agent-runs?limit=` | `MultiAgentRunSummary[]`, newest first (default and max 20; else 400 `invalid_limit`) |
+| GET | `/runs/estimates` | `AgentRunEstimate[]`: average duration / cost per agent over its last 10 done runs |
+| POST | `/findings/:id/learn` | saves a finding as one `learning` memory entry (no embedding, no LLM); idempotent — repeats return the same `memory_id` |
+
+All agents of one batch start at once up to `REVIEW_AGENT_CONCURRENCY`; the rest
+queue (`reviews/composition.ts` `runBounded`, `PQueue`). The agent runs execute
+in the background; each run's progress is on `GET /runs/:id/events`.
 
 ### Skills (`modules/skills`, spec [`specs/03-skills.md`](specs/03-skills.md))
 
@@ -141,6 +155,15 @@ The model (Settings → Feature models → `conventions`) only proposes rules. C
 the sample (configs + repo-intel top 12, or a walk of the clone) and checks every
 cited line against the clone. A rule without verified evidence is dropped and listed in
 `scan.dropped`. `LLM_PROVIDER_OVERRIDE=mock` gives a key-free scan.
+
+### Export to CI (`modules/ci`, spec [`../specs/export-to-ci.md`](../specs/export-to-ci.md), module notes [`src/modules/ci/README.md`](src/modules/ci/README.md), flow [`../docs/export-to-ci.md`](../docs/export-to-ci.md))
+
+| Method | Path | Result |
+|---|---|---|
+| POST | `/agents/:id/export-ci` | 200 `CiExport` for `action: "files"` (nothing written) · 201 for `open_pr` (commit on `devdigest/ci` + PR); 409 `ci_slug_conflict` · 422 `workflow_insecure` (`details.rule`) / `github_permission_denied` / `unsupported_*` / `invalid_triggers` |
+| GET | `/agents/:id/ci-installations` | `{installations}` with each last run |
+| GET | `/ci/runs` | `{runs}` newest first; `?agent_id`, `?limit` 1–200 |
+| POST | `/ci/refresh` | pull-based ingest of CI results from GitHub → `CiRefreshResult` |
 
 ### Evals (`modules/evals`, spec [`specs/eval-pipeline.md`](../specs/eval-pipeline.md))
 
@@ -274,6 +297,7 @@ outcome), never repo text.
 | `EMBEDDINGS_ENABLED` | `false` | memory/RAG embeddings (OpenAI); off → **zero** OpenAI calls |
 | `REPO_INTEL_ENABLED` | `true` | repo skeleton + callers in the prompt; `false` → ripgrep-only |
 | `REVIEW_MAP_CONCURRENCY` | reviewer-core default (3) | map-reduce chunks sent to the LLM in parallel (1–16); cancel aborts the in-flight ones |
+| `REVIEW_AGENT_CONCURRENCY` | `4` | agents of ONE review batch (`agentIds` / `all` / `agentId`) running in parallel (int 1–20; empty = 4); the rest wait in a queue |
 | `REVIEW_INTENT_ENABLED` | `true` | intent layer kill switch (spec [`05-intent-layer.md`](specs/05-intent-layer.md)); `false` → no derivation, no `pr_intent` row, byte-identical prompt |
 | `LLM_PROVIDER_OVERRIDE` | — | **dev/e2e only**: `mock` → every provider is the deterministic mock (`src/adapters/llm/mock.ts`, fixed review grounded on the seeded PR #482); refused with `NODE_ENV=production`, loud warning at boot |
 | `LLM_MOCK_DELAY_MS` | `0` | latency of each mock LLM call (abortable), so the live-run UI is observable |

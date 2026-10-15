@@ -40,12 +40,17 @@ export const agentRuns = pgTable(
     score: integer('score'),
     /** Findings that tripped the agent's gate (severity ≥ ciFailOn). */
     blockers: integer('blockers'),
+    /** Parent multi-agent run (specs/multi-agent-review.md); null for single runs and CI. */
+    multiAgentRunId: uuid('multi_agent_run_id').references(() => multiAgentRuns.id, {
+      onDelete: 'set null',
+    }),
   },
   (t) => [
     // PR run history (newest first) + the per-PR cost SUM.
     index('agent_runs_pr_ran_idx').on(t.prId, t.ranAt),
     // In-flight runs: tiny partial index for the "running now" lookups + boot reaper.
     index('agent_runs_running_idx').on(t.prId).where(sql`${t.status} = 'running'`),
+    index('agent_runs_multi_agent_run_idx').on(t.multiAgentRunId),
     enumCheck('agent_runs_status_chk', t.status, AGENT_RUN_STATUSES),
     enumCheck('agent_runs_source_chk', t.source, AGENT_RUN_SOURCES),
   ],

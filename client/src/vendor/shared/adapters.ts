@@ -175,6 +175,35 @@ export interface MergedPrSummary {
   files: string[];
 }
 
+/** One completed GitHub Actions workflow run (specs/export-to-ci.md, refresh/ingest). */
+export interface WorkflowRunSummary {
+  id: number;
+  run_attempt: number;
+  head_sha: string;
+  /** Workflow file path as GitHub reports it, e.g. ".github/workflows/x.yml". */
+  path: string;
+  event: string;
+  /** success | failure | cancelled | skipped | ... (null while not concluded). */
+  conclusion: string | null;
+  html_url: string;
+  /** Numeric id of the repository the run belongs to. */
+  repository_id: number;
+  /** Empty for fork PRs (GitHub does not populate it). */
+  pr_numbers: number[];
+  /** ISO timestamp. */
+  created_at: string;
+}
+
+/** One artifact of a workflow run. */
+export interface RunArtifactSummary {
+  id: number;
+  name: string;
+  size_in_bytes: number;
+  expired: boolean;
+  /** ISO timestamp. */
+  created_at: string;
+}
+
 export interface GitHubClient {
   listPullRequests(repo: RepoRef): Promise<PrMeta[]>;
   /**
@@ -213,6 +242,26 @@ export interface GitHubClient {
   getFileContent(repo: RepoRef, path: string, ref: string, opts?: { maxBytes?: number }): Promise<FileAtRef | null>;
   /** GET /user — for "posting as @user". */
   currentLogin(): Promise<string>;
+  /**
+   * Newest completed `pull_request` runs of one workflow file (by file name).
+   * A missing workflow file rejects with an error carrying `.status === 404`.
+   */
+  listWorkflowRuns(
+    repo: RepoRef,
+    workflowFile: string,
+    opts: { perPage: number },
+  ): Promise<WorkflowRunSummary[]>;
+  /** Artifacts of one workflow run (first page). */
+  listRunArtifacts(repo: RepoRef, runId: number): Promise<RunArtifactSummary[]>;
+  /**
+   * Artifact ZIP bytes; null when it is larger than `opts.maxBytes` (never
+   * returned oversize). An expired artifact rejects with `.status` 410.
+   */
+  downloadArtifact(
+    repo: RepoRef,
+    artifactId: number,
+    opts: { maxBytes: number },
+  ): Promise<Uint8Array | null>;
 }
 
 // ---------- Git (simple-git, heavy) ----------

@@ -27,6 +27,7 @@ Reviewed monthly: stale entries are removed in a dedicated commit.
 
 ## Recurring Errors & Fixes
 <!-- error message → cause → fix -->
+- 2026-10-15 — fresh git worktree: mcp/node_modules is not created by the server/client installs, so gates.sh selects mcp:typecheck and it fails with exit 127 'sh: tsc: command not found' (and the devdigest MCP server fails to start: ENOENT mcp/node_modules/.bin/tsx), though no mcp file changed → run 'cd mcp && npm ci' once per worktree (~7 s), then the gate passes
 - 2026-09-30 — mcp/test/tools.test.ts cancel test (@modelcontextprotocol/sdk 1.31 Client.callTool with {signal}): the client promise rejects the moment the local AbortSignal fires, before the server has handled notifications/cancelled, so asserting a server-side effect (e.g. api.cancelRun called) right after 'await expect(...).rejects' is flaky → wrap such assertions in vi.waitFor
 
 ## Session Notes

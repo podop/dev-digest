@@ -19,6 +19,9 @@ export const FindingRecord = Finding.extend({
   // Eval case created from this finding (eval-pipeline FR19); server always sets it.
   // nullish so older producers/fixtures that omit it stay valid.
   eval_case_id: z.string().nullish(),
+  // Memory entry created from this finding by Learn (specs/multi-agent-review.md);
+  // only the multi-agent read model and Learn fill it, other endpoints may omit it.
+  memory_id: z.string().nullish(),
 });
 export type FindingRecord = z.infer<typeof FindingRecord>;
 
@@ -59,6 +62,8 @@ export type ReviewRunTarget = z.infer<typeof ReviewRunTarget>;
 
 export const ReviewRunResponse = z.object({
   pr_id: z.string(),
+  /** Parent run id when the request created a multi-agent run (2+ agentIds). */
+  multi_agent_run_id: z.string().nullish(),
   runs: z.array(ReviewRunTarget),
   reviews: z.array(ReviewRecord),
 });

@@ -15,6 +15,7 @@ import { loadDiff } from './diff-loader.js';
 import { resolveIntentPrework } from './intent-prework.js';
 import type {
   AgentSkillsReader,
+  BoundedRunner,
   Clock,
   DiffSource,
   IntentResolver,
@@ -41,6 +42,8 @@ export interface RunExecutorDeps {
   clock: Clock;
   /** Max map-reduce chunks in flight; undefined = reviewer-core's default. */
   mapConcurrency?: number;
+  /** Bounded parallelism of one batch's agents (composition root); undefined = one after another. */
+  runBounded?: BoundedRunner;
   /** Intent layer (server/specs/05-intent-layer.md); undefined = kill switch off. */
   intent?: IntentResolver;
   /** Project Context (specs/2026-10-01-project-context.md); undefined = no documents are ever attached. */
@@ -124,26 +127,44 @@ export class ReviewRunExecutor {
       for (const off of offIntentCancels) off();
     }
 
-    for (const { agent, runId } of jobs) {
-      const agentStart = this.now();
+    // Each task catches its own error (runOneAgent already persisted the
+    // failure/cancel), so one agent never stops the others. No runner wired →
+    // one after another.
+    const tasks = jobs.map((job) => () => this.runJob(workspaceId, pull, repo, diff, job, runLog, intent, intentTrace, logger));
+    if (this.deps.runBounded) await this.deps.runBounded(tasks);
+    else for (const task of tasks) await task();
+  }
+
+  /** One queued agent run; never rejects. */
+  private async runJob(
+    workspaceId: string,
+    pull: ReviewPull,
+    repo: ReviewRepo,
+    diff: UnifiedDiff,
+    { agent, runId }: RunJob,
+    runLog: RunLogger,
+    intent: Intent | undefined,
+    intentTrace: IntentTrace | undefined,
+    logger?: Logger,
+  ): Promise<void> {
+    const agentStart = this.now();
+    logger?.info(
+      { runId, agent: agent.name, provider: agent.provider, model: agent.model, prId: pull.id },
+      `review: agent "${agent.name}" started (${agent.provider}/${agent.model})`,
+    );
+    try {
+      const findings = await this.runOneAgent(workspaceId, pull, repo, diff, agent, runId, runLog, intent, intentTrace);
       logger?.info(
-        { runId, agent: agent.name, provider: agent.provider, model: agent.model, prId: pull.id },
-        `review: agent "${agent.name}" started (${agent.provider}/${agent.model})`,
+        { runId, agent: agent.name, findings, durationMs: this.now() - agentStart },
+        `review: agent "${agent.name}" done — ${findings} finding(s)`,
       );
-      try {
-        const findings = await this.runOneAgent(workspaceId, pull, repo, diff, agent, runId, runLog, intent, intentTrace);
-        logger?.info(
-          { runId, agent: agent.name, findings, durationMs: this.now() - agentStart },
-          `review: agent "${agent.name}" done — ${findings} finding(s)`,
-        );
-      } catch (err) {
-        // runOneAgent already persisted the failure/cancel and completed the bus.
-        const cancelled = err instanceof RunCancelledError;
-        logger?.[cancelled ? 'info' : 'error'](
-          { runId, agent: agent.name, err: (err as Error).message, durationMs: this.now() - agentStart },
-          `review: agent "${agent.name}" ${cancelled ? 'cancelled' : 'failed'}`,
-        );
-      }
+    } catch (err) {
+      // runOneAgent already persisted the failure/cancel and completed the bus.
+      const cancelled = err instanceof RunCancelledError;
+      logger?.[cancelled ? 'info' : 'error'](
+        { runId, agent: agent.name, err: (err as Error).message, durationMs: this.now() - agentStart },
+        `review: agent "${agent.name}" ${cancelled ? 'cancelled' : 'failed'}`,
+      );
     }
   }
 
