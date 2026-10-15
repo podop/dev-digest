@@ -34,6 +34,8 @@ flowchart TD
   CTX["/repos/:repoId/context<br/>spec / doc / insight markdown, view-only"]
   TOUR["/repos/:repoId/onboarding<br/>five-part onboarding tour: generate, TOC, share"]
   EVAL["/eval<br/>agents overview · ?agent=id runs, trend, compare"]
+  MA["/multi-agent<br/>recent runs per repo"] --> MANEW["/multi-agent/new<br/>pick PR + 2+ agents, estimates"]
+  MA --> MARUN["/multi-agent/:id<br/>agent columns, grouped findings, Learn"]
   SETTINGS["/settings/:section<br/>API keys · models"]
 
   PULLS -->|"GET /repos/:id/pulls · /repos/:id/index-state"| API
@@ -45,8 +47,22 @@ flowchart TD
   CTX -->|"/repos/:id/context · /repos/:id/context/doc?path="| API
   TOUR -->|"GET · POST /repos/:id/onboarding · /repos/:id/index-state"| API
   EVAL -->|"GET /eval/dashboard · /agents/:id/eval/dashboard · /agents/:id/eval-runs · /eval-runs/:id · /eval-runs/compare<br/>POST /agents/:id/eval-runs · /eval-runs/run-all"| API
+  MA -->|"GET /repos/:id/multi-agent-runs"| API
+  MANEW -->|"GET /runs/estimates<br/>POST /pulls/:id/review {agentIds}"| API
+  MARUN -->|"GET /multi-agent-runs/:id<br/>POST /findings/:id/(accept|dismiss|learn)"| API
   SETTINGS -->|"/settings · /providers"| API
 ```
+
+The PR page's **Run Review** control is `RunReviewPicker`
+(`src/app/repos/[repoId]/pulls/[number]/_components/RunReviewPicker/`, replaces
+`RunReviewDropdown`): a multi-select over agents with estimated time. One agent
+runs in place with live SSE status; 2+ start a multi-agent run and navigate to
+`/multi-agent/:id`. `/multi-agent/new` accepts `?pr=<prId>&agents=<id>,<id>`
+(default: every enabled agent). The sidebar has a "Multi-Agent Review" entry
+(`src/vendor/ui/nav.ts`). `RunTraceDrawer` and `EvalCaseButton` were promoted from
+the PR page to `src/components/run-trace-drawer` and `src/components/eval-case-button`
+because the multi-agent results page reuses them. Data hooks:
+`src/lib/hooks/multi-agent.ts`.
 
 Cross-cutting chrome lives in `src/components/app-shell` (nav, breadcrumbs,
 `g`-then-key shortcuts). Pages are thin; feature logic sits in colocated

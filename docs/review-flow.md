@@ -47,8 +47,8 @@ sequenceDiagram
     %% ---------- 2. Trigger ----------
     rect rgb(240, 255, 240)
     Note over U,BUS: 2. Review trigger (manual)
-    U->>UI: Run Review (one agent or all)
-    UI->>API: POST /pulls/:id/review
+    U->>UI: Run Review (one agent, several or all)
+    UI->>API: POST /pulls/:id/review (agentId · all · agentIds)
     API->>DB: resolveTargets (agents)
     loop each target agent
         API->>DB: insert agent_runs status=running
@@ -177,6 +177,17 @@ sequenceDiagram
   `cancelled` and completes the bus immediately, so orphaned runs can be
   cancelled too. The cancel flag survives `complete()`, which is why the live
   runner still sees it.
+- **Multi-agent trigger.** `POST /pulls/:id/review` with `{agentIds}` (1–20
+  uuids) starts one run per distinct agent. With 2+ agents `startReview` first
+  inserts a `multi_agent_runs` parent, links every `agent_runs` row to it
+  (`multi_agent_run_id`) and returns that id next to `runs`; the client then
+  navigates to `/multi-agent/:id`, which reads `GET /multi-agent-runs/:id` (one
+  column per agent, findings grouped by location; polled every 3 s while any
+  column runs). The executor runs the batch through `runBounded`, at most
+  `REVIEW_AGENT_CONCURRENCY` (default 4) agents at once; the rest queue. One
+  agent failing leaves the others running. `POST /findings/:id/learn` turns a
+  finding into a memory entry (idempotent). See
+  [`server/README.md`](../server/README.md) §Multi-agent review.
 - **Per-agent failure.** Status `failed`, the error text and the log so far
   are persisted. The remaining agents keep running.
 - **Server restart.** `RunBus` is in-memory and reviews don't go through
@@ -218,8 +229,9 @@ sequenceDiagram
   run trace log.
 - **The score is deterministic.** It is computed from the grounded findings,
   and the model's own `score` is ignored. The verdict still comes from the model.
-- **`{all:true}` runs agents one after another.** Total time is the sum of the
-  per-agent times.
+- **`{all:true}` and `{agentIds}` run agents in parallel, bounded.** At most
+  `REVIEW_AGENT_CONCURRENCY` (default 4) at once, so total time is roughly the
+  slowest agent per wave, not the sum.
 - **The intent call's cost is never in `agent_runs.cost_usd`.** It is billed
   on `pr_intent` and in each run's `trace.intent` only — the reviewed-PR cost
   shown in the UI is purely the review calls' cost.
@@ -240,4 +252,5 @@ sequenceDiagram
 | Smart Diff | `server/src/modules/smart-diff/` (`domain/{classify,smart-diff,constants}.ts`, `application/smart-diff-service.ts`, `infrastructure/repository.ts`) — server/specs/06-smart-diff.md |
 | Engine | `reviewer-core/src/review/run.ts`, `reviewer-core/src/prompt.ts` (`renderIntent`, `INTENT_SCOPE_RULE`), `reviewer-core/src/grounding.ts`, `reviewer-core/src/review/scope.ts` (`applyScopePolicy`), `reviewer-core/src/review/reduce.ts` |
 | Live events | `server/src/platform/sse.ts` |
+| Multi-agent | `server/src/modules/reviews/application/multi-agent-service.ts`, `reviews/domain/multi-agent.ts`, `reviews/repository/multi-agent.repo.ts`; client `client/src/app/multi-agent/`, `client/src/lib/hooks/multi-agent.ts` |
 | Client | `client/src/lib/hooks/reviews.ts`, `client/src/app/repos/[repoId]/pulls/[number]/page.tsx` and its `_components/` |

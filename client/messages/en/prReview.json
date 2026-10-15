@@ -68,7 +68,13 @@
     "mergedWarning": "Already merged — review is informational",
     "mergedTooltip": "This PR is already merged; running a review won’t affect the merged code.",
     "noAgents": "No agents yet — create one",
-    "agentDisabled": "{model} · disabled"
+    "agentDisabled": "{model} · disabled",
+    "pickerLabel": "Choose agents to run",
+    "selectAll": "Select all",
+    "clear": "Clear",
+    "estimate": "~{seconds}s",
+    "runOne": "Run review",
+    "runMany": "Run multi-agent review ({count})"
   },
   "runStatus": {
     "elapsed": "Running · {count, plural, one {# agent} other {# agents}}",

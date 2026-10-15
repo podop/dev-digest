@@ -1,7 +1,10 @@
+import PQueue from 'p-queue';
 import type { Container } from '../../platform/container.js';
+import { MultiAgentService } from './application/multi-agent-service.js';
 import { ReviewService } from './application/review-service.js';
 import { ReviewRunExecutor } from './application/run-executor.js';
 import { ReviewRepository } from './repository.js';
+import { MultiAgentRepository } from './repository/multi-agent.repo.js';
 
 /**
  * Composition root of the reviews module (lazy: `Container.modules.reviews`).
@@ -24,6 +27,8 @@ export function buildReviewsModule(c: Container) {
     },
     skills: reviews,
     clock,
+    // Agents of one batch run in parallel, at most REVIEW_AGENT_CONCURRENCY at once.
+    runBounded: (tasks) => new PQueue({ concurrency: c.config.reviewAgentConcurrency }).addAll(tasks),
     ...(c.config.reviewMapConcurrency !== undefined ? { mapConcurrency: c.config.reviewMapConcurrency } : {}),
     // Intent layer (server/specs/05-intent-layer.md): reached only through this
     // port, never a direct import of modules/intent internals. Kill switch off
@@ -39,5 +44,10 @@ export function buildReviewsModule(c: Container) {
   });
   return {
     service: new ReviewService({ reviews, agents: c.agentsRepo, runBus: c.runBus, executor, clock }),
+    // Multi-agent read model + Learn (same module, no module of its own).
+    multiAgent: new MultiAgentService({
+      store: new MultiAgentRepository(c.db),
+      tx: c.transactionRunner((db) => ({ learn: new MultiAgentRepository(db) })),
+    }),
   };
 }

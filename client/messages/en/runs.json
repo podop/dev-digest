@@ -154,5 +154,82 @@
       "cta": "Run all agents"
     },
     "crumb": "Multi-Agent Review"
+  },
+  "multiAgent": {
+    "list": {
+      "title": "Multi-Agent Review",
+      "subtitle": "Recent multi-agent runs for the active repository.",
+      "crumb": "Multi-Agent Review",
+      "newReview": "New multi-agent review",
+      "loadError": "Could not load multi-agent runs.",
+      "emptyTitle": "No multi-agent run yet",
+      "emptyBody": "Pick several agents and run them in parallel on a pull request to compare their reviews side by side.",
+      "noRepoTitle": "Import a repository",
+      "noRepoBody": "Multi-agent review works on the pull requests of an imported repository.",
+      "noRepoCta": "Import a repository",
+      "prLabel": "#{number} · {title}",
+      "unknownPr": "Pull request unavailable",
+      "agents": "{count, plural, one {# agent} other {# agents}}",
+      "running": "{count} running",
+      "runsLabel": "Recent multi-agent runs"
+    },
+    "configure": {
+      "title": "Configure run",
+      "subtitle": "Choose a pull request and the agents to run on it in parallel.",
+      "crumb": "New multi-agent review",
+      "prStep": "Pull request",
+      "prSelectLabel": "Pull request",
+      "prPlaceholder": "Select a pull request",
+      "prItem": "#{number} · {title}",
+      "noPulls": "No pull requests",
+      "noPullsBody": "This repository has no pull requests to review yet.",
+      "pullsError": "Could not load pull requests.",
+      "agentsStep": "Agents",
+      "pickPrFirst": "Pick a pull request first",
+      "noAgents": "No agents yet — create one",
+      "agentsError": "Could not load agents.",
+      "agentDisabled": "disabled",
+      "selectAll": "Select all",
+      "clear": "Clear",
+      "estimate": "{time} · {cost}",
+      "noEstimate": "—",
+      "footer": "≈ {time} · {cost} · parallel fan-out",
+      "footerTimeOnly": "≈ {time} · parallel fan-out",
+      "footerNone": "no estimate yet",
+      "run": "Run multi-agent review ({count})",
+      "running": "Starting…",
+      "minAgents": "Select at least 2 agents.",
+      "noRepoTitle": "Import a repository",
+      "noRepoBody": "Multi-agent review works on the pull requests of an imported repository.",
+      "noRepoCta": "Import a repository"
+    },
+    "results": {
+      "title": "Multi-Agent Results",
+      "crumb": "Results",
+      "prLabel": "#{number} · {title}",
+      "unknownPr": "Pull request unavailable",
+      "agentsParallel": "{count, plural, one {# agent} other {# agents}} · parallel",
+      "configureRun": "Configure run",
+      "viewLabel": "Layout",
+      "view": {
+        "columns": "Columns",
+        "tabs": "Tabs"
+      },
+      "status": {
+        "running": "running",
+        "done": "done",
+        "failed": "failed",
+        "cancelled": "cancelled"
+      },
+      "deletedAgent": "Deleted agent",
+      "failedNoError": "The agent failed without an error message.",
+      "findingsOf": "Findings of {agent}",
+      "summaryOf": "Summary of {agent}",
+      "learned": "Learned",
+      "notCompared": "{count, plural, one {# agent} other {# agents}} not finished or failed — not compared.",
+      "notFound": "Multi-agent run not found",
+      "backToList": "Back to multi-agent runs",
+      "loadError": "Could not load this multi-agent run."
+    }
   }
 }

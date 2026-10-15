@@ -316,7 +316,7 @@ describe('ReviewService', () => {
   it('startReview returns the runs at once (reviews come later)', async () => {
     const { service } = setup(idle);
     const res = await service.startReview(WS, PR.id, { agentId: AGENT.id });
-    expect(res).toEqual({ pr_id: PR.id, runs: [{ run_id: 'run-1', agent_id: AGENT.id, agent_name: 'Sec' }], reviews: [] });
+    expect(res).toEqual({ pr_id: PR.id, multi_agent_run_id: null, runs: [{ run_id: 'run-1', agent_id: AGENT.id, agent_name: 'Sec' }], reviews: [] });
   });
 
   it('actOnFinding: a finding of another workspace is not found; other actions are invalid_action', async () => {

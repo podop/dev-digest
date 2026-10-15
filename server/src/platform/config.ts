@@ -34,6 +34,12 @@ const EnvSchema = z.object({
     (v) => (v === '' ? undefined : v),
     z.coerce.number().int().min(1).max(16).optional(),
   ),
+  // Max agents of ONE review batch (agentIds / all / agentId) running in
+  // parallel; the rest wait in the queue (specs/multi-agent-review.md FR4).
+  REVIEW_AGENT_CONCURRENCY: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.coerce.number().int().min(1).max(20).default(4),
+  ),
   // Kill switch for the intent layer (server/specs/05-intent-layer.md).
   // Default ON; 'false' → the executor's shared pre-work skips intent
   // derivation entirely (no call, no pr_intent row, prompt byte-identical to
@@ -136,6 +142,8 @@ export type AppConfig = {
   repoIntelEnabled: boolean;
   /** Max map-reduce chunks in flight per review; undefined = reviewer-core default. */
   reviewMapConcurrency?: number;
+  /** Max agents of one review batch running in parallel (1-20, default 4). */
+  reviewAgentConcurrency: number;
   /** Kill switch for the intent layer (server/specs/05-intent-layer.md). Default true. */
   reviewIntentEnabled: boolean;
   /** Globs of listable Project Context documents (PROJECT_CONTEXT_GLOBS). Never empty. */
@@ -181,6 +189,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     projectContextGlobs: projectContextGlobs.length > 0 ? projectContextGlobs : PROJECT_CONTEXT_DEFAULT_GLOBS,
     promptLogVerboseRequested,
     promptLogVerbose,
+    reviewAgentConcurrency: parsed.REVIEW_AGENT_CONCURRENCY,
     ...(parsed.REVIEW_MAP_CONCURRENCY !== undefined ? { reviewMapConcurrency: parsed.REVIEW_MAP_CONCURRENCY } : {}),
     ...(parsed.LLM_PROVIDER_OVERRIDE ? { llmProviderOverride: parsed.LLM_PROVIDER_OVERRIDE } : {}),
     ...(parsed.LLM_MOCK_DELAY_MS !== undefined ? { llmMockDelayMs: parsed.LLM_MOCK_DELAY_MS } : {}),

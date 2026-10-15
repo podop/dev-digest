@@ -23,6 +23,7 @@ Reviewed monthly: stale entries are removed in a dedicated commit.
 
 ## Codebase Patterns
 <!-- conventions and architectural decisions not obvious from the code -->
+- 2026-10-15 — src/lib/repo-context.tsx useActiveRepo: global routes without :repoId in the path (/multi-agent, /multi-agent/new) fall back to localStorage dd-repo, then the first repo; so ?pr=<id> from a PR of a non-active repo is not in the active repo's PR list and nothing is preselected → on a repo-less route, validate any repo-scoped query param against the active repo's data instead of trusting it
 - 2026-10-15 — src/test/fetch-mock.ts (mockFetch): routes match on the pathname only and the query string is recorded separately on each request → assert query params via api.requests('GET /path')[i].search, not by putting ?x=y in the route key (evals.test.tsx period param)
 - 2026-10-15 — src/vendor/ui/shell/NavItem.tsx:54 + components/app-shell/hooks/useShellCommands.ts:26: sidebar labels (NAV[].label) are English literals in vendored nav.ts; shell.json nav.* keys feed only the command palette → don't flag a literal sidebar label as an i18n miss; a page <title> goes through generateMetadata + getTranslations (as pulls/[number]/page.tsx)
 - 2026-10-15 — src/vendor/ui/kit/Modal.tsx: the vendored Modal has no Escape/keydown handling and vendor/ui is off-limits → a dialog that must close by keyboard (eval CompareModal, spec AC33) registers its own document keydown listener for Escape plus a focusable footer close button with a distinct label (the X button's aria-label is a hard-coded 'Close')

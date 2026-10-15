@@ -10,6 +10,7 @@ import type {
 } from '@devdigest/shared';
 import { InternalError, InvalidInputError, NotFoundError } from '../../../platform/errors.js';
 import type { RunBus } from '../../../platform/sse.js';
+import { MAX_AGENT_IDS } from '../domain/constants.js';
 import { referencedIds, withRunContext } from '../domain/review.js';
 import { finalStatusEvent } from '../domain/run.js';
 import type { ReviewAgent } from '../domain/types.js';
@@ -25,6 +26,13 @@ export interface ReviewServiceDeps {
   clock: Clock;
 }
 
+/** What the trigger accepts; exactly one of the three is expected. */
+export interface StartReviewRequest {
+  agentId?: string;
+  all?: boolean;
+  agentIds?: string[];
+}
+
 /**
  * Review use cases: start review runs (executed in the background by
  * ReviewRunExecutor), follow / cancel / delete them, read reviews and traces,
@@ -36,23 +44,34 @@ export class ReviewService {
   // ---- Runs -----------------------------------------------------------------
 
   /**
-   * Start one run per target agent (`all` → every enabled agent). The
-   * agent_runs rows are created up front so the runIds come back at once and
-   * the client can subscribe to their SSE streams; the slow review runs in the
-   * background and a failure of one agent does not abort the others.
+   * Start one run per target agent (`all` → every enabled agent, `agentIds` →
+   * the deduplicated set). The agent_runs rows are created up front so the
+   * runIds come back at once and the client can subscribe to their SSE
+   * streams; the slow review runs in the background and a failure of one agent
+   * does not abort the others. 2+ distinct `agentIds` also create the parent
+   * multi-agent run first and link every agent run to it.
    */
   async startReview(
     workspaceId: string,
     prId: string,
-    request: { agentId?: string; all?: boolean },
+    request: StartReviewRequest,
     logger?: Logger,
   ): Promise<ReviewRunResponse> {
+    // Everything that can be rejected runs before the first write.
     const targets = await this.resolveTargets(workspaceId, request);
     const { reviews } = this.deps;
     const pull = await reviews.getPull(workspaceId, prId);
     if (!pull) throw new NotFoundError('Pull request not found');
     const repo = await reviews.getRepo(pull.repoId);
     if (!repo) throw new NotFoundError('Repo not found');
+
+    const multiAgentRunId =
+      request.agentIds !== undefined && targets.length >= 2
+        ? await reviews.createMultiAgentRun(workspaceId, prId)
+        : null;
+    if (multiAgentRunId) {
+      logger?.info({ multiAgentRunId, prId, agentCount: targets.length }, 'review: multi-agent run created');
+    }
 
     const jobs: { agent: ReviewAgent; runId: string }[] = [];
     for (const agent of targets) {
@@ -62,6 +81,7 @@ export class ReviewService {
         prId,
         provider: agent.provider,
         model: agent.model,
+        multiAgentRunId,
       });
       jobs.push({ agent, runId });
     }
@@ -74,22 +94,39 @@ export class ReviewService {
 
     return {
       pr_id: prId,
+      multi_agent_run_id: multiAgentRunId,
       runs: jobs.map(({ agent, runId }) => ({ run_id: runId, agent_id: agent.id, agent_name: agent.name })),
       reviews: [],
     };
   }
 
-  private async resolveTargets(
-    workspaceId: string,
-    request: { agentId?: string; all?: boolean },
-  ): Promise<ReviewAgent[]> {
+  private async resolveTargets(workspaceId: string, request: StartReviewRequest): Promise<ReviewAgent[]> {
+    const { agentIds } = request;
+    if (agentIds !== undefined) {
+      if (request.agentId || request.all) {
+        throw new InvalidInputError('Provide exactly one of agentId, all or agentIds', undefined, 'invalid_run_request');
+      }
+      const unique = [...new Set(agentIds)];
+      if (agentIds.length < 1 || agentIds.length > MAX_AGENT_IDS) {
+        throw new InvalidInputError(
+          `agentIds must contain 1–${MAX_AGENT_IDS} ids`,
+          undefined,
+          'invalid_run_request',
+        );
+      }
+      const agents = await Promise.all(unique.map((id) => this.deps.agents.getById(workspaceId, id)));
+      return agents.map((agent) => {
+        if (!agent) throw new NotFoundError('Agent not found');
+        return agent;
+      });
+    }
     if (request.all) return this.deps.agents.listEnabled(workspaceId);
     if (request.agentId) {
       const agent = await this.deps.agents.getById(workspaceId, request.agentId);
       if (!agent) throw new NotFoundError('Agent not found');
       return [agent];
     }
-    throw new InvalidInputError('Provide agentId or all:true', undefined, 'invalid_run_request');
+    throw new InvalidInputError('Provide agentId, all:true or agentIds', undefined, 'invalid_run_request');
   }
 
   /** In-flight runs for a PR (server-side source of truth, survives reload). */

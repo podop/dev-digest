@@ -36,6 +36,10 @@ export const NAV: NavGroup[] = [
       { key: "eval", label: "Eval Dashboard", icon: "BarChart", href: "/eval" },
     ],
   },
+  {
+    section: "GLOBAL",
+    items: [{ key: "multi-agent", label: "Multi-Agent Review", icon: "Layers", href: "/multi-agent" }],
+  },
 ];
 
 export const SETTINGS_ITEM: NavItemDef = {
