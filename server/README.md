@@ -142,6 +142,26 @@ the sample (configs + repo-intel top 12, or a walk of the clone) and checks ever
 cited line against the clone. A rule without verified evidence is dropped and listed in
 `scan.dropped`. `LLM_PROVIDER_OVERRIDE=mock` gives a key-free scan.
 
+### Evals (`modules/evals`, spec [`specs/eval-pipeline.md`](../specs/eval-pipeline.md))
+
+| Method | Path | Result |
+|---|---|---|
+| POST | `/findings/:id/eval-case` | 201 `AgentEvalCase` from a decided finding; 409 `eval_case_exists` (+ `case_id`) · 422 `finding_undecided` / `finding_no_agent` / `patch_unavailable` / `patch_too_large` / `eval_case_limit` |
+| GET | `/agents/:id/eval-cases` | `{cases}` newest first, each with `last_result` from its latest finished run |
+| PATCH · DELETE | `/eval-cases/:id` | edit name / notes / lines (400 `validation_error` when `end_line < start_line`) · 204 |
+| POST | `/agents/:id/eval-runs` | 202 `EvalRunSummary` (`running`); the cases run in the background, 3 at a time, 120 s each. 409 `eval_run_active` · 422 `no_eval_cases` · 429 (10/min) |
+| GET | `/agents/:id/eval-runs?limit=` | `{runs}` newest first (1–100, default 20) |
+| GET | `/eval-runs/:id` | `{run, results}`: progress counters + per-case results (poll while `running`) |
+| GET | `/eval-runs/compare?a=&b=` | `EvalCompare`: B − A deltas, per-case flips, config diff; 422 `runs_not_comparable` (other agent / unfinished run) |
+| POST | `/eval-runs/run-all` | 202 `{started, skipped}`: every agent with cases and no running run; 429 (10/min) |
+| GET | `/eval/dashboard` · `/agents/:id/eval/dashboard` | overview (latest + sparkline per agent, recent runs) · latest, previous, trend, regression alert |
+
+A run executes the case's stored diff and PR title/description through the review engine
+with the agent's config **frozen at start** (version, provider, model, prompt, strategy,
+enabled skills; temperature 0) and is scored by code only — no LLM judges. At boot every
+run still `running` is failed as `interrupted`; on shutdown in-flight runs are aborted
+and record themselves first. Ids of another workspace are a 404.
+
 ### Intent (`modules/intent`, spec [`specs/05-intent-layer.md`](specs/05-intent-layer.md))
 
 | Method | Path | Result |

@@ -29,6 +29,8 @@ returns spec change requests (Step 7).
     (`server`, `client`, `reviewer-core`, `e2e`, `mcp`);
   - `specs/<YYYY-MM-DD>-<slug>.md` (repo root) — the feature touches **two or more**
     modules: one file for the whole feature.
+  - Exception: the user names the exact spec path (e.g. a course checklist requires
+    `specs/eval-pipeline.md`) → use that path, still under `specs/` or `<module>/specs/`.
   Edit only a spec you created in this session or one the user named for revision
   (Step 7). Never edit a `specs/README.md`, code, tests, plans, `docs/`, `INSIGHTS.md`,
   `AGENTS.md`/`CLAUDE.md`, configs. A request outside this role → say so and name the

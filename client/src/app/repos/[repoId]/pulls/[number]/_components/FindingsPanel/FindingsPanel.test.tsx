@@ -179,4 +179,12 @@ describe("FindingsPanel keyboard shortcuts", () => {
     const last = cardTitles().at(-1)!.split(" ")[1];
     await waitFor(() => expect(actionsSent()).toEqual([`${last}/dismiss`]));
   });
+  it("offers 'Turn into eval case' on each card with the review's agent and posts the finding id", async () => {
+    api.on("POST /findings/f1/eval-case", { id: "case1", agent_id: "ag1" });
+    const decided = { ...FINDINGS[0]!, accepted_at: "2026-10-14T10:00:00.000Z" };
+    const { user } = renderWithProviders(<FindingsPanel findings={[decided]} prId="pr1" agentId="ag1" />);
+    await user.click(screen.getByRole("button", { name: "Turn into eval case" }));
+    expect(await screen.findByRole("link", { name: /Eval case/ })).toHaveAttribute("href", "/agents/ag1?tab=evals");
+    expect(api.requests("POST", "/findings/f1/eval-case")).toHaveLength(1);
+  });
 });

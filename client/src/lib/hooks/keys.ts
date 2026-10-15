@@ -106,3 +106,23 @@ export const runKeys = {
   all: ["runs"] as const,
   trace: (runId: Id) => [...runKeys.all, runId, "trace"] as const,
 };
+
+/** Eval pipeline (specs/eval-pipeline.md §7). Everything agent-scoped nests under
+ *  `agent(id)`, so one prefix invalidation refreshes cases, runs and the agent dashboard. */
+export const evalKeys = {
+  all: ["evals"] as const,
+  agent: (agentId: Id) => [...evalKeys.all, "agent", agentId] as const,
+  /** GET /agents/:id/eval-cases */
+  cases: (agentId: Id) => [...evalKeys.agent(agentId), "cases"] as const,
+  /** GET /agents/:id/eval-runs?limit= — the prefix omits `limit`. */
+  runs: (agentId: Id, limit?: number) =>
+    [...evalKeys.agent(agentId), "runs", ...(limit === undefined ? [] : [limit])] as const,
+  /** GET /agents/:id/eval/dashboard */
+  dashboard: (agentId: Id) => [...evalKeys.agent(agentId), "dashboard"] as const,
+  /** GET /eval-runs/:id (run + per-case results). */
+  run: (runId: Id) => [...evalKeys.all, "run", runId] as const,
+  /** GET /eval-runs/compare?a=&b= */
+  compare: (a: Id, b: Id) => [...evalKeys.all, "compare", a, b] as const,
+  /** GET /eval/dashboard (all agents). */
+  overview: () => [...evalKeys.all, "overview"] as const,
+};

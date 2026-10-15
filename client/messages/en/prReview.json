@@ -14,7 +14,22 @@
     "outOfScopeCriticalHint": "Reported regardless of scope",
     "postToPr": "Post to PR",
     "postToPrHint": "Post this finding as an inline review comment on GitHub",
-    "postedToPr": "Posted on GitHub"
+    "postedToPr": "Posted on GitHub",
+    "evalCase": "Turn into eval case",
+    "evalCaseHint": "Save this decision as an eval case for the agent that produced it",
+    "evalCaseUndecided": "Accept or dismiss first",
+    "evalCaseNoAgent": "No agent for this review",
+    "evalCaseDone": "Eval case ✓",
+    "evalCaseDoneHint": "Open the agent's Evals tab",
+    "evalCaseError": {
+      "not_found": "This finding no longer exists.",
+      "finding_undecided": "Accept or dismiss the finding first.",
+      "finding_no_agent": "This review has no agent to own the eval case.",
+      "patch_unavailable": "No diff is stored for this file, so no eval case can be made.",
+      "patch_too_large": "The diff of this file is too large for an eval case.",
+      "eval_case_limit": "This agent has reached its eval case limit.",
+      "generic": "Could not create the eval case. Try again."
+    }
   },
   "trifecta": {
     "lethal": "LETHAL TRIFECTA — ALL 3 PRESENT",

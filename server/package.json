@@ -15,7 +15,8 @@
     "lint": "biome lint --error-on-warnings .",
     "test:unit": "vitest run --exclude '**/*.it.test.ts'",
     "test:integration": "vitest run .it.test",
-    "arch:check": "depcruise src ../reviewer-core/src --config .dependency-cruiser.cjs --ignore-known"
+    "arch:check": "depcruise src ../reviewer-core/src --config .dependency-cruiser.cjs --ignore-known",
+    "verify:l06": "bash scripts/verify-l06.sh"
   },
   "engines": {
     "node": ">=22"

@@ -10,6 +10,7 @@ import {
   TEST_QUALITY_REVIEWER_PROMPT,
 } from './seed-prompts.js';
 import { SEED_AGENT_SKILLS, SEED_SKILLS } from './seed-skills.js';
+import { seedEvalDemo } from './seed-eval-demo.js';
 
 /** Default provider/model for the built-in reviewer agents. */
 const DEFAULT_PROVIDER = 'openrouter' as const;
@@ -25,7 +26,8 @@ const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
  * built-in agents (General + Security + Performance + Test Quality), all on the
  * default openrouter/deepseek-v4-flash provider+model, the finished agent_run
  * that produced the sample review (so the Agent runs timeline has a run tile),
- * and the built-in skills (./seed-skills.ts) linked to those agents.
+ * and the built-in skills (./seed-skills.ts) linked to those agents, plus the
+ * eval demo PR #483 reviewed by the Security Reviewer (./seed-eval-demo.ts).
  *
  * The patch backfill and the run are keyed on "still missing" (patch IS NULL,
  * review.run_id IS NULL), so re-seeding an older DB adds them exactly once.
@@ -245,6 +247,7 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
   await seedSkills(db, workspaceId);
   await seedPr482Diff(db, pr!.id);
   await seedPr482Run(db, workspaceId, pr!.id);
+  await seedEvalDemo(db, workspaceId);
 
   return { workspaceId, userId };
 }

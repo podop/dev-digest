@@ -12,6 +12,8 @@ import {
   MemoryScope,
   MemoryKind,
   EvalOwnerKind,
+  EvalRunStatus,
+  EvalCaseStatus,
   CiTarget,
 } from '@devdigest/shared';
 import * as t from '../src/db/schema.js';
@@ -35,6 +37,8 @@ describe('schema enum value lists match the shared contracts', () => {
     ['memory.scope', t.MEMORY_SCOPES, MemoryScope.options],
     ['memory.kind', t.MEMORY_KINDS, MemoryKind.options],
     ['eval_cases.owner_kind', t.EVAL_OWNER_KINDS, EvalOwnerKind.options],
+    ['eval_suite_runs.status', t.EVAL_SUITE_RUN_STATUSES, EvalRunStatus.options],
+    ['eval_runs.status', t.EVAL_RUN_STATUSES, EvalCaseStatus.options],
     ['ci_installations.target_type', t.CI_TARGET_TYPES, CiTarget.options],
   ];
 

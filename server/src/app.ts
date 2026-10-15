@@ -71,6 +71,14 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     app.log.warn({ err }, 'stale-run reaping failed (non-fatal)');
   }
 
+  // Same for eval runs: one still `running` belongs to a stopped process (FR18).
+  try {
+    const reaped = await container.modules.evals.runs.reapInterrupted();
+    if (reaped > 0) app.log.info({ reaped }, 'reaped interrupted eval runs on boot');
+  } catch (err) {
+    app.log.warn({ err }, 'eval-run reaping failed (non-fatal)');
+  }
+
   // Security headers (X-Content-Type-Options, X-Frame-Options, …). The API
   // serves JSON only, so the default CSP is fine.
   await app.register(helmet);
@@ -116,6 +124,10 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     const res = await container.shutdown();
     if (res.cancelledRuns.length > 0 || !res.runsDrained || !res.jobsDrained) {
       app.log.warn(res, 'shutdown: in-flight work cancelled');
+    }
+    // Abort in-flight eval runs; they record themselves as interrupted before the db closes.
+    if (!(await container.modules.evals.runs.shutdown())) {
+      app.log.warn('shutdown: eval runs did not finish recording in time');
     }
   });
   // Part 2: close the db handle we created (after runs/jobs wrote their final state).
