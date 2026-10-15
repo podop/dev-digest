@@ -32,3 +32,7 @@ test-results/
 # Windows ADS junk from WSL copies
 *:Zone.Identifier
 .next-e2e/
+
+# Stryker mutation testing (server: pnpm mutate)
+.stryker-tmp/
+server/reports/mutation/

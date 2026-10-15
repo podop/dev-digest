@@ -65,6 +65,20 @@ describe('checkCaseContent (FR3)', () => {
     expect(() => check(d, 'src/a.ts', 1, 10)).not.toThrow();
   });
 
+  it('a file with two hunks: lines on either hunk pass, lines in the gap between them do not', () => {
+    const twoHunks = headed('src/a.ts', `${HUNK}\n@@ -40,3 +40,3 @@\n   a,\n-  b,\n+  c,\n   d,`);
+    expect(() => check(twoHunks, 'src/a.ts', 41, 41)).not.toThrow();
+    expect(() => check(twoHunks, 'src/a.ts', 11, 11)).not.toThrow();
+    const gap = code(() => check(twoHunks, 'src/a.ts', 20, 30));
+    expect(gap.code).toBe('expectation_lines_not_in_diff');
+    expect(gap.details).toEqual({
+      ranges: [
+        { start: 10, end: 12 },
+        { start: 40, end: 42 },
+      ],
+    });
+  });
+
   it('EC6: hunk header counts that do not match the lines present are accepted', () => {
     const lying = headed('src/a.ts', '@@ -1,99 +10,99 @@\n ctx\n+added');
     expect(() => check(lying, 'src/a.ts', 11, 11)).not.toThrow();

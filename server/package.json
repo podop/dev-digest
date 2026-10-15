@@ -16,7 +16,8 @@
     "test:unit": "vitest run --exclude '**/*.it.test.ts'",
     "test:integration": "vitest run .it.test",
     "arch:check": "depcruise src ../reviewer-core/src --config .dependency-cruiser.cjs --ignore-known",
-    "verify:l06": "bash scripts/verify-l06.sh"
+    "verify:l06": "bash scripts/verify-l06.sh",
+    "mutate": "stryker run"
   },
   "engines": {
     "node": ">=22"
@@ -49,6 +50,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/vitest-runner": "10.0.0",
     "@testcontainers/postgresql": "^10.16.0",
     "@types/node": "^22.10.0",
     "dependency-cruiser": "^17.4.3",

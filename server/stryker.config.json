@@ -1,0 +1,27 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "_comment": "Mutation testing, one module at a time: `pnpm mutate`. Reports go to reports/mutation (git-ignored).",
+  "testRunner": "vitest",
+  "vitest": {
+    "configFile": "vitest.mutation.config.ts",
+    "related": false
+  },
+  "mutate": [
+    "src/modules/evals/domain/case-input.ts"
+  ],
+  "reporters": [
+    "clear-text",
+    "progress",
+    "html"
+  ],
+  "htmlReporter": {
+    "fileName": "reports/mutation/index.html"
+  },
+  "tempDirName": ".stryker-tmp",
+  "concurrency": 4,
+  "thresholds": {
+    "high": 90,
+    "low": 75,
+    "break": null
+  }
+}
