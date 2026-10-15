@@ -5,30 +5,39 @@ import { IdParams } from '../_shared/schemas.js';
 import {
   ActiveRunsResponse,
   FindingActionResponse,
+  LearnResponse,
+  MultiAgentRunResponse,
+  MultiAgentRunsQuery,
+  MultiAgentRunsResponse,
   OkResponse,
   ReviewRunResponseSchema,
   ReviewsResponse,
   RunHistoryResponse,
+  RunEstimatesResponse,
   RunReviewBody,
   RunTraceResponse,
 } from './http/schemas.js';
 
 /**
  * reviews module.
- *   POST   /pulls/:id/review  {agentId} | {all:true}  → start review run(s); returns the runs
+ *   POST   /pulls/:id/review  {agentId} | {all:true} | {agentIds}  → start review run(s); returns the runs
+ *                                                (2+ agentIds also return multi_agent_run_id)
  *   GET    /runs/:id/events                            → SSE stream of RunEvent (replay-first)
  *   GET    /pulls/:id/runs/active | /pulls/:id/runs    → in-flight runs | run history
  *   DELETE /runs/:id · POST /runs/:id/cancel           → delete / cancel a run
  *   GET    /runs/:id/trace                             → the single-document RunTrace
  *   GET    /pulls/:id/reviews · DELETE /reviews/:id    → persisted reviews + findings
  *   POST   /findings/:id/(accept|dismiss)              → finding actions
+ *   GET    /multi-agent-runs/:id · /repos/:id/multi-agent-runs → comparison read model · recent runs
+ *   GET    /runs/estimates                             → per-agent time / cost estimates
+ *   POST   /findings/:id/learn                         → save a finding to memory (idempotent)
  */
 const FINDING_ACTIONS = ['accept', 'dismiss'] as const;
 
 export default async function reviewsRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
   const { container } = app;
-  const service = container.modules.reviews.service;
+  const { service, multiAgent } = container.modules.reviews;
 
   // Tight per-route limit: each call can fan out to expensive LLM runs. An
   // empty body counts as {} (the service then answers 400 invalid_run_request).
@@ -40,11 +49,15 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
     },
     async (req) => {
       const { workspaceId } = await getContext(container, req);
-      const { agentId, all } = req.body;
+      const { agentId, all, agentIds } = req.body;
       return service.startReview(
         workspaceId,
         req.params.id,
-        { ...(agentId !== undefined ? { agentId } : {}), ...(all !== undefined ? { all } : {}) },
+        {
+          ...(agentId !== undefined ? { agentId } : {}),
+          ...(all !== undefined ? { all } : {}),
+          ...(agentIds !== undefined ? { agentIds } : {}),
+        },
         req.log,
       );
     },
@@ -129,4 +142,36 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
       },
     );
   }
+
+  app.get(
+    '/multi-agent-runs/:id',
+    { schema: { params: IdParams, response: { 200: MultiAgentRunResponse } } },
+    async (req) => {
+      const { workspaceId } = await getContext(container, req);
+      return multiAgent.get(workspaceId, req.params.id);
+    },
+  );
+
+  app.get(
+    '/repos/:id/multi-agent-runs',
+    { schema: { params: IdParams, querystring: MultiAgentRunsQuery, response: { 200: MultiAgentRunsResponse } } },
+    async (req) => {
+      const { workspaceId } = await getContext(container, req);
+      return multiAgent.list(workspaceId, req.params.id, req.query.limit);
+    },
+  );
+
+  app.get('/runs/estimates', { schema: { response: { 200: RunEstimatesResponse } } }, async (req) => {
+    const { workspaceId } = await getContext(container, req);
+    return multiAgent.estimates(workspaceId);
+  });
+
+  app.post(
+    '/findings/:id/learn',
+    { schema: { params: IdParams, response: { 200: LearnResponse } } },
+    async (req) => {
+      const { workspaceId } = await getContext(container, req);
+      return multiAgent.learn(workspaceId, req.params.id, req.log);
+    },
+  );
 }

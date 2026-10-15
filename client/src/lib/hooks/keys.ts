@@ -102,6 +102,16 @@ export const conventionKeys = {
   state: (repoId: Id) => [...repoKeys.detail(repoId), "conventions"] as const,
 };
 
+/** Multi-agent review (specs/multi-agent-review.md §7). `run(id)` is one parent run's read
+ *  model; `repoRuns` the per-repo list; `estimates` the per-agent time/cost averages. */
+export const multiAgentKeys = {
+  all: ["multi-agent"] as const,
+  run: (id: Id) => [...multiAgentKeys.all, "run", id] as const,
+  repoRuns: (repoId: Id, limit?: number) =>
+    [...multiAgentKeys.all, "repo", repoId, ...(limit === undefined ? [] : [limit])] as const,
+  estimates: () => [...multiAgentKeys.all, "estimates"] as const,
+};
+
 export const runKeys = {
   all: ["runs"] as const,
   trace: (runId: Id) => [...runKeys.all, runId, "trace"] as const,

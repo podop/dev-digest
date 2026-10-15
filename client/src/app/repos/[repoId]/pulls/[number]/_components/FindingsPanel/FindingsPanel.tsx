@@ -8,7 +8,7 @@ import { useTranslations } from "next-intl";
 import { Toggle, EmptyState, Chip, SEV } from "@devdigest/ui";
 import type { FindingRecord, Severity } from "@devdigest/shared";
 import { FindingCard } from "../FindingCard";
-import { EvalCaseButton } from "../EvalCaseButton";
+import { EvalCaseButton } from "@/components/eval-case-button";
 import { useFindingAction } from "@/lib/hooks/reviews";
 import { KEY_TO_ACTION, SEVERITY_LEVELS } from "./constants";
 import { filterBySeverity, isEditableTarget, severityCounts, visibleFindings } from "./helpers";

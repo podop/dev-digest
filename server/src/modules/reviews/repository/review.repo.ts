@@ -49,7 +49,7 @@ export async function insertFindings(
 }
 
 /** Eval case created from each given finding (finding id → case id); findings without one are absent. One IN-query. */
-async function evalCaseIdsByFinding(db: DbOrTx, findingIds: string[]): Promise<Map<string, string>> {
+export async function evalCaseIdsByFinding(db: DbOrTx, findingIds: string[]): Promise<Map<string, string>> {
   if (findingIds.length === 0) return new Map();
   const rows = await db
     .select({ findingId: t.evalCases.sourceFindingId, caseId: t.evalCases.id })

@@ -83,6 +83,8 @@ export interface NewAgentRun {
   prId: string;
   provider: string | null;
   model: string | null;
+  /** Parent multi-agent run (a batch of 2+ agentIds); absent/null for a single run. */
+  multiAgentRunId?: string | null;
 }
 
 /** A new persisted review (one agent's pass over a PR). */

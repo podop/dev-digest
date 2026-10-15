@@ -5,6 +5,7 @@
  */
 import type {
   ActiveRun,
+  AgentColumn,
   Finding,
   FindingRecord,
   GitClient,
@@ -21,6 +22,7 @@ import type {
 import type { TransactionRunner } from '../../../application/transaction.js';
 import type { PinoLike } from '../../../platform/run-logger.js';
 import type { RepoIntel } from '../../repo-intel/types.js';
+import type { AgentEstimateRow, MultiAgentRunHeader, MultiAgentRunListRow } from '../domain/multi-agent.js';
 import type { StoredReview } from '../domain/review.js';
 import type {
   NewAgentRun,
@@ -63,6 +65,8 @@ export interface ReviewStore extends ReviewWrites {
   setFindingDismissed(findingId: string, at: Date): Promise<FindingRecord | undefined>;
 
   createAgentRun(values: NewAgentRun): Promise<string>;
+  /** Parent row of a multi-agent batch (written before its agent runs); returns its id. */
+  createMultiAgentRun(workspaceId: string, prId: string): Promise<string>;
   /** agent_run_skills: the skills (at their exact version) in the run's prompt, in order. */
   recordRunSkills(runId: string, skills: readonly ReviewSkill[]): Promise<void>;
   activeRunsForPull(workspaceId: string, prId: string): Promise<ActiveRun[]>;
@@ -78,6 +82,50 @@ export interface ReviewStore extends ReviewWrites {
   /** The stored (unvalidated) trace of a run in the workspace. */
   getRunTraceInWorkspace(workspaceId: string, runId: string): Promise<{ trace: unknown } | undefined>;
 }
+
+// ---- Multi-agent read model + Learn (specs/multi-agent-review.md) -----------
+
+/** A finding with the PR context Learn needs (workspace is checked by the caller). */
+export interface LearnTarget {
+  finding: FindingRecord;
+  workspaceId: string;
+  repoId: string;
+  prNumber: number;
+}
+
+/** The memory entry Learn stores for a finding (scope repo, kind learning, no embedding). */
+export interface NewLearnedMemory {
+  workspaceId: string;
+  repoId: string;
+  findingId: string;
+  prNumber: number;
+  content: string;
+  confidence: number;
+}
+
+/** Reads behind the multi-agent endpoints; no LLM or embedding call anywhere. */
+export interface MultiAgentStore {
+  getMultiAgentRun(workspaceId: string, id: string): Promise<MultiAgentRunHeader | undefined>;
+  /** One column per run linked to the parent (unordered), with every finding of its review. */
+  columnsForMultiAgentRun(workspaceId: string, multiAgentRunId: string): Promise<AgentColumn[]>;
+  repoInWorkspace(workspaceId: string, repoId: string): Promise<boolean>;
+  /** Newest first, at most `limit`. */
+  listMultiAgentRuns(workspaceId: string, repoId: string, limit: number): Promise<MultiAgentRunListRow[]>;
+  /** Averages over each agent's newest done runs; agents without one are absent. */
+  agentRunEstimates(workspaceId: string): Promise<AgentEstimateRow[]>;
+  findingForLearn(findingId: string): Promise<LearnTarget | undefined>;
+}
+
+/** Writes of Learn that must commit together (see LearnTx). */
+export interface LearnWrites {
+  /** Serialise concurrent Learn calls on one finding until the transaction ends. */
+  lockLearn(findingId: string): Promise<void>;
+  /** Existing Learn memory entries (finding id → memory id). */
+  memoryIdsForFindings(workspaceId: string, findingIds: string[]): Promise<Map<string, string>>;
+  insertLearnedMemory(values: NewLearnedMemory): Promise<string>;
+}
+
+export type LearnTx = TransactionRunner<{ learn: LearnWrites }>;
 
 /** The persist step of a run: review + findings + terminal status, atomically. */
 export type ReviewTx = TransactionRunner<{ reviews: ReviewWrites }>;
@@ -102,6 +150,9 @@ export type RepoContext = Pick<RepoIntel, 'getCallerSignatures' | 'getRepoMap' |
 export type LlmResolver = (provider: Provider) => Promise<LLMProvider>;
 
 export type DiffSource = Pick<GitClient, 'diff'>;
+
+/** Run the tasks with the composition root's bounded concurrency (one call = one review batch). */
+export type BoundedRunner = <T>(tasks: Array<() => Promise<T>>) => Promise<T[]>;
 
 /** Wall clock (injectable for tests). */
 export type Clock = () => Date;

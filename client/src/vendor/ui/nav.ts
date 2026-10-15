@@ -34,6 +34,12 @@ export const NAV: NavGroup[] = [
       { key: "agents", label: "Agents", icon: "Cpu", href: "/agents", gKey: "a" },
       { key: "conventions", label: "Conventions", icon: "ListChecks", href: "/repos/:repoId/conventions", gKey: "c" },
       { key: "eval", label: "Eval Dashboard", icon: "BarChart", href: "/eval" },
+    ],
+  },
+  {
+    section: "GLOBAL",
+    items: [
+      { key: "multi-agent", label: "Multi-Agent Review", icon: "Layers", href: "/multi-agent" },
       { key: "ci-runs", label: "CI Runs", icon: "Workflow", href: "/ci-runs" },
     ],
   },

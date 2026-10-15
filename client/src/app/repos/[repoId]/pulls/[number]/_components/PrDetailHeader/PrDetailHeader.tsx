@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { Icon, Avatar, Badge, Button, Tabs } from "@devdigest/ui";
-import { RunReviewDropdown } from "../RunReviewDropdown";
+import { RunReviewPicker } from "../RunReviewPicker";
 import { s } from "./styles";
 import type { PrDetail } from "@/lib/types";
 
@@ -81,7 +81,7 @@ export function PrDetailHeader({
           >
             {t("header.viewOnGithub")}
           </Button>
-          <RunReviewDropdown prId={prId} warnMerged={settled} onRunStart={onRunStart} />
+          <RunReviewPicker prId={prId} warnMerged={settled} onRunStart={onRunStart} />
         </div>
       </div>
       {settled && (
