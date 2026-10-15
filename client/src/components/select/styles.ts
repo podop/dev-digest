@@ -25,6 +25,7 @@ export const s = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   }),
+  icon: { color: "var(--text-muted)", flexShrink: 0 } as CSSProperties,
   chevron: { color: "var(--text-muted)", flexShrink: 0 } as CSSProperties,
   popup: (position: PopupPosition): CSSProperties => ({
     position: "fixed",

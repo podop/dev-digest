@@ -1,2 +1,2 @@
 export { RunsTable, type RunsTableProps, type RunsTableSelection } from "./RunsTable";
-export { formatRunDate, toggleSelected, type RunsTableRow } from "./helpers";
+export { followedRunId, formatRunDate, runningRun, toggleSelected, type RunsTableRow } from "./helpers";

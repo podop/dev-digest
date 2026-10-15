@@ -1,26 +1,27 @@
 /* EvalDashboardView — /eval: the Eval Dashboard. Without ?agent= it lists every agent
-   with eval data (latest metrics, sparkline), the 20 most recent runs across agents and
+   with eval data (cards with latest metrics, sparkline), the 20 most recent runs across agents and
    "Run all agents" (FR23); with ?agent=<id> it shows that agent's view (FR24). The URL
-   is the only view state: the page resolves ?agent= and passes it down. */
+   is the only view state: the page resolves ?agent= and ?period= and passes them down. */
 "use client";
 
 import React from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Button, EmptyState, ErrorState, Skeleton } from "@devdigest/ui";
+import type { EvalPeriodId } from "@devdigest/shared/constants/evals";
+import { Button, EmptyState, ErrorState, Icon, Skeleton } from "@devdigest/ui";
 import { AppShell } from "@/components/app-shell";
-import { RunsTable } from "@/components/eval-run-history";
 import { useEvalOverview, useRunAllEvals } from "@/lib/hooks";
 import { AgentEvalView } from "../AgentEvalView";
 import { AgentsOverview } from "../AgentsOverview";
+import { RecentRunsTable } from "./_components/RecentRunsTable";
 import { isOverviewEmpty } from "./helpers";
 import { s } from "./styles";
 
-export function EvalDashboardView({ agentId }: { agentId: string | null }) {
+export function EvalDashboardView({ agentId, period }: { agentId: string | null; period: EvalPeriodId }) {
   const t = useTranslations("eval");
   return (
     <AppShell crumb={[{ label: t("page.crumbSkillsLab") }, { label: t("page.crumbEvalDashboard") }]}>
-      <div style={s.page}>{agentId ? <AgentEvalView key={agentId} agentId={agentId} /> : <AllAgents />}</div>
+      <div style={s.page}>{agentId ? <AgentEvalView key={agentId} agentId={agentId} period={period} /> : <AllAgents />}</div>
     </AppShell>
   );
 }
@@ -64,12 +65,18 @@ function AllAgents() {
       {data && !isOverviewEmpty(data) && (
         <>
           <section style={s.section} aria-label={t("agentsHeading")}>
-            <h2 style={s.h2}>{t("agentsHeading")}</h2>
+            <h2 style={s.h2}>
+              <Icon.Cpu size={14} aria-hidden />
+              {t("agentsHeading")}
+            </h2>
             <AgentsOverview agents={data.agents} />
           </section>
           <section style={s.section} aria-label={t("recentRunsHeading")}>
-            <h2 style={s.h2}>{t("recentRunsHeading")}</h2>
-            {data.recent_runs.length > 0 ? <RunsTable runs={data.recent_runs} /> : <p style={s.caption}>{t("noRecentRuns")}</p>}
+            <h2 style={s.h2}>
+              <Icon.History size={14} aria-hidden />
+              {t("recentRunsHeading")}
+            </h2>
+            {data.recent_runs.length > 0 ? <RecentRunsTable runs={data.recent_runs} /> : <p style={s.caption}>{t("noRecentRuns")}</p>}
           </section>
         </>
       )}

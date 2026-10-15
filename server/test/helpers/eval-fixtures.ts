@@ -134,15 +134,22 @@ export async function insertAgent(
   return agent!;
 }
 
-/** `n` must_find cases of the agent, created one second apart (the run order). */
-export async function insertCases(db: Db, workspaceId: string, agentId: string, n: number, from = 0) {
+/** `n` must_find cases of an agent (or, with `ownerKind: 'skill'`, of a skill), created one second apart (the run order). */
+export async function insertCases(
+  db: Db,
+  workspaceId: string,
+  agentId: string,
+  n: number,
+  from = 0,
+  ownerKind: 'agent' | 'skill' = 'agent',
+) {
   const base = Date.now() - 3_600_000;
   const rows = await db
     .insert(t.evalCases)
     .values(
       Array.from({ length: n }, (_, i) => ({
         workspaceId,
-        ownerKind: 'agent' as const,
+        ownerKind,
         ownerId: agentId,
         name: `case-${from + i}`,
         inputDiff: caseDiff(from + i),
@@ -173,4 +180,54 @@ export async function waitForRun(app: FastifyInstance, runId: string, timeoutMs 
     if (Date.now() > deadline) throw new Error(`run ${runId} still running after ${timeoutMs}ms`);
     await new Promise((r) => setTimeout(r, 25));
   }
+}
+
+/** A manual skill of the workspace. */
+export async function insertSkill(
+  db: Db,
+  workspaceId: string,
+  overrides: Partial<typeof t.skills.$inferInsert> = {},
+) {
+  const [skill] = await db
+    .insert(t.skills)
+    .values({
+      workspaceId,
+      name: `eval-skill-${++seq}`,
+      description: 'Flag committed keys.',
+      type: 'custom',
+      source: 'manual',
+      body: 'Skill body marker.',
+      ...overrides,
+    })
+    .returning();
+  return skill!;
+}
+
+/** `POST` body of a valid manual case: header-less hunk with new-side lines 10-12 of `src/a.ts`. */
+export function manualCaseBody(over: Record<string, unknown> = {}) {
+  return {
+    name: 'Manual case',
+    expectation: { kind: 'must_find', file: 'src/a.ts', start_line: 11, end_line: 11 },
+    input_diff: '@@ -10,3 +10,3 @@\n   port: 3000,\n-  old: 1,\n+  stripeKey: "sk_live_xxx",\n   redisUrl: x,',
+    ...over,
+  };
+}
+
+export interface LoggedLine {
+  obj: Record<string, unknown>;
+  msg: string;
+}
+
+/** Replace every request's logger with a recorder (server INSIGHTS: the Container exposes no logger). */
+export function recordLogs(app: FastifyInstance): LoggedLine[] {
+  const logged: LoggedLine[] = [];
+  app.addHook('onRequest', async (req) => {
+    (req as { log: unknown }).log = {
+      info: (obj: Record<string, unknown>, msg: string) => logged.push({ obj, msg }),
+      error: (obj: Record<string, unknown>, msg: string) => logged.push({ obj, msg }),
+      warn: () => undefined,
+      debug: () => undefined,
+    };
+  });
+  return logged;
 }

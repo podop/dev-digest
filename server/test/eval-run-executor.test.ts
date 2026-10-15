@@ -209,8 +209,12 @@ class RecordingLog implements EvalLogger {
 const job = (store: FakeStore, over: Partial<RunJob> = {}): RunJob => ({
   runId: 'run-1',
   workspaceId: 'w1',
+  ownerKind: 'agent',
+  skillId: null,
+  skillVersion: null,
   agentId: 'a1',
   agentVersion: 3,
+  agentName: 'Reviewer',
   config: CONFIG,
   caseIds: [...store.cases.keys()],
   ...over,
@@ -353,7 +357,15 @@ describe('eval run executor (fakes, no DB)', () => {
     await runToEnd(executor, store, job(store), log);
 
     expect(log.lines.map((l) => l.msg)).toEqual(['eval run started', 'eval run finished']);
-    expect(log.lines[0]!.obj).toEqual({ runId: 'run-1', agentId: 'a1', agentVersion: 3, cases: 1 });
+    expect(log.lines[0]!.obj).toEqual({
+      runId: 'run-1',
+      ownerKind: 'agent',
+      skillId: null,
+      skillVersion: null,
+      agentId: 'a1',
+      agentVersion: 3,
+      cases: 1,
+    });
     expect(log.lines[1]!.obj).toMatchObject({ runId: 'run-1', status: 'completed', casesPassed: 1, costUsd: 0.5 });
     const text = JSON.stringify(log.lines);
     for (const secret of ['SYSTEM-PROMPT-MARKER', 'SKILL-BODY-MARKER', 'stripeKey', 'Hardcoded key', 'PR body']) {
@@ -411,6 +423,8 @@ describe('scoring makes no LLM call (AC13, NFR1)', () => {
   });
 });
 
+const SKILL = { id: 's1', name: 'sql-injection', description: 'Flag raw SQL.', body: 'Skill body.', version: 4 };
+
 describe('EvalRunsService', () => {
   function service(store = new FakeStore(), snapshot: 'agent' | 'none' = 'agent') {
     const launched: Array<{ job: RunJob }> = [];
@@ -419,8 +433,9 @@ describe('EvalRunsService', () => {
       agents: {
         exists: async () => snapshot === 'agent',
         listIds: async () => (snapshot === 'agent' ? ['a1', 'a2'] : []),
-        snapshot: async () => (snapshot === 'agent' ? { version: 3, config: CONFIG } : undefined),
+        snapshot: async () => (snapshot === 'agent' ? { version: 3, name: 'Reviewer', config: CONFIG } : undefined),
       },
+      skills: { get: async (_ws, id) => (id === 's1' ? SKILL : undefined) },
       executor: { launch: (j) => void launched.push({ job: j }), shutdown: async () => true },
     });
     return { svc, store, launched };
@@ -432,7 +447,17 @@ describe('EvalRunsService', () => {
     store.addCase('c2');
     const run = await svc.start('w1', 'a1');
     expect(run).toMatchObject({ id: 'run-1', status: 'running', cases_total: 2 });
-    expect(store.inserted[0]).toEqual({ workspaceId: 'w1', agentId: 'a1', agentVersion: 3, config: CONFIG, caseIds: ['c1', 'c2'] });
+    expect(store.inserted[0]).toEqual({
+      workspaceId: 'w1',
+      ownerKind: 'agent',
+      skillId: null,
+      skillVersion: null,
+      agentId: 'a1',
+      agentVersion: 3,
+      agentName: 'Reviewer',
+      config: CONFIG,
+      caseIds: ['c1', 'c2'],
+    });
     expect(launched).toHaveLength(1);
     expect(launched[0]!.job).toMatchObject({ runId: 'run-1', agentVersion: 3, caseIds: ['c1', 'c2'] });
   });
@@ -476,6 +501,37 @@ describe('EvalRunsService', () => {
         { agent_id: 'a2', reason: 'no_cases' },
       ],
     });
+  });
+
+  it('startSkill: freezes the host config with ONLY the skill, records the skill version and host name (FR18)', async () => {
+    const { svc, store, launched } = service();
+    store.addCase('c1');
+    const run = await svc.startSkill('w1', 's1', 'a1');
+    expect(run.id).toBe('run-1');
+    expect(store.inserted[0]).toMatchObject({
+      ownerKind: 'skill',
+      skillId: 's1',
+      skillVersion: 4,
+      agentId: 'a1',
+      agentVersion: 3,
+      agentName: 'Reviewer',
+      caseIds: ['c1'],
+      config: { ...CONFIG, skills: [SKILL] },
+    });
+    expect(launched[0]!.job).toMatchObject({ runId: 'run-1', ownerKind: 'skill', skillId: 's1' });
+  });
+
+  it('startSkill: unknown skill -> 404; unknown host -> host_agent_not_found; no cases -> no_eval_cases; active -> 409', async () => {
+    const { svc, store } = service();
+    store.addCase('c1');
+    await expect(svc.startSkill('w1', 'nope', 'a1')).rejects.toBeInstanceOf(NotFoundError);
+    await expect(service(new FakeStore(), 'none').svc.startSkill('w1', 's1', 'a1')).rejects.toMatchObject({
+      code: 'host_agent_not_found',
+    });
+    await expect(service().svc.startSkill('w1', 's1', 'a1')).rejects.toMatchObject({ code: 'no_eval_cases' });
+    store.active = true;
+    await expect(svc.startSkill('w1', 's1', 'a1')).rejects.toMatchObject({ code: 'eval_run_active' });
+    await expect(svc.listSkillRuns('w1', 'nope', 20)).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('an unknown / foreign agent or run is a 404', async () => {

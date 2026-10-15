@@ -3,13 +3,13 @@
  * per-case `eval_runs` rows. Plain functions over a db handle; `EvalsRepository`
  * delegates to them. Workspace-scoped wherever an id comes from the client.
  */
-import { and, desc, eq, getTableColumns, inArray, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns, gte, inArray, lte, sql } from 'drizzle-orm';
 import type { EvalRecentRun, EvalRunDetail, EvalRunSummary } from '@devdigest/shared';
 import type { Db, DbOrTx } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
 import type { InsertRunResult } from '../application/ports.js';
 import type { CompareSide } from '../domain/compare.js';
-import type { AgentCaseCount, CaseRecord, NewSuiteRun, RunFinal, RunnableCase } from '../domain/types.js';
+import type { AgentCaseCount, CaseOwner, CaseRecord, NewSuiteRun, RunFinal, RunnableCase } from '../domain/types.js';
 import { toCaseResult, toRunnableCase, toRunSummary } from './mappers.js';
 import { FOREIGN_KEY_VIOLATION, pgCode, UNIQUE_VIOLATION } from './pg-error.js';
 
@@ -17,31 +17,45 @@ const FINISHED = ['completed', 'failed'] as const;
 
 // ---- reads ------------------------------------------------------------------
 
-export async function caseIds(db: DbOrTx, workspaceId: string, agentId: string): Promise<string[]> {
+export async function caseIds(db: DbOrTx, workspaceId: string, owner: CaseOwner): Promise<string[]> {
   const rows = await db
     .select({ id: t.evalCases.id })
     .from(t.evalCases)
     .where(
       and(
         eq(t.evalCases.workspaceId, workspaceId),
-        eq(t.evalCases.ownerKind, 'agent'),
-        eq(t.evalCases.ownerId, agentId),
+        eq(t.evalCases.ownerKind, owner.kind),
+        eq(t.evalCases.ownerId, owner.id),
       ),
     )
     .orderBy(t.evalCases.createdAt, t.evalCases.id);
   return rows.map((r) => r.id);
 }
 
+/** The runs one owner started: an agent's own runs (never the skill runs it hosts) or a skill's runs. */
+function ownedRuns(owner: CaseOwner) {
+  return owner.kind === 'skill'
+    ? and(eq(t.evalSuiteRuns.ownerKind, 'skill'), eq(t.evalSuiteRuns.skillId, owner.id))
+    : and(eq(t.evalSuiteRuns.ownerKind, 'agent'), eq(t.evalSuiteRuns.agentId, owner.id));
+}
+
 export async function listRuns(
   db: DbOrTx,
   workspaceId: string,
-  agentId: string,
+  owner: CaseOwner,
   limit: number,
+  since?: Date,
 ): Promise<EvalRunSummary[]> {
   const rows = await db
     .select()
     .from(t.evalSuiteRuns)
-    .where(and(eq(t.evalSuiteRuns.workspaceId, workspaceId), eq(t.evalSuiteRuns.agentId, agentId)))
+    .where(
+      and(
+        eq(t.evalSuiteRuns.workspaceId, workspaceId),
+        ownedRuns(owner),
+        since ? gte(t.evalSuiteRuns.startedAt, since) : undefined,
+      ),
+    )
     .orderBy(desc(t.evalSuiteRuns.startedAt), desc(t.evalSuiteRuns.id))
     .limit(limit);
   return rows.map(toRunSummary);
@@ -96,13 +110,7 @@ export async function loadCase(db: DbOrTx, workspaceId: string, caseId: string):
   const [row] = await db
     .select()
     .from(t.evalCases)
-    .where(
-      and(
-        eq(t.evalCases.workspaceId, workspaceId),
-        eq(t.evalCases.ownerKind, 'agent'),
-        eq(t.evalCases.id, caseId),
-      ),
-    );
+    .where(and(eq(t.evalCases.workspaceId, workspaceId), eq(t.evalCases.id, caseId)));
   return row && toRunnableCase(row);
 }
 
@@ -113,6 +121,7 @@ export async function finishedRuns(
   workspaceId: string,
   agentId: string,
   limit: number,
+  since?: Date,
 ): Promise<EvalRunSummary[]> {
   const rows = await db
     .select()
@@ -120,8 +129,9 @@ export async function finishedRuns(
     .where(
       and(
         eq(t.evalSuiteRuns.workspaceId, workspaceId),
-        eq(t.evalSuiteRuns.agentId, agentId),
+        ownedRuns({ kind: 'agent', id: agentId }),
         inArray(t.evalSuiteRuns.status, FINISHED),
+        since ? gte(t.evalSuiteRuns.startedAt, since) : undefined,
       ),
     )
     .orderBy(desc(t.evalSuiteRuns.startedAt), desc(t.evalSuiteRuns.id))
@@ -148,6 +158,7 @@ export async function finishedRunsByAgent(
     .where(
       and(
         eq(t.evalSuiteRuns.workspaceId, workspaceId),
+        eq(t.evalSuiteRuns.ownerKind, 'agent'),
         inArray(t.evalSuiteRuns.agentId, agentIds),
         inArray(t.evalSuiteRuns.status, FINISHED),
       ),
@@ -181,7 +192,7 @@ export async function agentsWithEvals(db: DbOrTx, workspaceId: string): Promise<
       and(
         eq(t.agents.workspaceId, workspaceId),
         sql`(exists (select 1 from ${t.evalCases} where ${t.evalCases.ownerKind} = 'agent' and ${t.evalCases.ownerId} = ${t.agents.id})
-          or exists (select 1 from ${t.evalSuiteRuns} where ${t.evalSuiteRuns.agentId} = ${t.agents.id}))`,
+          or exists (select 1 from ${t.evalSuiteRuns} where ${t.evalSuiteRuns.ownerKind} = 'agent' and ${t.evalSuiteRuns.agentId} = ${t.agents.id}))`,
       ),
     )
     .orderBy(t.agents.name, t.agents.id);
@@ -193,7 +204,7 @@ export async function recentRuns(db: DbOrTx, workspaceId: string, limit: number)
     .select({ run: getTableColumns(t.evalSuiteRuns), agentName: t.agents.name })
     .from(t.evalSuiteRuns)
     .innerJoin(t.agents, eq(t.agents.id, t.evalSuiteRuns.agentId))
-    .where(eq(t.evalSuiteRuns.workspaceId, workspaceId))
+    .where(and(eq(t.evalSuiteRuns.workspaceId, workspaceId), eq(t.evalSuiteRuns.ownerKind, 'agent')))
     .orderBy(desc(t.evalSuiteRuns.startedAt), desc(t.evalSuiteRuns.id))
     .limit(limit);
   return rows.map((r) => ({ ...toRunSummary(r.run), agent_name: r.agentName }));
@@ -207,8 +218,12 @@ export async function insertRun(db: DbOrTx, values: NewSuiteRun): Promise<Insert
       .insert(t.evalSuiteRuns)
       .values({
         workspaceId: values.workspaceId,
+        ownerKind: values.ownerKind,
+        skillId: values.skillId,
+        skillVersion: values.skillVersion,
         agentId: values.agentId,
         agentVersion: values.agentVersion,
+        agentName: values.agentName,
         config: values.config,
         caseIds: values.caseIds,
         status: 'running',
@@ -217,7 +232,7 @@ export async function insertRun(db: DbOrTx, values: NewSuiteRun): Promise<Insert
       .returning();
     return { kind: 'created', run: toRunSummary(row!) };
   } catch (err) {
-    // The partial unique index allows one `running` run per agent.
+    // The partial unique indexes allow one `running` run per owner (agent or skill).
     if (pgCode(err) === UNIQUE_VIOLATION) return { kind: 'active' };
     throw err;
   }

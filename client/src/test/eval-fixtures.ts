@@ -5,8 +5,12 @@ import type { AgentEvalCase, EvalCaseResult, EvalCompare, EvalPromptDiffLine, Ev
 export function makeRun(overrides: Partial<EvalRunSummary> = {}): EvalRunSummary {
   return {
     id: "run1",
+    owner_kind: "agent",
+    skill_id: null,
+    skill_version: null,
     agent_id: "ag1",
     agent_version: 3,
+    agent_name: "Security Reviewer",
     model: "mock/reviewer",
     status: "completed",
     started_at: "2026-10-14T10:00:00.000Z",
@@ -29,6 +33,8 @@ export function makeRun(overrides: Partial<EvalRunSummary> = {}): EvalRunSummary
 export function makeCase(overrides: Partial<AgentEvalCase> = {}): AgentEvalCase {
   return {
     id: "case1",
+    owner_kind: "agent",
+    owner_id: "ag1",
     agent_id: "ag1",
     name: "stripe-key-leak",
     notes: null,
@@ -45,6 +51,8 @@ export function makeCase(overrides: Partial<AgentEvalCase> = {}): AgentEvalCase 
     input_meta: { pr_title: "Add Stripe", pr_description: "Wire payments", repo: "acme/shop", pr_number: 7, head_sha: "abc1234" },
     source_finding_id: "f1",
     source_pr_id: "pr1",
+    origin: "finding",
+    content_edited_at: null,
     created_at: "2026-10-14T09:00:00.000Z",
     last_result: null,
     ...overrides,

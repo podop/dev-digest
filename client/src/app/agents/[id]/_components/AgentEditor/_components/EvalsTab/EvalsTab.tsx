@@ -2,7 +2,8 @@
    the case list ("n / m passing"), "Run all evals" with live progress, the run history,
    and a link to the full dashboard (FR21). A run executes in the background; this tab
    follows it by polling (useEvalRun) and the hook refreshes tiles, rows and history when
-   it ends. Case modals and the delete confirmation sit next to the list, not in a row. */
+   it ends. The case list, editor and delete confirmation are the shared EvalCasesSection;
+   this tab hands it the Run all control. */
 "use client";
 
 import React from "react";
@@ -10,13 +11,11 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Button, ErrorState, Skeleton } from "@devdigest/ui";
 import type { Agent } from "@devdigest/shared";
+import { EvalCasesSection } from "@/components/eval-cases";
 import { MetricTiles } from "@/components/eval-metrics";
-import { RunsTable } from "@/components/eval-run-history";
-import { useDeleteEvalCase, useEvalAgentDashboard, useEvalCases, useEvalRun, useEvalRuns, useStartEvalRun } from "@/lib/hooks";
-import { DeleteCaseConfirm } from "./_components/DeleteCaseConfirm";
-import { EvalCaseModal } from "./_components/EvalCaseModal";
-import { EvalCaseRow } from "./_components/EvalCaseRow";
-import { countPassing, dashboardHref, followedRunId, runningRun } from "./helpers";
+import { followedRunId, RunsTable, runningRun } from "@/components/eval-run-history";
+import { useEvalAgentDashboard, useEvalCases, useEvalRun, useEvalRuns, useStartEvalRun } from "@/lib/hooks";
+import { dashboardHref } from "./helpers";
 import { s } from "./styles";
 
 export function EvalsTab({ agent }: { agent: Agent }) {
@@ -26,21 +25,19 @@ export function EvalsTab({ agent }: { agent: Agent }) {
   const dashboard = useEvalAgentDashboard(agent.id);
   const runs = useEvalRuns(agent.id);
   const start = useStartEvalRun(agent.id);
-  const remove = useDeleteEvalCase();
   const followed = useEvalRun(followedRunId(runs.data, start.data?.id));
-  const [openId, setOpenId] = React.useState<string | null>(null);
-  const [deletingId, setDeletingId] = React.useState<string | null>(null);
 
   const running = runningRun(followed.data, runs.data);
-  const caseList = cases.data ?? [];
-  const opened = caseList.find((c) => c.id === openId) ?? null;
-  const deleting = caseList.find((c) => c.id === deletingId) ?? null;
-  const noCases = !cases.isLoading && caseList.length === 0;
+  const noCases = !cases.isLoading && !cases.isError && cases.data?.length === 0;
   const busy = start.isPending || running != null;
 
-  const confirmDelete = () => {
-    if (deleting) remove.mutate({ id: deleting.id, agentId: agent.id }, { onSuccess: () => setDeletingId(null) });
-  };
+  const runSlot = (
+    <span title={noCases ? t("runAllNoCases") : undefined}>
+      <Button kind="primary" icon="Play" disabled={cases.isLoading || cases.isError || noCases || busy} onClick={() => start.mutate()}>
+        {running ? t("runningProgress", { finished: running.cases_finished, total: running.cases_total }) : t("runAll")}
+      </Button>
+    </span>
+  );
 
   return (
     <div style={s.wrap}>
@@ -65,39 +62,7 @@ export function EvalsTab({ agent }: { agent: Agent }) {
         )}
       </section>
 
-      <section style={s.section} aria-label={t("casesHeading")}>
-        <div style={s.header}>
-          <h2 style={{ ...s.h2, ...s.titleBlock }}>
-            {t("casesHeading")}
-            {!cases.isLoading && !cases.isError && (
-              <span style={s.passing}>{t("casesPassing", { passed: countPassing(caseList), total: caseList.length })}</span>
-            )}
-          </h2>
-          <span title={noCases ? t("runAllNoCases") : undefined}>
-            <Button
-              kind="primary"
-              icon="Play"
-              disabled={cases.isLoading || cases.isError || noCases || busy}
-              onClick={() => start.mutate()}
-            >
-              {running ? t("runningProgress", { finished: running.cases_finished, total: running.cases_total }) : t("runAll")}
-            </Button>
-          </span>
-        </div>
-        {cases.isLoading ? (
-          <Skeleton height={140} />
-        ) : cases.isError ? (
-          <ErrorState title={t("casesLoadError")} onRetry={() => cases.refetch()} retryLabel={tc("actions.retry")} />
-        ) : noCases ? (
-          <p style={s.caption}>{t("emptyCases")}</p>
-        ) : (
-          <ul style={s.list} aria-label={t("casesHeading")}>
-            {caseList.map((c) => (
-              <EvalCaseRow key={c.id} evalCase={c} onOpen={() => setOpenId(c.id)} onDelete={() => setDeletingId(c.id)} />
-            ))}
-          </ul>
-        )}
-      </section>
+      <EvalCasesSection owner={{ kind: "agent", id: agent.id }} runSlot={runSlot} emptyText={t("emptyCases")} />
 
       <section style={s.section} aria-label={t("historyHeading")}>
         <h2 style={s.h2}>{t("historyHeading")}</h2>
@@ -110,20 +75,6 @@ export function EvalsTab({ agent }: { agent: Agent }) {
         )}
       </section>
 
-      {opened && (
-        <EvalCaseModal
-          key={opened.id}
-          evalCase={opened}
-          onClose={() => setOpenId(null)}
-          onDelete={() => {
-            setOpenId(null);
-            setDeletingId(opened.id);
-          }}
-        />
-      )}
-      {deleting && (
-        <DeleteCaseConfirm name={deleting.name} deleting={remove.isPending} onConfirm={confirmDelete} onCancel={() => setDeletingId(null)} />
-      )}
     </div>
   );
 }

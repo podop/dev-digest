@@ -2,8 +2,21 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EvalRunDetail, EvalRunSummary } from "@devdigest/shared";
 import { renderHookWithProviders, cleanup, act, waitFor } from "@/test/render";
 import { mockFetch, jsonResponse } from "@/test/fetch-mock";
+import { makeCase } from "@/test/eval-fixtures";
 import { evalKeys, prKeys } from "./keys";
-import { EVAL_RUN_POLL_MS, useCreateEvalCase, useEvalRun } from "./evals";
+import {
+  EVAL_RUN_POLL_MS,
+  useCreateEvalCase,
+  useCreateManualEvalCase,
+  useDeleteEvalCase,
+  useEvalAgentDashboard,
+  useEvalRun,
+  useEvalRuns,
+  useSkillEvalCases,
+  useSkillEvalRuns,
+  useStartSkillEvalRun,
+  useUpdateEvalCase,
+} from "./evals";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -13,8 +26,12 @@ afterEach(() => {
 function makeRun(overrides: Partial<EvalRunSummary> = {}): EvalRunSummary {
   return {
     id: "run1",
+    owner_kind: "agent",
+    skill_id: null,
+    skill_version: null,
     agent_id: "ag1",
     agent_version: 3,
+    agent_name: "Security Reviewer",
     model: "mock/reviewer",
     status: "running",
     started_at: "2026-10-14T10:00:00.000Z",
@@ -95,5 +112,136 @@ describe("useCreateEvalCase", () => {
     act(() => result.current.mutate({ findingId: "f1", agentId: "ag1" }));
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error).toMatchObject({ status: 422, code: "finding_undecided" });
+  });
+});
+
+describe("period-aware reads", () => {
+  it("sends period on the runs list and the dashboard, and nothing without it", async () => {
+    const api = mockFetch({
+      "GET /agents/ag1/eval-runs": { runs: [] },
+      "GET /agents/ag1/eval/dashboard": { agent_id: "ag1", cases_total: 0, latest: null, previous: null, trend: [], alert: null },
+    });
+    const withPeriod = renderHookWithProviders(() => ({
+      runs: useEvalRuns("ag1", 100, "7d"),
+      dashboard: useEvalAgentDashboard("ag1", "7d"),
+    }));
+    await waitFor(() => expect(withPeriod.result.current.runs.isSuccess && withPeriod.result.current.dashboard.isSuccess).toBe(true));
+    expect(api.requests("GET", "/agents/ag1/eval-runs")[0]?.search).toBe("?limit=100&period=7d");
+    expect(api.requests("GET", "/agents/ag1/eval/dashboard")[0]?.search).toBe("?period=7d");
+    expect(withPeriod.queryClient.getQueryState(evalKeys.runs("ag1", 100, "7d"))?.status).toBe("success");
+    expect(withPeriod.queryClient.getQueryState(evalKeys.dashboard("ag1", "7d"))?.status).toBe("success");
+    cleanup();
+
+    const bare = renderHookWithProviders(() => ({ runs: useEvalRuns("ag1"), dashboard: useEvalAgentDashboard("ag1") }));
+    await waitFor(() => expect(bare.result.current.runs.isSuccess && bare.result.current.dashboard.isSuccess).toBe(true));
+    expect(api.requests("GET", "/agents/ag1/eval-runs")[1]?.search).toBe("?limit=20");
+    expect(api.requests("GET", "/agents/ag1/eval/dashboard")[1]?.search).toBe("");
+  });
+
+  it("keys differ per period and stay under the agent prefix", () => {
+    expect(evalKeys.runs("ag1", 100, "7d")).not.toEqual(evalKeys.runs("ag1", 100, "30d"));
+    expect(evalKeys.dashboard("ag1", "7d")).not.toEqual(evalKeys.dashboard("ag1"));
+    expect(evalKeys.dashboard("ag1", "7d").slice(0, evalKeys.agent("ag1").length)).toEqual(evalKeys.agent("ag1"));
+    expect(evalKeys.runs("ag1")).toEqual([...evalKeys.agent("ag1"), "runs"]);
+  });
+});
+
+describe("skill-owned eval reads and runs", () => {
+  it("keys nest under the skill prefix, apart from the agent prefix", () => {
+    expect(evalKeys.skillCases("sk1")).toEqual([...evalKeys.skill("sk1"), "cases"]);
+    expect(evalKeys.skillRuns("sk1")).toEqual([...evalKeys.skill("sk1"), "runs"]);
+    expect(evalKeys.skillRuns("sk1", 20)).toEqual([...evalKeys.skill("sk1"), "runs", 20]);
+    expect(evalKeys.skill("sk1")).not.toEqual(evalKeys.agent("sk1"));
+  });
+
+  it("reads a skill's cases and runs and starts a run with the host agent", async () => {
+    const started = makeRun({ id: "sr1", owner_kind: "skill", skill_id: "sk1", skill_version: 2, agent_id: "host1" });
+    const api = mockFetch({
+      "GET /skills/sk1/eval-cases": { cases: [makeCase({ owner_kind: "skill", owner_id: "sk1", agent_id: null })] },
+      "GET /skills/sk1/eval-runs": { runs: [] },
+      "POST /skills/sk1/eval-runs": started,
+    });
+    const { result, queryClient } = renderHookWithProviders(() => ({
+      cases: useSkillEvalCases("sk1"),
+      runs: useSkillEvalRuns("sk1"),
+      start: useStartSkillEvalRun("sk1"),
+    }));
+    await waitFor(() => expect(result.current.cases.data).toHaveLength(1));
+    await waitFor(() => expect(result.current.runs.isSuccess).toBe(true));
+    expect(api.requests("GET", "/skills/sk1/eval-runs")[0]?.search).toBe("?limit=20");
+
+    act(() => result.current.start.mutate({ agent_id: "host1" }));
+    await waitFor(() => expect(result.current.start.isSuccess).toBe(true));
+    expect(api.requests("POST", "/skills/sk1/eval-runs")[0]?.body).toEqual({ agent_id: "host1" });
+    expect(queryClient.getQueryData<EvalRunDetail>(evalKeys.run("sr1"))?.run.id).toBe("sr1");
+  });
+
+  it("a finished skill run invalidates the skill's queries and leaves the agent's alone", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const skillRun = (over: Partial<EvalRunSummary>) => makeRun({ id: "sr1", owner_kind: "skill", skill_id: "sk1", agent_id: "host1", ...over });
+    const responses = [detail(skillRun({})), detail(skillRun({ status: "completed", cases_finished: 8 }))];
+    let calls = 0;
+    mockFetch({ "GET /eval-runs/sr1": () => responses[Math.min(calls++, responses.length - 1)] });
+    const { result, queryClient } = renderHookWithProviders(() => useEvalRun("sr1"));
+    queryClient.setQueryData(evalKeys.skillRuns("sk1", 20), { runs: [] });
+    queryClient.setQueryData(evalKeys.runs("host1", 20), { runs: [] });
+    queryClient.setQueryData(evalKeys.overview(), { agents: [], recent_runs: [] });
+
+    await waitFor(() => expect(result.current.data?.run.status).toBe("running"));
+    await act(() => vi.advanceTimersByTimeAsync(EVAL_RUN_POLL_MS));
+    await waitFor(() => expect(queryClient.getQueryState(evalKeys.skillRuns("sk1", 20))?.isInvalidated).toBe(true));
+    expect(queryClient.getQueryState(evalKeys.runs("host1", 20))?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(evalKeys.overview())?.isInvalidated).toBe(false);
+  });
+});
+
+describe("case mutations by owner", () => {
+  it("creates a manual case on the owner's route and refreshes only that owner", async () => {
+    const created = makeCase({ id: "c9", owner_kind: "skill", owner_id: "sk1", agent_id: null, origin: "manual" });
+    const api = mockFetch({ "POST /skills/sk1/eval-cases": jsonResponse(created, 201) });
+    const { result, queryClient } = renderHookWithProviders(() => useCreateManualEvalCase({ kind: "skill", id: "sk1" }));
+    queryClient.setQueryData(evalKeys.skillCases("sk1"), { cases: [] });
+    queryClient.setQueryData(evalKeys.cases("sk1"), { cases: [] });
+    const input = {
+      name: "n",
+      expectation: { kind: "must_find" as const, file: "a.ts", start_line: 1, end_line: 1 },
+      input_diff: "+x",
+    };
+
+    act(() => result.current.mutate(input));
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(api.requests("POST", "/skills/sk1/eval-cases")[0]?.body).toEqual(input);
+    expect(queryClient.getQueryState(evalKeys.skillCases("sk1"))?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(evalKeys.cases("sk1"))?.isInvalidated).toBe(false);
+  });
+
+  it("surfaces a create error on the mutation (the editor shows it inline)", async () => {
+    mockFetch({ "POST /agents/ag1/eval-cases": jsonResponse({ error: { code: "eval_case_limit", message: "limit" } }, 422) });
+    const { result } = renderHookWithProviders(() => useCreateManualEvalCase({ kind: "agent", id: "ag1" }));
+    act(() => result.current.mutate({ name: "n", expectation: { kind: "must_find", file: "a.ts", start_line: 1, end_line: 1 }, input_diff: "+x" }));
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toMatchObject({ status: 422, code: "eval_case_limit" });
+  });
+
+  it("update and delete refresh the case's owner: a skill case leaves the agent keys alone", async () => {
+    const skillCase = makeCase({ id: "c1", owner_kind: "skill", owner_id: "sk1", agent_id: null });
+    mockFetch({ "PATCH /eval-cases/c1": skillCase, "DELETE /eval-cases/c1": jsonResponse(null, 204) });
+    const { result, queryClient } = renderHookWithProviders(() => ({ update: useUpdateEvalCase(), remove: useDeleteEvalCase() }));
+    const seed = () => {
+      queryClient.setQueryData(evalKeys.skillCases("sk1"), { cases: [] });
+      queryClient.setQueryData(evalKeys.cases("ag1"), { cases: [] });
+    };
+    seed();
+
+    act(() => result.current.update.mutate({ id: "c1", patch: { name: "renamed" } }));
+    await waitFor(() => expect(result.current.update.isSuccess).toBe(true));
+    expect(queryClient.getQueryState(evalKeys.skillCases("sk1"))?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(evalKeys.cases("ag1"))?.isInvalidated).toBe(false);
+
+    seed();
+    act(() => result.current.remove.mutate({ id: "c1", owner: { kind: "skill", id: "sk1" } }));
+    await waitFor(() => expect(result.current.remove.isSuccess).toBe(true));
+    expect(queryClient.getQueryState(evalKeys.skillCases("sk1"))?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(evalKeys.cases("ag1"))?.isInvalidated).toBe(false);
   });
 });

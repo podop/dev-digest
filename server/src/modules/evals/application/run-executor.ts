@@ -79,7 +79,15 @@ export class EvalRunExecutor implements RunLauncher {
   private async execute(job: RunJob, log: EvalLogger): Promise<void> {
     const started = this.now();
     log.info(
-      { runId: job.runId, agentId: job.agentId, agentVersion: job.agentVersion, cases: job.caseIds.length },
+      {
+        runId: job.runId,
+        ownerKind: job.ownerKind,
+        skillId: job.skillId,
+        skillVersion: job.skillVersion,
+        agentId: job.agentId,
+        agentVersion: job.agentVersion,
+        cases: job.caseIds.length,
+      },
       'eval run started',
     );
 
@@ -113,6 +121,10 @@ export class EvalRunExecutor implements RunLauncher {
     log.info(
       {
         runId: job.runId,
+        ownerKind: job.ownerKind,
+        skillId: job.skillId,
+        skillVersion: job.skillVersion,
+        agentId: job.agentId,
         status: final.status,
         durationMs: final.durationMs,
         costUsd: metrics.cost_usd,

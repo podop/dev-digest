@@ -270,6 +270,9 @@ main session: `docker compose down -v`/`--volumes`, `biome check --write|--fix`,
 `biome format`, `git push`. Command-level bans live there because `disallowedTools:
 Bash(...)` in frontmatter removes all of Bash.
 
+A `PreToolUse` hook also gates Claude's `git commit` on a green gates report for the
+current state: see [`../../docs/commit-gate.md`](../../docs/commit-gate.md).
+
 ## Sources behind the agents
 
 | Source | Rules taken from it | Applied in |

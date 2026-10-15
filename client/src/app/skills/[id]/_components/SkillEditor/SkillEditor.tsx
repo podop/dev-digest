@@ -1,5 +1,5 @@
 /* SkillEditor — the tabbed editor for one skill (Config · Context · Preview ·
-   Versions · Stats) over a draft its host owns (SkillWorkspace: useSkillDraft + the
+   Versions · Stats · Evals) over a draft its host owns (SkillWorkspace: useSkillDraft + the
    unsaved-changes guard), so every tab sees it: Preview renders the unsaved
    body and Versions disables Restore while dirty. */
 "use client";
@@ -10,6 +10,7 @@ import type { Skill } from "@devdigest/shared";
 import { SKILL_TAB_ICONS, SKILL_TABS, type SkillTab } from "@/app/skills/constants";
 import { ConfigTab } from "./_components/ConfigTab";
 import { ContextTab } from "./_components/ContextTab";
+import { EvalsTab } from "./_components/EvalsTab";
 import { PreviewTab } from "./_components/PreviewTab";
 import { StatsTab } from "./_components/StatsTab";
 import { VersionsTab } from "./_components/VersionsTab";
@@ -41,6 +42,7 @@ export function SkillEditor({
         )}
         {tab === "versions" && <VersionsTab skill={skill} dirty={draft.dirty} />}
         {tab === "stats" && <StatsTab skillId={skill.id} />}
+        {tab === "evals" && <EvalsTab skill={skill} />}
       </div>
     </div>
   );

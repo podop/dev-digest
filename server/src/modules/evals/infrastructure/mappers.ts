@@ -2,15 +2,17 @@
 import { EvalCaseInputMeta, EvalExpectation, EvalResultFinding } from '@devdigest/shared';
 import type { AgentEvalCase, EvalCaseLastResult, EvalCaseResult, EvalRunSummary } from '@devdigest/shared';
 import type * as t from '../../../db/schema.js';
-import type { FindingSource, RunnableCase } from '../domain/types.js';
+import type { FindingSource, RunnableCase, StoredCase } from '../domain/types.js';
 
 type EvalCaseRow = typeof t.evalCases.$inferSelect;
 
-/** Agent cases are written only by this module, so the JSON columns hold valid contract shapes. */
+/** Cases are written only by this module, so the JSON columns hold valid contract shapes. */
 export function toAgentEvalCase(row: EvalCaseRow, lastResult: EvalCaseLastResult | null): AgentEvalCase {
   return {
     id: row.id,
-    agent_id: row.ownerId,
+    owner_kind: row.ownerKind,
+    owner_id: row.ownerId,
+    agent_id: row.ownerKind === 'agent' ? row.ownerId : null,
     name: row.name,
     notes: row.notes ?? null,
     expectation: EvalExpectation.parse(row.expectedOutput),
@@ -18,6 +20,8 @@ export function toAgentEvalCase(row: EvalCaseRow, lastResult: EvalCaseLastResult
     input_meta: EvalCaseInputMeta.parse(row.inputMeta),
     source_finding_id: row.sourceFindingId ?? null,
     source_pr_id: row.sourcePrId ?? null,
+    origin: row.sourceFindingId ? 'finding' : 'manual',
+    content_edited_at: row.contentEditedAt?.toISOString() ?? null,
     created_at: row.createdAt.toISOString(),
     last_result: lastResult,
   };
@@ -49,6 +53,16 @@ export function toFindingSource(row: FindingSourceRow): FindingSource {
   return { ...rest, decision: acceptedAt ? 'accepted' : dismissedAt ? 'dismissed' : null };
 }
 
+/** The content an edit merges into (read under the row lock). */
+export function toStoredCase(row: EvalCaseRow): StoredCase {
+  return {
+    name: row.name,
+    expectation: EvalExpectation.parse(row.expectedOutput),
+    inputDiff: row.inputDiff ?? '',
+    inputMeta: EvalCaseInputMeta.parse(row.inputMeta),
+  };
+}
+
 export function toRunnableCase(row: EvalCaseRow): RunnableCase {
   return {
     id: row.id,
@@ -63,8 +77,12 @@ type SuiteRunRow = typeof t.evalSuiteRuns.$inferSelect;
 export function toRunSummary(row: SuiteRunRow): EvalRunSummary {
   return {
     id: row.id,
+    owner_kind: row.ownerKind,
+    skill_id: row.skillId,
+    skill_version: row.skillVersion,
     agent_id: row.agentId,
     agent_version: row.agentVersion,
+    agent_name: row.agentName,
     model: row.config.model,
     status: row.status,
     started_at: row.startedAt.toISOString(),

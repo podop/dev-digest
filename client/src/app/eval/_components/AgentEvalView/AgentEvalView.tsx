@@ -1,35 +1,34 @@
-/* AgentEvalView — /eval?agent=<id>: one agent's eval history (FR24): agent picker, Run
-   eval with live progress, latest-run tiles with deltas, the regression banner, the
-   metric trend, and the runs table with selection of exactly two finished runs → Compare.
-   A run executes in the background; this view follows it by polling (useEvalRun) and the
-   hook refreshes dashboard and runs when it ends. The compare dialog is a sibling of the
-   table, not part of a row. */
+/* AgentEvalView — /eval?agent=<id>&period=<p>: one agent's eval history (FR24): header with
+   agent picker, period control and Run eval, the regression banner, latest-run tiles with
+   deltas, the metric trend and the runs table with selection of exactly two finished runs →
+   Compare. A run executes in the background; this view follows it by polling (useEvalRun)
+   and the hook refreshes dashboard and runs when it ends. The dashboard block and the runs
+   table fail independently. The compare dialog is a sibling of the table, not part of a row. */
 "use client";
 
 import React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Button, ErrorState, Skeleton } from "@devdigest/ui";
-import { MetricTiles } from "@/components/eval-metrics";
-import { RunsTable, toggleSelected } from "@/components/eval-run-history";
-import { Select } from "@/components/select";
+import type { EvalPeriodId } from "@devdigest/shared/constants/evals";
+import { ErrorState, Skeleton } from "@devdigest/ui";
+import { toggleSelected } from "@/components/eval-run-history";
 import { useAgents, useEvalAgentDashboard, useEvalRun, useEvalRuns, useStartEvalRun } from "@/lib/hooks";
-import { agentEvalsHref, evalHref } from "../../helpers";
+import { AGENT_RUNS_LIMIT } from "../../constants";
+import { AgentHeader } from "./_components/AgentHeader";
+import { AgentMetricTiles } from "./_components/AgentMetricTiles";
+import { AgentRunsTable } from "./_components/AgentRunsTable";
 import { CompareModal } from "./_components/CompareModal";
 import { RegressionBanner } from "./_components/RegressionBanner";
 import { TrendChart } from "./_components/TrendChart";
 import { comparePair, followedRunId, runningRun } from "./helpers";
 import { s } from "./styles";
 
-export function AgentEvalView({ agentId }: { agentId: string }) {
+export function AgentEvalView({ agentId, period }: { agentId: string; period: EvalPeriodId }) {
   const t = useTranslations("eval.agentView");
   const td = useTranslations("eval.dashboard");
   const tc = useTranslations("common");
-  const router = useRouter();
   const agents = useAgents();
-  const dashboard = useEvalAgentDashboard(agentId);
-  const runs = useEvalRuns(agentId);
+  const dashboard = useEvalAgentDashboard(agentId, period);
+  const runs = useEvalRuns(agentId, AGENT_RUNS_LIMIT, period);
   const start = useStartEvalRun(agentId);
   const followed = useEvalRun(followedRunId(runs.data, start.data?.id));
   const [selected, setSelected] = React.useState<string[]>([]);
@@ -38,44 +37,24 @@ export function AgentEvalView({ agentId }: { agentId: string }) {
   const data = dashboard.data;
   const running = runningRun(followed.data, runs.data);
   const pair = comparePair(runs.data, selected);
-  const casesTotal = data?.cases_total ?? 0;
-  const noCases = data != null && casesTotal === 0;
+  const noCases = data != null && data.cases_total === 0;
   const busy = start.isPending || running != null;
-  const agentName = agents.data?.find((a) => a.id === agentId)?.name;
-  const options = (agents.data ?? []).map((a) => ({ value: a.id, label: a.name }));
 
   return (
     <div style={s.wrap}>
-      <Link href={evalHref()} style={s.back}>
-        {t("back")}
-      </Link>
+      <AgentHeader
+        agentId={agentId}
+        period={period}
+        agents={agents.data}
+        casesTotal={data?.cases_total}
+        runCount={runs.data?.length}
+        running={running ? { finished: running.cases_finished, total: running.cases_total } : null}
+        runDisabled={dashboard.isLoading || noCases || busy}
+        noCases={noCases}
+        onRun={() => start.mutate()}
+      />
 
-      <header style={s.header}>
-        <div style={s.titleBlock}>
-          <h1 style={s.h1}>{agentName ?? td("defaultTitle")}</h1>
-          {data && runs.data && <p style={s.subtitle}>{td("casesSummary", { count: casesTotal, runs: runs.data.length })}</p>}
-        </div>
-        <div style={s.picker}>
-          <Select
-            value={agentId}
-            options={options}
-            mono={false}
-            aria-label={t("pickerLabel")}
-            disabled={options.length === 0}
-            onChange={(id) => router.replace(evalHref(id))}
-          />
-        </div>
-        <Link href={agentEvalsHref(agentId)} style={s.link}>
-          {td("configure")}
-        </Link>
-        <span title={noCases ? t("noCasesHint") : undefined}>
-          <Button kind="primary" icon="Play" disabled={dashboard.isLoading || noCases || busy} onClick={() => start.mutate()}>
-            {running ? t("runningProgress", { finished: running.cases_finished, total: running.cases_total }) : td("runEval", { count: casesTotal })}
-          </Button>
-        </span>
-      </header>
-
-      {data?.alert && <RegressionBanner alert={data.alert} />}
+      {data?.alert && data.latest && <RegressionBanner alert={data.alert} latest={data.latest} previous={data.previous} />}
 
       {dashboard.isLoading ? (
         <Skeleton height={96} />
@@ -83,33 +62,20 @@ export function AgentEvalView({ agentId }: { agentId: string }) {
         <ErrorState title={t("loadError")} onRetry={() => dashboard.refetch()} retryLabel={tc("actions.retry")} />
       ) : data.latest ? (
         <>
-          <MetricTiles latest={data.latest} previous={data.previous} history={data.trend} showCasesPassed />
-          <section style={s.section} aria-label={td("metricTrend")}>
-            <h2 style={s.h2}>{td("metricTrend")}</h2>
-            <TrendChart runs={data.trend} />
-          </section>
+          <AgentMetricTiles latest={data.latest} previous={data.previous} history={data.trend} />
+          <TrendChart runs={data.trend} period={period} />
         </>
       ) : (
         <p style={s.caption}>{td("noRuns")}</p>
       )}
 
-      <section style={s.section} aria-label={td("recentRuns")}>
-        <div style={s.sectionHead}>
-          <h2 style={{ ...s.h2, ...s.grow }}>{td("recentRuns")}</h2>
-          <span title={pair ? undefined : t("compareHint")}>
-            <Button kind="secondary" disabled={!pair} onClick={() => setComparing(true)}>
-              {t("compare")}
-            </Button>
-          </span>
-        </div>
-        {runs.isError ? (
-          <ErrorState title={t("runsLoadError")} onRetry={() => runs.refetch()} retryLabel={tc("actions.retry")} />
-        ) : runs.data && runs.data.length > 0 ? (
-          <RunsTable runs={runs.data} selection={{ selectedIds: selected, onToggle: (id) => setSelected((ids) => toggleSelected(ids, id)) }} />
-        ) : (
-          runs.isLoading && <Skeleton height={80} />
-        )}
-      </section>
+      <AgentRunsTable
+        runs={runs.data}
+        state={runs.isError ? "error" : runs.isLoading ? "loading" : "ready"}
+        onRetry={() => runs.refetch()}
+        selection={{ selectedIds: selected, onToggle: (id) => setSelected((ids) => toggleSelected(ids, id)) }}
+        onCompare={pair ? () => setComparing(true) : undefined}
+      />
 
       {comparing && pair && <CompareModal aId={pair[0].id} bId={pair[1].id} onClose={() => setComparing(false)} />}
     </div>

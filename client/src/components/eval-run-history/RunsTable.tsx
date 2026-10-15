@@ -1,14 +1,15 @@
 /* RunsTable — eval runs, newest first: date, version, model, pass count, the three
    metrics (whole %, "—" when undefined) and cost. With `selection` every finished run
    gets a labelled native checkbox (keyboard-operable, NFR8); a running run cannot be
-   selected. Shared by the per-agent dashboard and the cross-agent recent runs. */
+   selected. Shared by the per-agent dashboard, the cross-agent recent runs and (variant `skill`:
+   skill version + host-agent column) the skill's Evals tab. */
 "use client";
 
 import React from "react";
 import { useTranslations } from "next-intl";
 import { CostText } from "@/components/cost-text";
 import { toPercent } from "@/components/eval-metrics";
-import { formatRunDate, hasAgentColumn, isSelectable, type RunsTableRow } from "./helpers";
+import { formatRunDate, isSelectable, runVersion, type RunsTableRow } from "./helpers";
 import { s } from "./styles";
 
 export interface RunsTableSelection {
@@ -18,13 +19,15 @@ export interface RunsTableSelection {
 
 export interface RunsTableProps {
   runs: readonly RunsTableRow[];
+  /** `skill` adds the host-agent column; the default `agent` table lists one agent's runs. */
+  variant?: "agent" | "skill";
   /** Adds a checkbox column; omit for a read-only table. */
   selection?: RunsTableSelection;
 }
 
-export function RunsTable({ runs, selection }: RunsTableProps) {
+export function RunsTable({ runs, variant = "agent", selection }: RunsTableProps) {
   const t = useTranslations("eval.runsTable");
-  const showAgent = hasAgentColumn(runs);
+  const showAgent = variant === "skill";
   return (
     <div style={s.scroll}>
       <table style={s.table} aria-label={t("caption")}>
@@ -48,7 +51,7 @@ export function RunsTable({ runs, selection }: RunsTableProps) {
         </thead>
         <tbody>
           {runs.map((run) => (
-            <RunRow key={run.id} run={run} showAgent={showAgent} selection={selection} />
+            <RunRow key={run.id} run={run} variant={variant} selection={selection} />
           ))}
         </tbody>
       </table>
@@ -56,9 +59,10 @@ export function RunsTable({ runs, selection }: RunsTableProps) {
   );
 }
 
-function RunRow({ run, showAgent, selection }: { run: RunsTableRow; showAgent: boolean; selection?: RunsTableSelection }) {
+function RunRow({ run, variant, selection }: { run: RunsTableRow; variant: "agent" | "skill"; selection?: RunsTableSelection }) {
   const t = useTranslations("eval.runsTable");
   const date = formatRunDate(run.started_at);
+  const version = runVersion(run, variant);
   const checked = selection?.selectedIds.includes(run.id) ?? false;
   const selectable = isSelectable(run);
   return (
@@ -71,14 +75,14 @@ function RunRow({ run, showAgent, selection }: { run: RunsTableRow; showAgent: b
             checked={checked}
             disabled={!selectable}
             title={selectable ? undefined : t("runningNotSelectable")}
-            aria-label={t("selectRun", { version: run.agent_version, date })}
+            aria-label={t("selectRun", { version, date })}
             onChange={() => selection.onToggle(run.id)}
           />
         </td>
       )}
       <td style={s.td}>{date}</td>
-      {showAgent && <td style={{ ...s.td, ...s.agent }}>{run.agent_name}</td>}
-      <td style={s.td}>{t("version", { version: run.agent_version })}</td>
+      {variant === "skill" && <td style={{ ...s.td, ...s.agent }}>{run.agent_name}</td>}
+      <td style={s.td}>{t("version", { version })}</td>
       <td style={s.td} className="mono">{run.model}</td>
       <td style={s.td}>
         <RunResult run={run} />

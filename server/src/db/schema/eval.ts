@@ -10,12 +10,14 @@ import {
   numeric,
   index,
   uniqueIndex,
+  check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { enumCheck, now } from './_shared';
 import { workspaces } from './core';
 import { pullRequests } from './pulls';
 import { agents } from './agents';
+import { skills } from './skills';
 
 // ============================================================ Eval / Conformance / Compose
 
@@ -55,6 +57,8 @@ export const evalCases = pgTable(
     sourceFindingId: uuid('source_finding_id'),
     sourceReviewId: uuid('source_review_id'),
     sourcePrId: uuid('source_pr_id'),
+    /** Set at the first edit that changes the case's content; null = never edited. */
+    contentEditedAt: timestamp('content_edited_at', { withTimezone: true }),
   },
   (t) => [
     enumCheck('eval_cases_owner_kind_chk', t.ownerKind, EVAL_OWNER_KINDS),
@@ -64,7 +68,11 @@ export const evalCases = pgTable(
   ],
 );
 
-/** One execution of an agent's whole case set; per-case results live in `eval_runs`. */
+/**
+ * One execution of an owner's whole case set; per-case results live in `eval_runs`.
+ * `owner_kind = 'agent'`: the agent's cases. `'skill'`: the skill's cases, run on the host
+ * agent `agent_id` with only that skill attached (`skill_id` / `skill_version`).
+ */
 export const evalSuiteRuns = pgTable(
   'eval_suite_runs',
   {
@@ -76,6 +84,11 @@ export const evalSuiteRuns = pgTable(
       .notNull()
       .references(() => agents.id, { onDelete: 'cascade' }),
     agentVersion: integer('agent_version').notNull(),
+    /** Agent name frozen at run start (the host agent's, for a skill run). */
+    agentName: text('agent_name').notNull().default(''),
+    ownerKind: text('owner_kind', { enum: EVAL_OWNER_KINDS }).notNull().default('agent'),
+    skillId: uuid('skill_id').references(() => skills.id, { onDelete: 'cascade' }),
+    skillVersion: integer('skill_version'),
     config: jsonb('config').$type<EvalRunConfigSnapshot>().notNull(),
     caseIds: jsonb('case_ids').$type<string[]>().notNull(),
     status: text('status', { enum: EVAL_SUITE_RUN_STATUSES }).notNull().default('running'),
@@ -95,9 +108,21 @@ export const evalSuiteRuns = pgTable(
     error: text('error'),
   },
   (t) => [
-    // At most one running suite run per agent (a second start → 409 eval_run_active).
-    uniqueIndex('eval_suite_runs_one_running_uq').on(t.agentId).where(sql`${t.status} = 'running'`),
+    // At most one running suite run per owner (a second start → 409 eval_run_active).
+    uniqueIndex('eval_suite_runs_one_running_agent_uq')
+      .on(t.agentId)
+      .where(sql`${t.status} = 'running' and ${t.ownerKind} = 'agent'`),
+    uniqueIndex('eval_suite_runs_one_running_skill_uq')
+      .on(t.skillId)
+      .where(sql`${t.status} = 'running' and ${t.ownerKind} = 'skill'`),
     index('eval_suite_runs_agent_started_idx').on(t.agentId, t.startedAt),
+    index('eval_suite_runs_skill_started_idx').on(t.skillId, t.startedAt),
+    enumCheck('eval_suite_runs_owner_kind_chk', t.ownerKind, EVAL_OWNER_KINDS),
+    // A skill run names its skill; an agent run has none.
+    check(
+      'eval_suite_runs_owner_consistency_chk',
+      sql`(${t.ownerKind} = 'agent' and ${t.skillId} is null) or (${t.ownerKind} = 'skill' and ${t.skillId} is not null)`,
+    ),
     index('eval_suite_runs_ws_started_idx').on(t.workspaceId, t.startedAt),
     enumCheck('eval_suite_runs_status_chk', t.status, EVAL_SUITE_RUN_STATUSES),
   ],

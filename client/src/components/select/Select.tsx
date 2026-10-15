@@ -7,12 +7,15 @@
 
 import React from "react";
 import { createPortal } from "react-dom";
-import { Icon } from "@devdigest/ui";
+import { Icon, type IconName } from "@devdigest/ui";
 import { normalizeOptions, type SelectOption } from "./helpers";
 import { useSelectListbox } from "./useSelectListbox";
 import { s } from "./styles";
 
 export type { SelectOption };
+
+/** Trailing indicator of the trigger: the up/down pair (default), a single down chevron, or none. */
+export type SelectChevron = "updown" | "down" | "none";
 
 export function Select<V extends string>({
   value,
@@ -22,6 +25,8 @@ export function Select<V extends string>({
   "aria-label": ariaLabel,
   disabled,
   formatValue,
+  icon,
+  chevron = "updown",
 }: {
   value: V;
   onChange?: (v: V) => void;
@@ -31,6 +36,9 @@ export function Select<V extends string>({
   disabled?: boolean;
   /** Trigger text for the current option's label (e.g. "Sort: Newest"); the list keeps the bare labels. */
   formatValue?: (label: string) => string;
+  /** Decorative icon before the label, on the trigger and on every option. */
+  icon?: IconName;
+  chevron?: SelectChevron;
 }) {
   const normalized = React.useMemo(() => normalizeOptions(options), [options]);
   const {
@@ -67,8 +75,10 @@ export function Select<V extends string>({
       className={mono ? "mono" : undefined}
       style={s.trigger(disabled)}
     >
+      {icon && <OptionIcon name={icon} testId="select-trigger-icon" />}
       <span style={s.value(!normalized.some((o) => o.value === value))}>{formatValue ? formatValue(currentLabel) : currentLabel}</span>
-      <Icon.ChevronsUpDown size={14} style={s.chevron} />
+      {chevron === "updown" && <Icon.ChevronsUpDown size={14} style={s.chevron} />}
+      {chevron === "down" && <Icon.ChevronDown size={14} style={s.chevron} />}
       {open &&
         !disabled &&
         createPortal(
@@ -99,6 +109,7 @@ export function Select<V extends string>({
                 style={s.option(i === activeIndex)}
               >
                 <Icon.Check size={13} style={s.check(o.value === value)} />
+                {icon && <OptionIcon name={icon} testId="select-option-icon" />}
                 <span style={s.optionLabel}>{o.label}</span>
               </div>
             ))}
@@ -107,4 +118,9 @@ export function Select<V extends string>({
         )}
     </div>
   );
+}
+
+function OptionIcon({ name, testId }: { name: IconName; testId: string }) {
+  const Glyph = Icon[name];
+  return <Glyph size={14} aria-hidden data-testid={testId} style={s.icon} />;
 }

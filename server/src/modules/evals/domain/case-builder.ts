@@ -57,7 +57,8 @@ export function buildEvalCase(workspaceId: string, src: FindingSource): NewEvalC
   };
   return {
     workspaceId,
-    agentId: src.agentId,
+    ownerKind: 'agent',
+    ownerId: src.agentId,
     name: caseName(src.title, src.file, src.startLine),
     notes: null,
     expectation,

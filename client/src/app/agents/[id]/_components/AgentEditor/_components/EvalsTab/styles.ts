@@ -10,6 +10,4 @@ export const s = {
   subtitle: { margin: "2px 0 0", fontSize: 13, color: "var(--text-muted)" } satisfies CSSProperties,
   link: { fontSize: 13, color: "var(--accent-text)" } satisfies CSSProperties,
   caption: { fontSize: 13, color: "var(--text-muted)", margin: 0 } satisfies CSSProperties,
-  list: { padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 } satisfies CSSProperties,
-  passing: { marginLeft: 12, fontSize: 14, fontWeight: 500, color: "var(--text-secondary)" } satisfies CSSProperties,
 } as const;

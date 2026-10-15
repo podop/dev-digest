@@ -20,8 +20,8 @@ function providerId(provider: string): (typeof AGENT_PROVIDERS)[number] {
 /**
  * Composition root of the evals module (lazy: `Container.modules.evals`).
  * `cases` = eval case use cases; `runs` = run use cases (start / list / compare /
- * dashboards / reap / shutdown). The agents repository is the only cross-module
- * reach, through the `AgentDirectory` and `AgentSnapshots` ports.
+ * dashboards / reap / shutdown). Other modules are reached only through ports: the
+ * agents repository (`AgentDirectory`, `AgentSnapshots`) and the skills service (`SkillDirectory`).
  */
 export function buildEvalsModule(c: Container) {
   const store = new EvalsRepository(c.db);
@@ -31,6 +31,20 @@ export function buildEvalsModule(c: Container) {
       (await c.agentsRepo.getById(workspaceId, agentId)) !== undefined,
     listIds: async (workspaceId: string) => (await c.agentsRepo.list(workspaceId)).map((a) => a.id),
     snapshot: (workspaceId: string, agentId: string) => snapshots.snapshot(workspaceId, agentId),
+  };
+  const skills = {
+    get: async (workspaceId: string, skillId: string) => {
+      const skill = await c.modules.skills.service.get(workspaceId, skillId);
+      return (
+        skill && {
+          id: skill.id,
+          name: skill.name,
+          description: skill.description,
+          body: skill.body,
+          version: skill.version,
+        }
+      );
+    },
   };
   const executor = new EvalRunExecutor({
     runs: store,
@@ -44,7 +58,9 @@ export function buildEvalsModule(c: Container) {
       cases: store,
       tx: c.transactionRunner((db) => ({ cases: new EvalsRepository(db) })),
       agents,
+      skills,
+      parseDiff: parseUnifiedDiff,
     }),
-    runs: new EvalRunsService({ runs: store, agents, executor }),
+    runs: new EvalRunsService({ runs: store, agents, skills, executor }),
   };
 }

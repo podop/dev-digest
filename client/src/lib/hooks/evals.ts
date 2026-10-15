@@ -9,18 +9,32 @@ import type {
   AgentEvalCaseList,
   AgentEvalCaseUpdateInput,
   EvalAgentDashboard,
+  EvalCaseCreateInput,
   EvalCompare,
   EvalOverview,
+  EvalOwnerKind,
+  EvalPeriod,
   EvalRunAllResponse,
   EvalRunDetail,
   EvalRunList,
   EvalRunSummary,
+  EvalSkillRunStartInput,
 } from "@devdigest/shared";
 import { api, ApiError } from "../api";
 import { evalKeys, prKeys } from "./keys";
 
 /** ApiError code of a second POST /findings/:id/eval-case for the same finding. */
 export const EVAL_CASE_EXISTS_CODE = "eval_case_exists";
+
+/** Who owns a case: an agent or a skill (both have an Evals tab). */
+export interface EvalCaseOwner {
+  kind: EvalOwnerKind;
+  id: string;
+}
+
+const casesKey = (owner: EvalCaseOwner) => (owner.kind === "agent" ? evalKeys.cases(owner.id) : evalKeys.skillCases(owner.id));
+const ownerKey = (owner: EvalCaseOwner) => (owner.kind === "agent" ? evalKeys.agent(owner.id) : evalKeys.skill(owner.id));
+const casesPath = (owner: EvalCaseOwner) => `/${owner.kind === "agent" ? "agents" : "skills"}/${owner.id}/eval-cases`;
 
 /** Poll period of a running eval run (cases_finished moves while it executes). */
 export const EVAL_RUN_POLL_MS = 2000;
@@ -35,6 +49,31 @@ export function useEvalCases(agentId: string | null | undefined) {
     queryFn: () => api.get<AgentEvalCaseList>(`/agents/${agentId}/eval-cases`),
     enabled: !!agentId,
     select: (data) => data.cases,
+  });
+}
+
+/** GET /skills/:id/eval-cases. */
+export function useSkillEvalCases(skillId: string | null | undefined) {
+  return useQuery({
+    queryKey: evalKeys.skillCases(skillId),
+    queryFn: () => api.get<AgentEvalCaseList>(`/skills/${skillId}/eval-cases`),
+    enabled: !!skillId,
+    select: (data) => data.cases,
+  });
+}
+
+/** POST /agents/:id/eval-cases or /skills/:id/eval-cases — a case written by hand. The editor
+ *  shows 4xx errors (field errors, limit) inline, so no global toast. The agent dashboards
+ *  count cases, so an agent owner also refreshes the overview. */
+export function useCreateManualEvalCase(owner: EvalCaseOwner) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: EvalCaseCreateInput) => api.post<AgentEvalCase>(casesPath(owner), input),
+    meta: { quietErrorCodes: ["*"] },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ownerKey(owner) });
+      if (owner.kind === "agent") qc.invalidateQueries({ queryKey: evalKeys.overview() });
+    },
   });
 }
 
@@ -95,14 +134,14 @@ export function useUpdateEvalCase() {
     mutationFn: ({ id, patch }: UpdateEvalCaseVars) => api.patch<AgentEvalCase>(`/eval-cases/${id}`, patch),
     meta: { quietErrorCodes: ["*"] },
     onSuccess: (updated) => {
-      qc.invalidateQueries({ queryKey: evalKeys.cases(updated.agent_id) });
+      qc.invalidateQueries({ queryKey: casesKey({ kind: updated.owner_kind, id: updated.owner_id }) });
     },
   });
 }
 
 export interface DeleteEvalCaseVars {
   id: string;
-  agentId: string;
+  owner: EvalCaseOwner;
 }
 
 /** DELETE /eval-cases/:id. */
@@ -110,26 +149,38 @@ export function useDeleteEvalCase() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id }: DeleteEvalCaseVars) => api.del<void>(`/eval-cases/${id}`),
-    onSuccess: (_res, { agentId }) => {
-      qc.invalidateQueries({ queryKey: evalKeys.agent(agentId) });
-      qc.invalidateQueries({ queryKey: evalKeys.overview() });
+    onSuccess: (_res, { owner }) => {
+      qc.invalidateQueries({ queryKey: ownerKey(owner) });
+      if (owner.kind === "agent") qc.invalidateQueries({ queryKey: evalKeys.overview() });
     },
   });
 }
 
 // ---- Runs ----
 
-export function useEvalRuns(agentId: string | null | undefined, limit: number = DEFAULT_RUNS_LIMIT) {
+/** GET /agents/:id/eval-runs. Without `period` the URL carries only `limit`. */
+export function useEvalRuns(agentId: string | null | undefined, limit: number = DEFAULT_RUNS_LIMIT, period?: EvalPeriod) {
   return useQuery({
-    queryKey: evalKeys.runs(agentId, limit),
-    queryFn: () => api.get<EvalRunList>(`/agents/${agentId}/eval-runs?limit=${limit}`),
+    queryKey: evalKeys.runs(agentId, limit, period),
+    queryFn: () => api.get<EvalRunList>(`/agents/${agentId}/eval-runs?limit=${limit}${period ? `&period=${period}` : ""}`),
     enabled: !!agentId,
     select: (data) => data.runs,
   });
 }
 
+/** GET /skills/:id/eval-runs. */
+export function useSkillEvalRuns(skillId: string | null | undefined, limit: number = DEFAULT_RUNS_LIMIT) {
+  return useQuery({
+    queryKey: evalKeys.skillRuns(skillId, limit),
+    queryFn: () => api.get<EvalRunList>(`/skills/${skillId}/eval-runs?limit=${limit}`),
+    enabled: !!skillId,
+    select: (data) => data.runs,
+  });
+}
+
 /** One run with its per-case results. Polls every 2 s while the run is `running`; the poll
- *  that sees it finish invalidates everything its agent shows (runs, cases, dashboards). */
+ *  that sees it finish invalidates everything its owner shows: an agent run refreshes the
+ *  agent's runs, cases, dashboards and the overview; a skill run only the skill's queries. */
 export function useEvalRun(runId: string | null | undefined) {
   const qc = useQueryClient();
   const key = evalKeys.run(runId);
@@ -139,8 +190,12 @@ export function useEvalRun(runId: string | null | undefined) {
       const previous = qc.getQueryData<EvalRunDetail>(key);
       const detail = await api.get<EvalRunDetail>(`/eval-runs/${runId}`);
       if (previous?.run.status === "running" && detail.run.status !== "running") {
-        qc.invalidateQueries({ queryKey: evalKeys.agent(detail.run.agent_id) });
-        qc.invalidateQueries({ queryKey: evalKeys.overview() });
+        if (detail.run.owner_kind === "skill") {
+          qc.invalidateQueries({ queryKey: evalKeys.skill(detail.run.skill_id) });
+        } else {
+          qc.invalidateQueries({ queryKey: evalKeys.agent(detail.run.agent_id) });
+          qc.invalidateQueries({ queryKey: evalKeys.overview() });
+        }
       }
       return detail;
     },
@@ -164,6 +219,25 @@ export function useStartEvalRun(agentId: string) {
     onError: (err) => {
       if (err instanceof ApiError && err.status === 409) {
         qc.invalidateQueries({ queryKey: evalKeys.agent(agentId) });
+      }
+    },
+  });
+}
+
+/** POST /skills/:id/eval-runs (202) — runs the skill's cases on the chosen host agent with only
+ *  this skill attached. Errors (409 eval_run_active, 422 host_agent_not_found / no_eval_cases,
+ *  429) go to the global toast; a 409 also refreshes the runs so the running one shows up. */
+export function useStartSkillEvalRun(skillId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: EvalSkillRunStartInput) => api.post<EvalRunSummary>(`/skills/${skillId}/eval-runs`, input),
+    onSuccess: (run) => {
+      qc.setQueryData<EvalRunDetail>(evalKeys.run(run.id), { run, results: [] });
+      qc.invalidateQueries({ queryKey: evalKeys.skill(skillId) });
+    },
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 409) {
+        qc.invalidateQueries({ queryKey: evalKeys.skill(skillId) });
       }
     },
   });
@@ -197,11 +271,12 @@ export function useEvalOverview() {
   });
 }
 
-/** GET /agents/:id/eval/dashboard — latest/previous run, trend, regression alert. */
-export function useEvalAgentDashboard(agentId: string | null | undefined) {
+/** GET /agents/:id/eval/dashboard — latest/previous run, trend, regression alert. With `period`
+ *  the trend covers that window; without it the URL and the 20-run trend are unchanged. */
+export function useEvalAgentDashboard(agentId: string | null | undefined, period?: EvalPeriod) {
   return useQuery({
-    queryKey: evalKeys.dashboard(agentId),
-    queryFn: () => api.get<EvalAgentDashboard>(`/agents/${agentId}/eval/dashboard`),
+    queryKey: evalKeys.dashboard(agentId, period),
+    queryFn: () => api.get<EvalAgentDashboard>(`/agents/${agentId}/eval/dashboard${period ? `?period=${period}` : ""}`),
     enabled: !!agentId,
   });
 }

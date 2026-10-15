@@ -3,9 +3,10 @@ import type { EvalExpectation, EvalRunSummary } from '@devdigest/shared';
 import { EVAL_INPUT_DIFF_MAX_CHARS } from '@devdigest/shared';
 import { parseUnifiedDiff } from '../src/adapters/git/diff-parser.js';
 import { aggregateRun, metricDelta, rangesIntersect, runVerdict, scoreCase } from '../src/modules/evals/domain/scoring.js';
+import { evalTaskLine } from '../src/modules/evals/domain/run-input.js';
 import { buildEvalCase, buildSingleFileDiff, caseName, editExpectationLines } from '../src/modules/evals/domain/case-builder.js';
 import { assertComparable, compareRuns, lineDiff } from '../src/modules/evals/domain/compare.js';
-import { regressionAlert, sparklineOf, trendOf } from '../src/modules/evals/domain/dashboard.js';
+import { periodStart, regressionAlert, sparklineOf, trendOf } from '../src/modules/evals/domain/dashboard.js';
 import type { CaseOutcome, EvalRunConfig, FindingSource, KeptFinding } from '../src/modules/evals/domain/types.js';
 
 const exp = (kind: EvalExpectation['kind'], start = 10, end = 12, file = 'src/a.ts'): EvalExpectation => ({
@@ -151,7 +152,8 @@ describe('case builder', () => {
     expect(diff.files[0]?.path).toBe('src/config.ts');
     expect(diff.files[0]?.hunks[0]?.newLineNumbers).toContain(11);
     expect(c.sourceFindingId).toBe('f1');
-    expect(c.agentId).toBe('a1');
+    expect(c.ownerKind).toBe('agent');
+    expect(c.ownerId).toBe('a1');
   });
 
   it('dismissed -> must_not_flag (AC2)', () => {
@@ -226,8 +228,12 @@ describe('lineDiff', () => {
 
 const run = (over: Partial<EvalRunSummary> = {}): EvalRunSummary => ({
   id: 'r',
+  owner_kind: 'agent',
+  skill_id: null,
+  skill_version: null,
   agent_id: 'a1',
   agent_version: 1,
+  agent_name: 'Reviewer',
   model: 'gpt',
   status: 'completed',
   started_at: '2026-01-01T00:00:00.000Z',
@@ -307,6 +313,14 @@ describe('compareRuns', () => {
     expect(() => assertComparable(run(), run({ status: 'running' }))).toThrow(/not finished/);
     expect(() => assertComparable(run(), run({ status: 'failed' }))).not.toThrow();
   });
+
+  it('FR21: runs of different owners are not comparable; skill runs compare by skill', () => {
+    const skillRun = (over: Partial<EvalRunSummary> = {}) =>
+      run({ owner_kind: 'skill', skill_id: 's1', skill_version: 1, ...over });
+    expect(() => assertComparable(run(), skillRun())).toThrow(/owner kinds/);
+    expect(() => assertComparable(skillRun(), skillRun({ skill_id: 's2' }))).toThrow(/different skills/);
+    expect(() => assertComparable(skillRun(), skillRun({ agent_id: 'other-host', skill_version: 2 }))).not.toThrow();
+  });
 });
 
 describe('dashboard derivations', () => {
@@ -337,5 +351,30 @@ describe('dashboard derivations', () => {
     expect(spark).toHaveLength(10);
     expect(spark.map((p) => p.run_id)[0]).toBe('r16');
     expect(sparklineOf([])).toEqual([]);
+  });
+
+  it('trend takes an explicit max: 120 runs with max 100 keep the newest 100, oldest first', () => {
+    const newestFirst = Array.from({ length: 120 }, (_, i) => run({ id: `r${120 - i}` }));
+    const trend = trendOf(newestFirst, 100);
+    expect(trend).toHaveLength(100);
+    expect(trend[0]?.id).toBe('r21');
+    expect(trend[99]?.id).toBe('r120');
+  });
+
+  it('periodStart is now minus exactly N x 24 h, and null for all', () => {
+    const now = new Date('2026-10-15T12:00:00.000Z');
+    expect(periodStart('7d', now)?.getTime()).toBe(now.getTime() - 7 * 86_400_000);
+    expect(periodStart('30d', now)?.getTime()).toBe(now.getTime() - 30 * 86_400_000);
+    expect(periodStart('90d', now)?.getTime()).toBe(now.getTime() - 90 * 86_400_000);
+    expect(periodStart('all', now)).toBeNull();
+  });
+});
+
+describe('evalTaskLine', () => {
+  it('FR7: names the PR number when there is one, the title only when null', () => {
+    expect(evalTaskLine({ pr_number: 7, pr_title: 'Add rl' })).toMatch(/^Review pull request #7 "Add rl"\. /);
+    const manual = evalTaskLine({ pr_number: null, pr_title: 'Add rl' });
+    expect(manual).toMatch(/^Review pull request "Add rl"\. /);
+    expect(manual).not.toMatch(/null|#/);
   });
 });

@@ -45,19 +45,22 @@ const OVERVIEW: EvalOverview = {
 };
 
 describe("EvalDashboardView", () => {
-  it("lists agent rows and the recent runs of all agents; an agent without a run shows dashes", async () => {
+  it("lists agent cards and the recent runs of all agents; an agent without a run shows dashes", async () => {
     mockFetch({ "GET /eval/dashboard": OVERVIEW });
-    renderWithProviders(<EvalDashboardView agentId={null} />);
+    renderWithProviders(<EvalDashboardView agentId={null} period="30d" />);
 
     expect(await screen.findByRole("heading", { name: "Eval Dashboard" })).toBeInTheDocument();
-    const agents = within(await screen.findByRole("table", { name: "Agents and their latest eval run" }));
-    expect(agents.getAllByTestId("eval-agent-row")).toHaveLength(2);
-    expect(agents.getByRole("link", { name: "Security Reviewer" })).toHaveAttribute("href", "/eval?agent=ag1");
-    expect(agents.getByText("never run")).toBeInTheDocument();
+    expect(screen.getByText("Regression harness across all reviewer agents · pick an agent to see its runs")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "AGENTS" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "RECENT EVAL RUNS · ALL AGENTS" })).toBeInTheDocument();
+    const agents = within(await screen.findByRole("list", { name: "Agents and their latest eval run" }));
+    expect(agents.getAllByTestId("eval-agent-card")).toHaveLength(2);
+    expect(agents.getByRole("link", { name: /Security Reviewer/ })).toHaveAttribute("href", "/eval?agent=ag1");
+    expect(agents.getByText("Never run")).toBeInTheDocument();
 
-    const recent = within(screen.getByRole("table", { name: "Eval runs" }));
+    const recent = within(screen.getByRole("table", { name: "Recent eval runs of all agents" }));
     expect(recent.getByText("Security Reviewer")).toBeInTheDocument();
-    expect(recent.getByText("6 / 8 passed")).toBeInTheDocument();
+    expect(recent.getByText("6/8")).toBeInTheDocument();
   });
 
   it("Run all agents posts once and reports which agents started and which were skipped", async () => {
@@ -66,7 +69,7 @@ describe("EvalDashboardView", () => {
       "POST /eval-runs/run-all": () =>
         jsonResponse({ started: [makeRun({ id: "r9", status: "running", finished_at: null })], skipped: [{ agent_id: "ag2", reason: "run_active" }] }, 202),
     });
-    const { user } = renderWithProviders(<EvalDashboardView agentId={null} />);
+    const { user } = renderWithProviders(<EvalDashboardView agentId={null} period="30d" />);
 
     await user.click(await screen.findByRole("button", { name: "Run all agents" }));
     expect(await screen.findByText("1 run started · 1 agent skipped")).toBeInTheDocument();
@@ -77,19 +80,19 @@ describe("EvalDashboardView", () => {
 
   it("shows the empty state with a link to Agents when there is nothing yet", async () => {
     mockFetch({ "GET /eval/dashboard": { agents: [], recent_runs: [] } });
-    renderWithProviders(<EvalDashboardView agentId={null} />);
+    renderWithProviders(<EvalDashboardView agentId={null} period="30d" />);
     expect(await screen.findByText("No eval runs yet")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Go to Agents" })).toHaveAttribute("href", "/agents");
   });
 
   it("shows an error with Retry that loads the dashboard again", async () => {
     const api = mockFetch({ "GET /eval/dashboard": jsonResponse({ error: { code: "internal", message: "boom" } }, 500) });
-    const { user } = renderWithProviders(<EvalDashboardView agentId={null} />);
+    const { user } = renderWithProviders(<EvalDashboardView agentId={null} period="30d" />);
     expect(await screen.findByText("Could not load the eval dashboard")).toBeInTheDocument();
 
     api.on("GET /eval/dashboard", OVERVIEW);
     await user.click(screen.getByRole("button", { name: "Retry" }));
-    expect(await screen.findByRole("table", { name: "Agents and their latest eval run" })).toBeInTheDocument();
+    expect(await screen.findByRole("list", { name: "Agents and their latest eval run" })).toBeInTheDocument();
   });
 
   it("hands ?agent=<id> to the per-agent view", async () => {
@@ -98,17 +101,17 @@ describe("EvalDashboardView", () => {
       "GET /agents/ag1/eval/dashboard": { agent_id: "ag1", cases_total: 0, latest: null, previous: null, trend: [], alert: null },
       "GET /agents/ag1/eval-runs": { runs: [] },
     });
-    renderWithProviders(<EvalDashboardView agentId="ag1" />);
+    renderWithProviders(<EvalDashboardView agentId="ag1" period="30d" />);
     expect(await screen.findByRole("heading", { name: "Security Reviewer" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "← All agents" })).toHaveAttribute("href", "/eval");
+    expect(screen.getByRole("link", { name: "All agents" })).toHaveAttribute("href", "/eval");
   });
 
   it("AC34: every visible string comes from the message files (rendered with a pseudo bundle)", async () => {
     mockFetch({ "GET /eval/dashboard": OVERVIEW });
-    const { container } = renderWithProviders(<EvalDashboardView agentId={null} />, { messages: pseudoMessages() });
-    await screen.findByRole("table", { name: /eval\.agentsOverview\.caption/ });
-    // Data only: agent names, models, run dates (toLocaleString), cost.
-    const stray = strayText(container, ["Security Reviewer", "Perf Reviewer", "gpt-4.1", "claude", "mock/reviewer", /^\$\d/, /\d{1,2}[/.]\d{1,2}[/.]\d{2,4}/]);
+    const { container } = renderWithProviders(<EvalDashboardView agentId={null} period="30d" />, { messages: pseudoMessages() });
+    await screen.findByRole("list", { name: /eval\.agentsOverview\.caption/ });
+    // Data only: agent names, models, local run stamps, cost.
+    const stray = strayText(container, ["Security Reviewer", "Perf Reviewer", "gpt-4.1", "claude", "mock/reviewer", /^\$\d/, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/]);
     expect(stray).toEqual([]);
   });
 });

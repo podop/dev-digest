@@ -1,6 +1,6 @@
 /**
  * Evals data access (infrastructure; implements EvalCasesStore and EvalRunsStore). Owns
- * `eval_cases` for agent-owned cases and reads `eval_runs` / `eval_suite_runs` for each
+ * `eval_cases` (agent- and skill-owned) and reads `eval_runs` / `eval_suite_runs` for each
  * case's last result; the finding source read joins findings → reviews → PR → repo →
  * stored patch. Suite-run SQL lives in `run-queries.ts`. Workspace-scoped throughout.
  * Case transactions are opened by the use case; `recordCase` owns its own (adapter-side).
@@ -19,6 +19,7 @@ import type {
 import type { CompareSide } from '../domain/compare.js';
 import type {
   AgentCaseCount,
+  CaseOwner,
   CaseRecord,
   EvalCaseWrite,
   FindingSource,
@@ -26,20 +27,18 @@ import type {
   NewSuiteRun,
   RunFinal,
   RunnableCase,
+  StoredCase,
 } from '../domain/types.js';
-import { toAgentEvalCase, toFindingSource } from './mappers.js';
+import { toAgentEvalCase, toFindingSource, toStoredCase } from './mappers.js';
 import { pgCode, UNIQUE_VIOLATION } from './pg-error.js';
 import * as runQueries from './run-queries.js';
 
 export class EvalsRepository implements EvalCasesReader, EvalCasesWriter, EvalRunsStore {
   constructor(private readonly db: DbOrTx) {}
 
-  private agentCase(workspaceId: string, id: string) {
-    return and(
-      eq(t.evalCases.workspaceId, workspaceId),
-      eq(t.evalCases.ownerKind, 'agent'),
-      eq(t.evalCases.id, id),
-    );
+  /** A case of any owner kind, by id. */
+  private caseById(workspaceId: string, id: string) {
+    return and(eq(t.evalCases.workspaceId, workspaceId), eq(t.evalCases.id, id));
   }
 
   // ---- reads ----------------------------------------------------------------
@@ -71,15 +70,15 @@ export class EvalsRepository implements EvalCasesReader, EvalCasesWriter, EvalRu
     return out;
   }
 
-  async list(workspaceId: string, agentId: string): Promise<AgentEvalCase[]> {
+  async list(workspaceId: string, owner: CaseOwner): Promise<AgentEvalCase[]> {
     const rows = await this.db
       .select()
       .from(t.evalCases)
       .where(
         and(
           eq(t.evalCases.workspaceId, workspaceId),
-          eq(t.evalCases.ownerKind, 'agent'),
-          eq(t.evalCases.ownerId, agentId),
+          eq(t.evalCases.ownerKind, owner.kind),
+          eq(t.evalCases.ownerId, owner.id),
         ),
       )
       .orderBy(desc(t.evalCases.createdAt), desc(t.evalCases.id));
@@ -88,21 +87,21 @@ export class EvalsRepository implements EvalCasesReader, EvalCasesWriter, EvalRu
   }
 
   async find(workspaceId: string, id: string): Promise<AgentEvalCase | undefined> {
-    const [row] = await this.db.select().from(t.evalCases).where(this.agentCase(workspaceId, id));
+    const [row] = await this.db.select().from(t.evalCases).where(this.caseById(workspaceId, id));
     if (!row) return undefined;
     const last = await this.lastResults([row.id]);
     return toAgentEvalCase(row, last.get(row.id) ?? null);
   }
 
-  async count(workspaceId: string, agentId: string): Promise<number> {
+  async count(workspaceId: string, owner: CaseOwner): Promise<number> {
     const [row] = await this.db
       .select({ n: sql<number>`count(*)::int` })
       .from(t.evalCases)
       .where(
         and(
           eq(t.evalCases.workspaceId, workspaceId),
-          eq(t.evalCases.ownerKind, 'agent'),
-          eq(t.evalCases.ownerId, agentId),
+          eq(t.evalCases.ownerKind, owner.kind),
+          eq(t.evalCases.ownerId, owner.id),
         ),
       );
     return row?.n ?? 0;
@@ -155,8 +154,8 @@ export class EvalsRepository implements EvalCasesReader, EvalCasesWriter, EvalRu
         .insert(t.evalCases)
         .values({
           workspaceId: values.workspaceId,
-          ownerKind: 'agent',
-          ownerId: values.agentId,
+          ownerKind: values.ownerKind,
+          ownerId: values.ownerId,
           name: values.name,
           notes: values.notes,
           inputDiff: values.inputDiff,
@@ -169,7 +168,7 @@ export class EvalsRepository implements EvalCasesReader, EvalCasesWriter, EvalRu
         .returning();
       return { kind: 'created', case: toAgentEvalCase(row!, null) };
     } catch (err) {
-      if (pgCode(err) !== UNIQUE_VIOLATION) throw err;
+      if (pgCode(err) !== UNIQUE_VIOLATION || values.sourceFindingId === null) throw err;
       // Lost the one-case-per-finding race (double click, two tabs): hand back the winner.
       const caseId = await this.caseIdForFinding(values.workspaceId, values.sourceFindingId);
       if (!caseId) throw err;
@@ -177,12 +176,9 @@ export class EvalsRepository implements EvalCasesReader, EvalCasesWriter, EvalRu
     }
   }
 
-  async lockForUpdate(
-    workspaceId: string,
-    id: string,
-  ): Promise<{ id: string; expectation: AgentEvalCase['expectation'] } | undefined> {
-    const [row] = await this.db.select().from(t.evalCases).where(this.agentCase(workspaceId, id)).for('update');
-    return row && { id: row.id, expectation: toAgentEvalCase(row, null).expectation };
+  async lockForUpdate(workspaceId: string, id: string): Promise<StoredCase | undefined> {
+    const [row] = await this.db.select().from(t.evalCases).where(this.caseById(workspaceId, id)).for('update');
+    return row && toStoredCase(row);
   }
 
   async update(workspaceId: string, id: string, values: EvalCaseWrite): Promise<AgentEvalCase> {
@@ -190,9 +186,13 @@ export class EvalsRepository implements EvalCasesReader, EvalCasesWriter, EvalRu
       ...(values.name !== undefined ? { name: values.name } : {}),
       ...(values.notes !== undefined ? { notes: values.notes } : {}),
       ...(values.expectation !== undefined ? { expectedOutput: values.expectation } : {}),
+      ...(values.inputDiff !== undefined ? { inputDiff: values.inputDiff } : {}),
+      ...(values.inputMeta !== undefined ? { inputMeta: values.inputMeta } : {}),
+      // Set once, never cleared: an already-stamped case keeps its first edit time.
+      ...(values.markContentEdited ? { contentEditedAt: sql`coalesce(${t.evalCases.contentEditedAt}, now())` } : {}),
     };
     if (Object.keys(set).length > 0) {
-      await this.db.update(t.evalCases).set(set).where(this.agentCase(workspaceId, id));
+      await this.db.update(t.evalCases).set(set).where(this.caseById(workspaceId, id));
     }
     const fresh = await this.find(workspaceId, id);
     if (!fresh) throw new Error(`eval case ${id} vanished inside its own transaction`);
@@ -202,19 +202,19 @@ export class EvalsRepository implements EvalCasesReader, EvalCasesWriter, EvalRu
   async delete(workspaceId: string, id: string): Promise<boolean> {
     const rows = await this.db
       .delete(t.evalCases)
-      .where(this.agentCase(workspaceId, id))
+      .where(this.caseById(workspaceId, id))
       .returning({ id: t.evalCases.id });
     return rows.length > 0;
   }
 
   // ---- suite runs (SQL in run-queries.ts) -----------------------------------
 
-  caseIds(workspaceId: string, agentId: string): Promise<string[]> {
-    return runQueries.caseIds(this.db, workspaceId, agentId);
+  caseIds(workspaceId: string, owner: CaseOwner): Promise<string[]> {
+    return runQueries.caseIds(this.db, workspaceId, owner);
   }
 
-  listRuns(workspaceId: string, agentId: string, limit: number): Promise<EvalRunSummary[]> {
-    return runQueries.listRuns(this.db, workspaceId, agentId, limit);
+  listRuns(workspaceId: string, owner: CaseOwner, limit: number, since?: Date): Promise<EvalRunSummary[]> {
+    return runQueries.listRuns(this.db, workspaceId, owner, limit, since);
   }
 
   getRun(workspaceId: string, id: string): Promise<EvalRunDetail | undefined> {
@@ -249,8 +249,8 @@ export class EvalsRepository implements EvalCasesReader, EvalCasesWriter, EvalRu
     return runQueries.compareSide(this.db, workspaceId, id);
   }
 
-  finishedRuns(workspaceId: string, agentId: string, limit: number): Promise<EvalRunSummary[]> {
-    return runQueries.finishedRuns(this.db, workspaceId, agentId, limit);
+  finishedRuns(workspaceId: string, agentId: string, limit: number, since?: Date): Promise<EvalRunSummary[]> {
+    return runQueries.finishedRuns(this.db, workspaceId, agentId, limit, since);
   }
 
   finishedRunsByAgent(workspaceId: string, agentIds: string[], perAgent: number): Promise<Map<string, EvalRunSummary[]>> {

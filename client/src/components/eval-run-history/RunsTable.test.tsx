@@ -45,19 +45,35 @@ describe("RunsTable", () => {
     expect(onToggle).toHaveBeenLastCalledWith("r2");
   });
 
-  it("shows an Agent column for cross-agent rows and renders text literally", () => {
+  it("shows an Agent column only in the skill variant and renders text literally", () => {
     const hostile = "<img src=x onerror=alert(1)>";
     const { container } = renderWithProviders(
-      <RunsTable runs={[{ ...makeRun(), agent_name: hostile, model: hostile }]} />,
+      <RunsTable runs={[{ ...makeRun(), agent_name: hostile, model: hostile }]} variant="skill" />,
     );
     expect(screen.getByRole("columnheader", { name: "Agent" })).toBeInTheDocument();
     expect(screen.getAllByText(hostile)).toHaveLength(2);
     expect(container.querySelector("img")).toBeNull();
   });
 
+  it("labels skill runs with the skill version next to the host agent and model", () => {
+    const run = makeRun({ owner_kind: "skill", skill_id: "sk1", skill_version: 5, agent_version: 3, agent_name: "Host Reviewer", model: "mock/host" });
+    renderWithProviders(<RunsTable runs={[run]} variant="skill" selection={{ selectedIds: [], onToggle: () => {} }} />);
+    const row = screen.getAllByRole("row")[1]!;
+    expect(within(row).getByText("v5")).toBeInTheDocument();
+    expect(within(row).queryByText("v3")).toBeNull();
+    expect(within(row).getByText("Host Reviewer")).toBeInTheDocument();
+    expect(within(row).getByText("mock/host")).toBeInTheDocument();
+    expect(within(row).getByRole("checkbox")).toHaveAccessibleName(/^Select run v5 · /);
+  });
+
+  it("has no Agent column in the default agent variant", () => {
+    renderWithProviders(<RunsTable runs={[makeRun({ agent_name: "Reviewer" })]} />);
+    expect(screen.queryByRole("columnheader", { name: "Agent" })).toBeNull();
+  });
+
   it("takes every visible string from the message files", () => {
     const { container } = renderWithProviders(
-      <RunsTable runs={RUNS.map((r) => ({ ...r, agent_name: "Reviewer" }))} selection={{ selectedIds: [], onToggle: () => {} }} />,
+      <RunsTable runs={RUNS.map((r) => ({ ...r, agent_name: "Reviewer" }))} variant="skill" selection={{ selectedIds: [], onToggle: () => {} }} />,
       { messages: pseudoMessages() },
     );
     // data: the date, the model, the agent name, the cost ("—" / "$…")

@@ -10,7 +10,7 @@ export interface AgentConfigSource {
   getById(
     workspaceId: string,
     id: string,
-  ): Promise<{ version: number; provider: string; model: string; systemPrompt: string; strategy: string } | undefined>;
+  ): Promise<{ version: number; name: string; provider: string; model: string; systemPrompt: string; strategy: string } | undefined>;
   linkedSkills(agentId: string): Promise<
     Array<{ skill: { id: string; name: string; description: string; body: string; version: number; enabled: boolean } }>
   >;
@@ -26,6 +26,7 @@ export class AgentConfigSnapshots implements AgentSnapshots {
     const linked = await this.agents.linkedSkills(agentId);
     return {
       version: agent.version,
+      name: agent.name,
       config: {
         provider: agent.provider,
         model: agent.model,

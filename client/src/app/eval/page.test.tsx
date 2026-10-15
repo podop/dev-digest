@@ -22,9 +22,16 @@ describe("EvalPage", () => {
     expect(await generateMetadata()).toEqual({ title: "Eval Dashboard" });
   });
 
-  it("renders the dashboard view for the resolved ?agent=", async () => {
-    const page = await EvalPage({ searchParams: Promise.resolve({ agent: "ag1" }) });
+  it("renders the dashboard view for the resolved ?agent= and ?period=", async () => {
+    const page = await EvalPage({ searchParams: Promise.resolve({ agent: "ag1", period: "7d" }) });
     expect(page.type).toBe(EvalDashboardView);
-    expect(page.props).toEqual({ agentId: "ag1" });
+    expect(page.props).toEqual({ agentId: "ag1", period: "7d" });
+  });
+
+  it("falls back to 30d for a missing or unknown ?period=", async () => {
+    const missing = await EvalPage({ searchParams: Promise.resolve({ agent: "ag1" }) });
+    expect(missing.props).toEqual({ agentId: "ag1", period: "30d" });
+    const bogus = await EvalPage({ searchParams: Promise.resolve({ period: "bogus" }) });
+    expect(bogus.props).toEqual({ agentId: null, period: "30d" });
   });
 });

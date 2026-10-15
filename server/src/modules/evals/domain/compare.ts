@@ -82,10 +82,14 @@ export interface CompareSide {
   results: ReadonlyArray<{ case_id: string; case_name: string; status: EvalCaseStatus }>;
 }
 
-/** Two runs are comparable when they belong to one agent and both finished (EC12). */
+/** Two runs are comparable when they belong to one owner (one agent or one skill) and both finished (EC12). */
 export function assertComparable(a: EvalRunSummary, b: EvalRunSummary): void {
-  if (a.agent_id !== b.agent_id) {
-    throw new ValidationError('Runs of different agents cannot be compared', undefined, 'runs_not_comparable');
+  if (a.owner_kind !== b.owner_kind) {
+    throw new ValidationError('Runs of different owner kinds cannot be compared', undefined, 'runs_not_comparable');
+  }
+  if (a.owner_kind === 'skill' ? a.skill_id !== b.skill_id : a.agent_id !== b.agent_id) {
+    const what = a.owner_kind === 'skill' ? 'skills' : 'agents';
+    throw new ValidationError(`Runs of different ${what} cannot be compared`, undefined, 'runs_not_comparable');
   }
   if (a.status === 'running' || b.status === 'running') {
     throw new ValidationError('A run that has not finished cannot be compared', undefined, 'runs_not_comparable');

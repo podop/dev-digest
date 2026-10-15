@@ -10,8 +10,10 @@ import type { KeptFinding } from './types.js';
 
 /** Task framing from the stored PR title (the author is not part of a case). Same trusted rule as a live review. */
 export function evalTaskLine(meta: Pick<EvalCaseInputMeta, 'pr_number' | 'pr_title'>): string {
+  // A manual case has no PR number: name the title only, never `#null`.
+  const pr = meta.pr_number === null ? '' : ` #${meta.pr_number}`;
   return (
-    `Review pull request #${meta.pr_number} "${meta.pr_title}". ` +
+    `Review pull request${pr} "${meta.pr_title}". ` +
     `Report only the distinct, high-value findings you can defend, each citing an exact ` +
     `file and line range that appears in the diff. Zero findings is a valid result — do not pad. ` +
     `Review the ENTIRE diff. Never withhold or downgrade a security or correctness finding, ` +

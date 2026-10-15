@@ -5,6 +5,7 @@ import type {
   EvalExpectation,
   EvalExpectationKind,
   EvalFindingMatch,
+  EvalOwnerKind,
 } from '@devdigest/shared';
 
 /** Agent config frozen at run start (what the run's cases were executed with). */
@@ -89,18 +90,26 @@ export interface FindingSource {
   repoFullName: string;
 }
 
-/** A case ready to insert (owner kind is always `agent`). */
+/** Who owns a case: an agent or a skill. */
+export interface CaseOwner {
+  kind: EvalOwnerKind;
+  id: string;
+}
+
+/** A case ready to insert; a manual case has no source finding / review / PR. */
 export interface NewEvalCase {
   workspaceId: string;
-  agentId: string;
+  ownerKind: EvalOwnerKind;
+  /** The agent or skill id, per `ownerKind`. */
+  ownerId: string;
   name: string;
   notes: string | null;
   expectation: EvalExpectation;
   inputDiff: string;
   inputMeta: EvalCaseInputMeta;
-  sourceFindingId: string;
-  sourceReviewId: string;
-  sourcePrId: string;
+  sourceFindingId: string | null;
+  sourceReviewId: string | null;
+  sourcePrId: string | null;
 }
 
 /** Editable fields of a case; absent = keep. */
@@ -108,6 +117,18 @@ export interface EvalCaseWrite {
   name?: string;
   notes?: string | null;
   expectation?: EvalExpectation;
+  inputDiff?: string;
+  inputMeta?: EvalCaseInputMeta;
+  /** Stamp `content_edited_at` now unless it is already set (never cleared). */
+  markContentEdited?: boolean;
+}
+
+/** A case's stored content, read under the row lock for an edit. */
+export interface StoredCase {
+  name: string;
+  expectation: EvalExpectation;
+  inputDiff: string;
+  inputMeta: EvalCaseInputMeta;
 }
 
 /** A case as the executor runs it: only the fixed inputs and the expectation. */
@@ -136,8 +157,14 @@ export interface CaseRecord {
 /** A suite run ready to insert as `running`. */
 export interface NewSuiteRun {
   workspaceId: string;
+  ownerKind: EvalOwnerKind;
+  /** The skill a skill run tests; null for an agent run. */
+  skillId: string | null;
+  skillVersion: number | null;
+  /** The agent the cases run on (the host agent for a skill run). */
   agentId: string;
   agentVersion: number;
+  agentName: string;
   config: EvalRunConfig;
   caseIds: string[];
 }
@@ -154,8 +181,12 @@ export interface RunFinal {
 export interface RunJob {
   runId: string;
   workspaceId: string;
+  ownerKind: EvalOwnerKind;
+  skillId: string | null;
+  skillVersion: number | null;
   agentId: string;
   agentVersion: number;
+  agentName: string;
   config: EvalRunConfig;
   caseIds: string[];
 }

@@ -69,6 +69,8 @@ d('eval runs API (Testcontainers pg)', () => {
     expect(res.statusCode, res.body).toBe(202);
     const started = res.json() as EvalRunSummary;
     expect(started).toMatchObject({ status: 'running', cases_total: 8, agent_id: agent.id, model: 'gpt-4o' });
+    // The run owner fields: an agent run carries no skill, and the agent's name frozen at start.
+    expect(started).toMatchObject({ owner_kind: 'agent', skill_id: null, skill_version: null, agent_name: agent.name });
 
     const done = await waitForRun(app, started.id);
     expect(done.run).toMatchObject({
@@ -323,5 +325,64 @@ d('eval runs API (Testcontainers pg)', () => {
     hold.open();
     const [running] = await pg.handle.db.select().from(t.evalSuiteRuns).where(eq(t.evalSuiteRuns.agentId, agent.id));
     await waitForRun(app, running!.id);
+  });
+  describe('run owner columns (migration 0019)', () => {
+    async function insertSkill() {
+      const [skill] = await pg.handle.db
+        .insert(t.skills)
+        .values({ workspaceId, name: `owner-skill-${Date.now()}-${Math.random()}`, description: 'd', type: 'custom', source: 'manual', body: 'b' })
+        .returning();
+      return skill!;
+    }
+    const runValues = (agentId: string) => ({
+      workspaceId,
+      agentId,
+      agentVersion: 1,
+      agentName: 'host',
+      config: { provider: 'openai', model: 'gpt-4o', system_prompt: 'p', strategy: 'single-pass', skills: [] },
+      caseIds: [],
+    });
+
+    it('AC30: deleting the skill deletes its runs; deleting the host agent deletes the skill runs it hosted', async () => {
+      const host = await insertAgent(pg.handle.db, workspaceId);
+      const skillA = await insertSkill();
+      const skillB = await insertSkill();
+      const [byDeletedSkill] = await pg.handle.db
+        .insert(t.evalSuiteRuns)
+        .values({ ...runValues(host.id), ownerKind: 'skill', skillId: skillA.id, skillVersion: 1, status: 'completed' })
+        .returning();
+      const [byDeletedHost] = await pg.handle.db
+        .insert(t.evalSuiteRuns)
+        .values({ ...runValues(host.id), ownerKind: 'skill', skillId: skillB.id, skillVersion: 1, status: 'completed' })
+        .returning();
+
+      await pg.handle.db.delete(t.skills).where(eq(t.skills.id, skillA.id));
+      expect(await pg.handle.db.select().from(t.evalSuiteRuns).where(eq(t.evalSuiteRuns.id, byDeletedSkill!.id))).toHaveLength(0);
+
+      await pg.handle.db.delete(t.agents).where(eq(t.agents.id, host.id));
+      expect(await pg.handle.db.select().from(t.evalSuiteRuns).where(eq(t.evalSuiteRuns.id, byDeletedHost!.id))).toHaveLength(0);
+      expect(await pg.handle.db.select().from(t.skills).where(eq(t.skills.id, skillB.id))).toHaveLength(1);
+    });
+
+    it('rejects an inconsistent owner (agent run with a skill, skill run without one)', async () => {
+      const host = await insertAgent(pg.handle.db, workspaceId);
+      const skill = await insertSkill();
+      await expect(
+        pg.handle.db.insert(t.evalSuiteRuns).values({ ...runValues(host.id), ownerKind: 'agent', skillId: skill.id }),
+      ).rejects.toThrow();
+      await expect(
+        pg.handle.db.insert(t.evalSuiteRuns).values({ ...runValues(host.id), ownerKind: 'skill', skillId: null }),
+      ).rejects.toThrow();
+    });
+
+    it('allows one running run per owner: two skills on one host run side by side, a second run of the same skill conflicts', async () => {
+      const host = await insertAgent(pg.handle.db, workspaceId);
+      const [s1, s2] = [await insertSkill(), await insertSkill()];
+      const skillRun = (skillId: string) => ({ ...runValues(host.id), ownerKind: 'skill' as const, skillId, skillVersion: 1 });
+      await pg.handle.db.insert(t.evalSuiteRuns).values(skillRun(s1.id));
+      await pg.handle.db.insert(t.evalSuiteRuns).values(skillRun(s2.id));
+      await pg.handle.db.insert(t.evalSuiteRuns).values(runValues(host.id)); // the host's own agent run
+      await expect(pg.handle.db.insert(t.evalSuiteRuns).values(skillRun(s1.id))).rejects.toThrow();
+    });
   });
 });

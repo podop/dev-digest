@@ -16,6 +16,7 @@ __pycache__/
 .devdigest/cache/
 .devdigest/self-review/
 .devdigest/gates/
+.devdigest/commit-gate/
 .devdigest/review/
 .devdigest/research/
 clones/

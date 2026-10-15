@@ -1,4 +1,18 @@
 import { z } from 'zod';
+import {
+  EVAL_CASE_NAME_MAX,
+  EVAL_CASES_PER_AGENT_MAX,
+  EVAL_DIFF_FILES_DETAIL_MAX,
+  EVAL_EXPECTATION_FILE_MAX,
+  EVAL_EXPECTATION_TITLE_MAX,
+  EVAL_INPUT_DIFF_MAX_CHARS,
+  EVAL_PERIOD_TREND_MAX,
+  EVAL_PERIODS,
+  EVAL_PR_DESCRIPTION_MAX,
+  EVAL_PR_TITLE_MAX,
+} from '../constants/evals.js';
+import { FindingCategory, Severity } from './findings.js';
+import { EvalOwnerKind } from './knowledge.js'; // who owns a case / a suite run (also eval-ci)
 
 /**
  * Eval pipeline contracts (specs/eval-pipeline.md §7): turn a decided finding into an
@@ -10,10 +24,17 @@ import { z } from 'zod';
  * deliberately distinct (`AgentEvalCase`, `EvalRunSummary`, …).
  */
 
-// ---- limits (zod-free consumers can mirror these) ----
-export const EVAL_CASE_NAME_MAX = 120;
-export const EVAL_INPUT_DIFF_MAX_CHARS = 200_000;
-export const EVAL_CASES_PER_AGENT_MAX = 200;
+// ---- limits (defined zod-free in constants/evals.ts; the client imports that subpath) ----
+export {
+  EVAL_CASE_NAME_MAX,
+  EVAL_CASES_PER_AGENT_MAX,
+  EVAL_DIFF_FILES_DETAIL_MAX,
+  EVAL_EXPECTATION_FILE_MAX,
+  EVAL_EXPECTATION_TITLE_MAX,
+  EVAL_INPUT_DIFF_MAX_CHARS,
+  EVAL_PR_DESCRIPTION_MAX,
+  EVAL_PR_TITLE_MAX,
+};
 
 // ---- enums ----
 export const EvalExpectationKind = z.enum(['must_find', 'must_not_flag']);
@@ -29,6 +50,10 @@ export type EvalRunStatus = z.infer<typeof EvalRunStatus>;
 
 export const EvalFindingMatch = z.enum(['hit', 'violation', 'unlabeled']);
 export type EvalFindingMatch = z.infer<typeof EvalFindingMatch>;
+
+/** Derived: `finding` when the case has a source finding, else `manual`. */
+export const EvalCaseOrigin = z.enum(['finding', 'manual']);
+export type EvalCaseOrigin = z.infer<typeof EvalCaseOrigin>;
 
 export const EvalMetricName = z.enum(['recall', 'precision', 'citation_accuracy']);
 export type EvalMetricName = z.infer<typeof EvalMetricName>;
@@ -46,6 +71,10 @@ export const EvalErrorCode = z.enum([
   'eval_run_active',
   'no_eval_cases',
   'runs_not_comparable',
+  'diff_invalid',
+  'expectation_file_not_in_diff',
+  'expectation_lines_not_in_diff',
+  'host_agent_not_found',
 ]);
 export type EvalErrorCode = z.infer<typeof EvalErrorCode>;
 
@@ -69,8 +98,9 @@ export type EvalExpectation = z.infer<typeof EvalExpectation>;
 export const EvalCaseInputMeta = z.object({
   pr_title: z.string(),
   pr_description: z.string().nullable(),
-  repo: z.string(),
-  pr_number: z.number().int(),
+  /** Null on a manual case. */
+  repo: z.string().nullable(),
+  pr_number: z.number().int().nullable(),
   head_sha: z.string().nullable(),
 });
 export type EvalCaseInputMeta = z.infer<typeof EvalCaseInputMeta>;
@@ -84,7 +114,10 @@ export type EvalCaseLastResult = z.infer<typeof EvalCaseLastResult>;
 
 export const AgentEvalCase = z.object({
   id: z.string(),
-  agent_id: z.string(),
+  owner_kind: EvalOwnerKind,
+  owner_id: z.string(),
+  /** The owning agent; null for a skill case. */
+  agent_id: z.string().nullable(),
   name: z.string().min(1).max(EVAL_CASE_NAME_MAX),
   notes: z.string().nullable(),
   expectation: EvalExpectation,
@@ -92,19 +125,62 @@ export const AgentEvalCase = z.object({
   input_meta: EvalCaseInputMeta,
   source_finding_id: z.string().nullable(),
   source_pr_id: z.string().nullable(),
+  origin: EvalCaseOrigin,
+  /** Set at the first edit that changes the case's content; never cleared. */
+  content_edited_at: z.string().nullable(),
   created_at: z.string(),
   last_result: EvalCaseLastResult.nullable(),
 });
 export type AgentEvalCase = z.infer<typeof AgentEvalCase>;
 
-/** `PATCH /eval-cases/:id` — field shape only; `end_line >= start_line` is checked against the stored values. */
+/** `PATCH /eval-cases/:id` — field shape only; the merged values are checked by the service (end >= start → 400). */
 export const AgentEvalCaseUpdateInput = z.object({
-  name: z.string().min(1).max(EVAL_CASE_NAME_MAX).optional(),
+  name: z.string().trim().min(1).max(EVAL_CASE_NAME_MAX).optional(),
   notes: z.string().nullable().optional(),
+  kind: EvalExpectationKind.optional(),
+  file: z.string().min(1).max(EVAL_EXPECTATION_FILE_MAX).optional(),
   start_line: z.number().int().min(1).optional(),
   end_line: z.number().int().min(1).optional(),
+  severity: Severity.nullish(),
+  category: FindingCategory.nullish(),
+  title: z.string().max(EVAL_EXPECTATION_TITLE_MAX).nullish(),
+  input_diff: z.string().min(1).optional(),
+  pr_title: z.string().max(EVAL_PR_TITLE_MAX).nullish(),
+  pr_description: z.string().max(EVAL_PR_DESCRIPTION_MAX).nullish(),
 });
 export type AgentEvalCaseUpdateInput = z.infer<typeof AgentEvalCaseUpdateInput>;
+
+/**
+ * `POST /agents/:id/eval-cases` and `POST /skills/:id/eval-cases`. `input_diff` has no
+ * schema-level upper bound: the service rejects a STORED diff over EVAL_INPUT_DIFF_MAX_CHARS
+ * as `patch_too_large` (422), after wrapping a header-less paste.
+ */
+export const EvalCaseCreateInput = z.object({
+  name: z.string().trim().min(1).max(EVAL_CASE_NAME_MAX),
+  notes: z.string().nullish(),
+  expectation: z
+    .object({
+      kind: EvalExpectationKind,
+      file: z.string().min(1).max(EVAL_EXPECTATION_FILE_MAX),
+      start_line: z.number().int().min(1),
+      end_line: z.number().int().min(1),
+      severity: Severity.nullish(),
+      category: FindingCategory.nullish(),
+      title: z.string().max(EVAL_EXPECTATION_TITLE_MAX).nullish(),
+    })
+    .refine((e) => e.end_line >= e.start_line, {
+      message: 'end_line must be >= start_line',
+      path: ['end_line'],
+    }),
+  input_diff: z.string().min(1),
+  input_meta: z
+    .object({
+      pr_title: z.string().max(EVAL_PR_TITLE_MAX).nullish(),
+      pr_description: z.string().max(EVAL_PR_DESCRIPTION_MAX).nullish(),
+    })
+    .optional(),
+});
+export type EvalCaseCreateInput = z.infer<typeof EvalCaseCreateInput>;
 
 export const AgentEvalCaseList = z.object({ cases: z.array(AgentEvalCase) });
 export type AgentEvalCaseList = z.infer<typeof AgentEvalCaseList>;
@@ -113,8 +189,15 @@ export type AgentEvalCaseList = z.infer<typeof AgentEvalCaseList>;
 /** Metrics are null while running and when their denominator is 0. */
 export const EvalRunSummary = z.object({
   id: z.string(),
+  owner_kind: EvalOwnerKind,
+  /** The skill a skill run tests; null for an agent run. */
+  skill_id: z.string().nullable(),
+  skill_version: z.number().int().nullable(),
+  /** For a skill run the three fields below describe the HOST agent. */
   agent_id: z.string(),
   agent_version: z.number().int(),
+  /** Agent name frozen at run start. */
+  agent_name: z.string(),
   model: z.string(),
   status: EvalRunStatus,
   started_at: z.string(),
@@ -157,11 +240,22 @@ export const EvalCaseResult = z.object({
 });
 export type EvalCaseResult = z.infer<typeof EvalCaseResult>;
 
+/** `POST /skills/:id/eval-runs` — the host agent the skill's cases run on. */
+export const EvalSkillRunStartInput = z.object({ agent_id: z.string().uuid() });
+export type EvalSkillRunStartInput = z.infer<typeof EvalSkillRunStartInput>;
+
 export const EvalRunList = z.object({ runs: z.array(EvalRunSummary) });
 export type EvalRunList = z.infer<typeof EvalRunList>;
 
+export { EVAL_PERIOD_TREND_MAX, EVAL_PERIODS };
+
+/** Dashboard / runs-list window: runs started within the last N days of server time, or all of them. */
+export const EvalPeriod = z.enum(EVAL_PERIODS);
+export type EvalPeriod = z.infer<typeof EvalPeriod>;
+
 export const EvalRunListQuery = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
+  period: EvalPeriod.optional(),
 });
 export type EvalRunListQuery = z.infer<typeof EvalRunListQuery>;
 
@@ -247,12 +341,15 @@ export const EvalRegressionAlert = z.object({
 });
 export type EvalRegressionAlert = z.infer<typeof EvalRegressionAlert>;
 
+export const EvalAgentDashboardQuery = z.object({ period: EvalPeriod.optional() });
+export type EvalAgentDashboardQuery = z.infer<typeof EvalAgentDashboardQuery>;
+
 export const EvalAgentDashboard = z.object({
   agent_id: z.string(),
   cases_total: z.number().int(),
   latest: EvalRunSummary.nullable(),
   previous: EvalRunSummary.nullable(),
-  trend: z.array(EvalRunSummary).max(20),
+  trend: z.array(EvalRunSummary).max(EVAL_PERIOD_TREND_MAX),
   alert: EvalRegressionAlert.nullable(),
 });
 export type EvalAgentDashboard = z.infer<typeof EvalAgentDashboard>;

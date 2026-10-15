@@ -15,7 +15,8 @@ describe("skills route helpers", () => {
     expect(resolveSkillTab("versions")).toBe("versions");
     expect(resolveSkillTab(["stats", "config"])).toBe("stats");
     expect(resolveSkillTab(undefined)).toBe("config");
-    expect(resolveSkillTab("evals")).toBe("config");
+    expect(resolveSkillTab("evals")).toBe("evals");
+    expect(resolveSkillTab("nope")).toBe("config");
   });
 
   it("resolvePreviewId (legacy ?preview= redirect) treats an empty value as none", () => {

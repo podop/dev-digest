@@ -2,9 +2,14 @@ import { describe, it, expect } from 'vitest';
 import {
   AgentEvalCase,
   AgentEvalCaseUpdateInput,
+  EVAL_INPUT_DIFF_MAX_CHARS,
+  EvalCaseCreateInput,
+  EvalErrorCode,
+  EvalSkillRunStartInput,
   EvalCaseResult,
   EvalCompare,
   EvalAgentDashboard,
+  EvalAgentDashboardQuery,
   EvalOverview,
   EvalRunAllResponse,
   EvalRunDetail,
@@ -26,8 +31,12 @@ const expectation = {
 
 const run = {
   id: 'r1',
+  owner_kind: 'agent' as const,
+  skill_id: null,
+  skill_version: null,
   agent_id: 'a1',
   agent_version: 3,
+  agent_name: 'Security Reviewer',
   model: 'gpt-4o',
   status: 'completed' as const,
   started_at: '2026-10-14T10:00:00.000Z',
@@ -47,6 +56,8 @@ const run = {
 
 const evalCase = {
   id: 'c1',
+  owner_kind: 'agent' as const,
+  owner_id: 'a1',
   agent_id: 'a1',
   name: 'SQL injection',
   notes: null,
@@ -61,6 +72,8 @@ const evalCase = {
   },
   source_finding_id: 'f1',
   source_pr_id: 'p1',
+  origin: 'finding' as const,
+  content_edited_at: null,
   created_at: '2026-10-14T10:00:00.000Z',
   last_result: null,
 };
@@ -87,6 +100,70 @@ describe('eval-pipeline contracts', () => {
     expect(AgentEvalCase.safeParse({ ...evalCase, name: '' }).success).toBe(false);
   });
 
+  it('accepts a manual case with null repo / PR number, and a skill case with a null agent_id', () => {
+    const manual = {
+      ...evalCase,
+      owner_kind: 'skill' as const,
+      agent_id: null,
+      origin: 'manual' as const,
+      source_finding_id: null,
+      source_pr_id: null,
+      input_meta: { pr_title: 'T', pr_description: null, repo: null, pr_number: null, head_sha: null },
+    };
+    expect(AgentEvalCase.parse(manual).input_meta.repo).toBeNull();
+    expect(AgentEvalCase.safeParse({ ...manual, origin: 'other' }).success).toBe(false);
+  });
+
+  describe('EvalCaseCreateInput', () => {
+    const valid = {
+      name: 'A case',
+      expectation: { kind: 'must_find' as const, file: 'src/a.ts', start_line: 3, end_line: 4 },
+      input_diff: '@@ -1 +1 @@\n+x',
+    };
+
+    it('accepts the minimal body and nullish optionals', () => {
+      expect(EvalCaseCreateInput.safeParse(valid).success).toBe(true);
+      const full = {
+        ...valid,
+        notes: null,
+        expectation: { ...valid.expectation, severity: null, category: 'bug', title: null },
+        input_meta: { pr_title: null, pr_description: 'd' },
+      };
+      expect(EvalCaseCreateInput.safeParse(full).success).toBe(true);
+    });
+
+    it('rejects a blank (whitespace) name and trims a padded one', () => {
+      expect(EvalCaseCreateInput.safeParse({ ...valid, name: '   ' }).success).toBe(false);
+      expect(EvalCaseCreateInput.parse({ ...valid, name: '  hi  ' }).name).toBe('hi');
+    });
+
+    it('rejects end_line < start_line', () => {
+      const bad = { ...valid, expectation: { ...valid.expectation, start_line: 9, end_line: 3 } };
+      expect(EvalCaseCreateInput.safeParse(bad).success).toBe(false);
+    });
+
+    it('rejects a severity or category outside the finding enums', () => {
+      const sev = { ...valid, expectation: { ...valid.expectation, severity: 'critical' } };
+      const cat = { ...valid, expectation: { ...valid.expectation, category: 'nope' } };
+      expect(EvalCaseCreateInput.safeParse(sev).success).toBe(false);
+      expect(EvalCaseCreateInput.safeParse(cat).success).toBe(false);
+    });
+
+    it('does not cap input_diff (the service answers patch_too_large on the stored length)', () => {
+      const big = { ...valid, input_diff: 'x'.repeat(EVAL_INPUT_DIFF_MAX_CHARS + 1) };
+      expect(EvalCaseCreateInput.safeParse(big).success).toBe(true);
+      expect(EvalCaseCreateInput.safeParse({ ...valid, input_diff: '' }).success).toBe(false);
+    });
+  });
+
+  it('knows the new editor / skill-run error codes and the skill run start body', () => {
+    for (const code of ['diff_invalid', 'expectation_file_not_in_diff', 'expectation_lines_not_in_diff', 'host_agent_not_found']) {
+      expect(EvalErrorCode.safeParse(code).success).toBe(true);
+    }
+    expect(EvalSkillRunStartInput.safeParse({ agent_id: '3f2b8c1e-5a6d-4e2f-9b1a-0c7d8e9f1a2b' }).success).toBe(true);
+    expect(EvalSkillRunStartInput.safeParse({ agent_id: 'nope' }).success).toBe(false);
+  });
+
   describe('AgentEvalCaseUpdateInput', () => {
     it('accepts any subset, including the empty body', () => {
       expect(AgentEvalCaseUpdateInput.parse({})).toEqual({});
@@ -103,6 +180,23 @@ describe('eval-pipeline contracts', () => {
       expect(AgentEvalCaseUpdateInput.safeParse({ name: 'x'.repeat(121) }).success).toBe(false);
       expect(AgentEvalCaseUpdateInput.safeParse({ start_line: 0 }).success).toBe(false);
       expect(AgentEvalCaseUpdateInput.safeParse({ end_line: 1.5 }).success).toBe(false);
+    });
+
+    it('accepts the extended editable fields and rejects bad enum values', () => {
+      expect(
+        AgentEvalCaseUpdateInput.safeParse({
+          kind: 'must_not_flag',
+          file: 'a.ts',
+          severity: null,
+          category: 'perf',
+          title: null,
+          input_diff: '@@ -1 +1 @@',
+          pr_title: null,
+          pr_description: 'x',
+        }).success,
+      ).toBe(true);
+      expect(AgentEvalCaseUpdateInput.safeParse({ severity: 'high' }).success).toBe(false);
+      expect(AgentEvalCaseUpdateInput.safeParse({ file: '' }).success).toBe(false);
     });
 
     it('does not compare end_line to start_line (checked against the stored case)', () => {
@@ -155,6 +249,23 @@ describe('eval-pipeline contracts', () => {
     expect(EvalRunListQuery.parse({ limit: '5' }).limit).toBe(5);
     expect(EvalRunListQuery.safeParse({ limit: '0' }).success).toBe(false);
     expect(EvalRunListQuery.safeParse({ limit: '101' }).success).toBe(false);
+  });
+
+  it('accepts the four period presets on both queries and rejects anything else', () => {
+    for (const period of ['7d', '30d', '90d', 'all']) {
+      expect(EvalRunListQuery.parse({ period }).period).toBe(period);
+      expect(EvalAgentDashboardQuery.parse({ period }).period).toBe(period);
+    }
+    expect(EvalRunListQuery.parse({}).period).toBeUndefined();
+    expect(EvalAgentDashboardQuery.parse({}).period).toBeUndefined();
+    expect(EvalRunListQuery.safeParse({ period: '14d' }).success).toBe(false);
+    expect(EvalAgentDashboardQuery.safeParse({ period: '14d' }).success).toBe(false);
+  });
+
+  it('allows up to 100 trend points on the agent dashboard, not 101', () => {
+    const dash = { agent_id: 'a1', cases_total: 8, latest: run, previous: null, alert: null };
+    expect(EvalAgentDashboard.safeParse({ ...dash, trend: Array.from({ length: 100 }, () => run) }).success).toBe(true);
+    expect(EvalAgentDashboard.safeParse({ ...dash, trend: Array.from({ length: 101 }, () => run) }).success).toBe(false);
   });
 
   it('parses a compare payload with absent cases and a prompt line diff', () => {

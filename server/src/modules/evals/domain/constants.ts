@@ -11,6 +11,9 @@ export const COST_DECIMALS = 6;
 /** Sparkline length on the overview, trend length on the per-agent dashboard (Q3). */
 export const SPARKLINE_POINTS = 10;
 export const TREND_POINTS = 20;
+/** Days a `period` preset looks back; `all` has no bound (periodStart returns null). */
+export const PERIOD_DAYS = { '7d': 7, '30d': 30, '90d': 90 } as const;
+export const MS_PER_DAY = 86_400_000;
 /** Recent runs across agents on the overview (FR14). */
 export const RECENT_RUNS_LIMIT = 20;
 

@@ -27,6 +27,9 @@ const dashboard = (over: Partial<EvalAgentDashboard> = {}): EvalAgentDashboard =
   ...over,
 });
 
+/** A one-hunk diff whose new side covers lines 10–12 of `file`, so the case passes the editor's checks. */
+const diffFor = (file: string) => `diff --git a/${file} b/${file}\n--- a/${file}\n+++ b/${file}\n@@ -10,1 +10,3 @@\n ctx\n+one\n+two\n`;
+
 /** 8 cases of one finished run: 5 passed, 1 failed, 1 error, 1 never run. */
 function eightCases(): AgentEvalCase[] {
   const status = ["passed", "passed", "passed", "passed", "passed", "failed", "error", null] as const;
@@ -35,6 +38,7 @@ function eightCases(): AgentEvalCase[] {
       id: `c${i}`,
       name: i === 7 ? HOSTILE : `case-${i}`,
       expectation: { ...makeCase().expectation, kind: i % 2 ? "must_not_flag" : "must_find", file: `src/f${i}.ts` },
+      input_diff: diffFor(`src/f${i}.ts`),
       last_result: st ? { run_id: "r2", status: st, ran_at: "2026-10-14T10:01:00.000Z" } : null,
     }),
   );
@@ -90,7 +94,7 @@ describe("EvalsTab", () => {
     expect(await screen.findByText(/No eval cases yet/)).toBeInTheDocument();
     expect(screen.getByText(/No runs yet/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run all evals" })).toBeDisabled();
-    expect(screen.getByTitle("Create an eval case from a decided finding first")).toBeInTheDocument();
+    expect(screen.getByTitle("Create an eval case first")).toBeInTheDocument();
   });
 
   it("shows an error with Retry when the cases cannot be loaded", async () => {
