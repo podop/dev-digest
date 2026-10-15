@@ -255,6 +255,9 @@ export type RepoIndexState = z.infer<typeof RepoIndexState>;
 export const RunRequest = z.object({
   agentId: z.string().optional(),
   all: z.boolean().optional(),
+  /** Explicit agent set (specs/multi-agent-review.md); 2+ ids create a multi-agent
+   *  run. Exactly one of agentId / all / agentIds is accepted by the route. */
+  agentIds: z.array(z.string()).min(1).max(20).optional(),
 });
 export type RunRequest = z.infer<typeof RunRequest>;
 

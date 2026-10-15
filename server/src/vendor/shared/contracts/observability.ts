@@ -1,14 +1,18 @@
 import { z } from 'zod';
 import { Severity } from './findings.js';
+import { FindingRecord } from './review-api.js';
 
 /**
- * A5 — Observability / Multi-agent contracts (L07).
+ * A5 — Observability / Multi-agent contracts (L07, specs/multi-agent-review.md).
  *
  * These are NEW contracts (A5 owns this file; the barrel re-exports it). They
  * sit alongside A2's `review-api.ts`:
- *   - MultiAgentRun        the response of POST /pulls/:id/multi-agent-run
+ *   - MultiAgentRun        GET /multi-agent-runs/:id (parent of N agent runs,
+ *                          started by POST /pulls/:id/review with 2+ agentIds)
+ *   - MultiAgentRunSummary GET /repos/:id/multi-agent-runs (newest first)
+ *   - AgentRunEstimate     GET /runs/estimates (Configure run screen)
  *   - AgentColumn          one agent's column in the multi-agent view
- *   - Conflict / ConflictTake  where agents disagree on the same file:line
+ *   - Conflict / ConflictTake  one location group and each agent's take on it
  *   - AgentStats           per-agent quality aggregates (GET /agents/:id/stats)
  *   - CuratorResult        the cross-session memory curator outcome
  *
@@ -35,55 +39,93 @@ export type AgentColumnFinding = z.infer<typeof AgentColumnFinding>;
 export const AgentColumn = z.object({
   run_id: z.string(),
   agent_id: z.string(),
+  /** Stored name; the client labels a deleted agent. */
   agent_name: z.string(),
   provider: z.string().nullable(),
   model: z.string().nullable(),
-  status: z.enum(['done', 'failed', 'running']),
+  status: z.enum(['done', 'failed', 'running', 'cancelled']),
+  error: z.string().nullish(),
   verdict: z.string().nullable(),
   score: z.number().int().nullable(),
   summary: z.string().nullable(),
   duration_ms: z.number().int().nullable(),
   cost_usd: z.number().nullable(),
-  findings: z.array(AgentColumnFinding),
+  findings: z.array(FindingRecord),
 });
 export type AgentColumn = z.infer<typeof AgentColumn>;
 
-/** One agent's stance on a contended file:line. */
+/** One agent's stance on a location group. */
 export const ConflictTake = z.object({
   agent_id: z.string(),
+  /** Agent name. */
   persona: z.string(),
-  /** Severity if the agent flagged it, or 'ignored' when it did not. */
+  run_id: z.string(),
+  /** Highest severity the agent flagged in the group, or 'ignored' = "did not flag". */
   verdict: z.union([Severity, z.literal('ignored')]),
+  /** Title of the agent's highest-severity finding in the group; "" when ignored. */
   note: z.string(),
+  /** The agent's findings in the group; empty when ignored. */
+  finding_ids: z.array(z.string()),
 });
 export type ConflictTake = z.infer<typeof ConflictTake>;
 
 /**
- * A conflict = a file:line that at least one agent flagged and at least one
- * other agent (that also reviewed) did NOT, OR where agents assigned divergent
- * severities. Computed from persisted findings; not stored.
+ * A location group = findings in the same file whose line ranges overlap
+ * (chains merge). `is_conflict` is false when every finished agent flagged it
+ * with the same severity. Computed from persisted findings on read; not stored.
  */
 export const Conflict = z.object({
   file: z.string(),
+  /** Min start_line of the group. */
   line: z.number().int(),
+  /** Max end_line of the group. */
+  end_line: z.number().int(),
   title: z.string(),
+  is_conflict: z.boolean(),
   takes: z.array(ConflictTake),
 });
 export type Conflict = z.infer<typeof Conflict>;
 
-/** Response of POST /pulls/:id/multi-agent-run and GET /pulls/:id/multi-agent. */
+/** Response of GET /multi-agent-runs/:id. Totals and status are derived on read. */
 export const MultiAgentRun = z.object({
   id: z.string(),
   pr_id: z.string(),
+  repo_id: z.string(),
   pr_number: z.number().int().nullish(),
+  pr_title: z.string().nullish(),
   ran_at: z.string(),
   agent_count: z.number().int(),
+  /** Wall clock of a parallel fan-out: max column duration_ms (0 when none). */
   total_duration_ms: z.number().int(),
+  /** Sum of non-null column costs; null when all are null. */
   total_cost_usd: z.number().nullable(),
   columns: z.array(AgentColumn),
+  /** Every location group, conflict or not. */
   conflicts: z.array(Conflict),
 });
 export type MultiAgentRun = z.infer<typeof MultiAgentRun>;
+
+/** Row of GET /repos/:id/multi-agent-runs (newest ran_at first). */
+export const MultiAgentRunSummary = z.object({
+  id: z.string(),
+  pr_id: z.string(),
+  pr_number: z.number().int().nullable(),
+  pr_title: z.string().nullable(),
+  ran_at: z.string(),
+  agent_count: z.number().int(),
+  running_count: z.number().int(),
+  total_cost_usd: z.number().nullable(),
+});
+export type MultiAgentRunSummary = z.infer<typeof MultiAgentRunSummary>;
+
+/** Per-agent averages over its last ≤ 10 done runs (GET /runs/estimates). */
+export const AgentRunEstimate = z.object({
+  agent_id: z.string(),
+  sample_size: z.number().int(),
+  avg_duration_ms: z.number().nullable(),
+  avg_cost_usd: z.number().nullable(),
+});
+export type AgentRunEstimate = z.infer<typeof AgentRunEstimate>;
 
 // ---------------------------------------------------------------------------
 // Per-agent Stats (GET /agents/:id/stats)
