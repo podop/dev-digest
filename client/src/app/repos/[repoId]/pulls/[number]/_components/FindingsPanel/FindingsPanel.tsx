@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { Toggle, EmptyState, Chip, SEV } from "@devdigest/ui";
 import type { FindingRecord, Severity } from "@devdigest/shared";
 import { FindingCard } from "../FindingCard";
+import { EvalCaseButton } from "../EvalCaseButton";
 import { useFindingAction } from "@/lib/hooks/reviews";
 import { KEY_TO_ACTION, SEVERITY_LEVELS } from "./constants";
 import { filterBySeverity, isEditableTarget, severityCounts, visibleFindings } from "./helpers";
@@ -17,6 +18,7 @@ import { s } from "./styles";
 export function FindingsPanel({
   findings,
   prId,
+  agentId,
   repoFullName,
   headSha,
   active = true,
@@ -24,6 +26,8 @@ export function FindingsPanel({
 }: {
   findings: FindingRecord[];
   prId: string;
+  /** Agent of this review (null for seed reviews) — owner of the eval cases made from its findings. */
+  agentId?: string | null;
   repoFullName?: string | null;
   headSha?: string | null;
   /** Only the active panel handles j/k/a/d — several panels can be open at once. */
@@ -104,6 +108,7 @@ export function FindingsPanel({
               repoFullName={repoFullName}
               headSha={headSha}
               onAction={(act) => mutate({ findingId: f.id, action: act })}
+              extraActions={<EvalCaseButton finding={f} agentId={agentId} prId={prId} />}
             />
           ))
         )}

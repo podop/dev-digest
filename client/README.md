@@ -29,20 +29,22 @@ flowchart TD
   PULLS --> PR["/pulls/:number<br/>review detail<br/>(overview · diff · findings)"]
 
   AGENTS["/agents"] --> AGENT["/agents/:id<br/>editor (config · skills)"]
-  SKILLS["/skills<br/>grid"] --> SKILL["/skills/:id<br/>list sidebar + editor (config · preview · versions · stats)"]
+  SKILLS["/skills<br/>grid"] --> SKILL["/skills/:id<br/>list sidebar + editor (config · preview · versions · stats · evals)"]
   CONV["/repos/:repoId/conventions<br/>rules + create-skill modal"]
   CTX["/repos/:repoId/context<br/>spec / doc / insight markdown, view-only"]
   TOUR["/repos/:repoId/onboarding<br/>five-part onboarding tour: generate, TOC, share"]
+  EVAL["/eval<br/>agents overview · ?agent=id runs, trend, compare"]
   SETTINGS["/settings/:section<br/>API keys · models"]
 
   PULLS -->|"GET /repos/:id/pulls · /repos/:id/index-state"| API
   PR -->|"GET /pulls/:id · /reviews · /pulls/:id/comments<br/>POST /pulls/:id/review · /findings/:id/(accept|dismiss)"| API
   AGENTS -->|"/agents · /agents/:id · /agents/:id/skills"| API
   SKILLS -->|"/skills · /skills/stats · /skills/community · /skills/import/preview"| API
-  SKILL -->|"/skills/:id · /versions · /versions/:v/restore · /agents · /stats"| API
+  SKILL -->|"/skills/:id · /versions · /versions/:v/restore · /agents · /stats · /eval-cases · /eval-runs"| API
   CONV -->|"/repos/:id/conventions · /extract · /skill · /conventions/:id"| API
   CTX -->|"/repos/:id/context · /repos/:id/context/doc?path="| API
   TOUR -->|"GET · POST /repos/:id/onboarding · /repos/:id/index-state"| API
+  EVAL -->|"GET /eval/dashboard · /agents/:id/eval/dashboard · /agents/:id/eval-runs · /eval-runs/:id · /eval-runs/compare<br/>POST /agents/:id/eval-runs · /eval-runs/run-all"| API
   SETTINGS -->|"/settings · /providers"| API
 ```
 

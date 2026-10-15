@@ -22,4 +22,11 @@ describe("NAV", () => {
     const items = NAV.flatMap((g) => g.items);
     expect(items.find((i) => i.key === "onboarding-tour")?.href).toBe("/repos/:repoId/onboarding");
   });
+
+  it("lists the Eval Dashboard in the Skills Lab group and highlights it on /eval", () => {
+    const group = NAV.find((g) => g.items.some((i) => i.key === "eval"));
+    expect(group?.section).toBe("SKILLS LAB");
+    expect(group?.items.find((i) => i.key === "eval")?.href).toBe("/eval");
+    expect(activeKeyFor("/eval")).toBe("eval");
+  });
 });

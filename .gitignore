@@ -16,6 +16,7 @@ __pycache__/
 .devdigest/cache/
 .devdigest/self-review/
 .devdigest/gates/
+.devdigest/commit-gate/
 .devdigest/review/
 .devdigest/research/
 clones/
@@ -31,3 +32,7 @@ test-results/
 # Windows ADS junk from WSL copies
 *:Zone.Identifier
 .next-e2e/
+
+# Stryker mutation testing (server: pnpm mutate)
+.stryker-tmp/
+server/reports/mutation/

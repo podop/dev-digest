@@ -5,7 +5,7 @@ import type { SkillType } from "@devdigest/shared";
 export const SKILL_TYPES: readonly SkillType[] = ["rubric", "convention", "security", "custom"];
 
 /** Skill editor tabs reachable via ?tab= (labels: skills.editor.tabs.*). */
-export const SKILL_TABS = ["config", "context", "preview", "versions", "stats"] as const;
+export const SKILL_TABS = ["config", "context", "preview", "versions", "stats", "evals"] as const;
 export type SkillTab = (typeof SKILL_TABS)[number];
 
 export const SKILL_TAB_ICONS: Record<SkillTab, IconName> = {
@@ -14,6 +14,7 @@ export const SKILL_TAB_ICONS: Record<SkillTab, IconName> = {
   preview: "Eye",
   versions: "History",
   stats: "BarChart",
+  evals: "FlaskConical",
 };
 
 /** Tab shown when ?tab= is missing or unknown. */

@@ -71,3 +71,14 @@ describe("FindingCard — accessible toggle", () => {
     expect(screen.getByRole("button", { name: "Hardcoded Stripe secret key" })).toHaveAttribute("aria-expanded", "false");
   });
 });
+
+describe("FindingCard — extraActions slot", () => {
+  it("renders caller-supplied actions in the actions row of an expanded card", async () => {
+    const { user } = renderWithProviders(
+      <FindingCard f={FINDING} onAction={() => {}} extraActions={<button type="button">Extra</button>} />,
+    );
+    expect(screen.queryByRole("button", { name: "Extra" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Hardcoded Stripe secret key" }));
+    expect(screen.getByRole("button", { name: "Extra" })).toBeInTheDocument();
+  });
+});

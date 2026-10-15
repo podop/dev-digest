@@ -23,6 +23,7 @@ describe('Container composition root', () => {
       'blast',
       'brief',
       'conventions',
+      'evals',
       'intent',
       'onboarding',
       'polling',

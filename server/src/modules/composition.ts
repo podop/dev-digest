@@ -2,6 +2,7 @@ import { buildAgentsModule } from './agents/composition.js';
 import { buildBlastModule } from './blast/composition.js';
 import { buildBriefModule } from './brief/composition.js';
 import { buildConventionsModule } from './conventions/composition.js';
+import { buildEvalsModule } from './evals/composition.js';
 import { buildIntentModule } from './intent/composition.js';
 import { buildOnboardingModule } from './onboarding/composition.js';
 import { buildPollingModule } from './polling/composition.js';
@@ -42,4 +43,5 @@ export const moduleFactories = {
   projectContext: buildProjectContextModule,
   onboarding: buildOnboardingModule,
   brief: buildBriefModule,
+  evals: buildEvalsModule,
 };

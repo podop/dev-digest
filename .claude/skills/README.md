@@ -19,6 +19,7 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [security](security/SKILL.md) | Full-stack | OWASP Top 10:2025, auth, injection, uploads, secrets |
 | [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
 | [pr-self-review](pr-self-review/SKILL.md) | Workflow | Pre-PR self-review: routes the branch diff to the other skills, runs the deterministic gates, PASS/BLOCK |
+| [dependency-checker](dependency-checker/SKILL.md) | Workflow | Dependency audit of every package: Mermaid graph (internal aliases vs npm), sizes, unused/phantom/drift, P0–P2/Info findings + summary. Read-only |
 | [engineering-insights](engineering-insights/SKILL.md) | Shared | Append non-obvious lessons to the touched package's `INSIGHTS.md` |
 | [implement](implement/SKILL.md) | Workflow | `/implement <plan>`: implementer (single pass or waves) → plan-verifier ∥ architecture-reviewer → delta fix rounds → wrap-up. Manual only |
 | [workflow-retro](workflow-retro/SKILL.md) | Workflow | `/workflow-retro [label]`: last pipeline step, same session — per-subagent tokens, cache hit, time, tools, cost, parallelism; re-read files, re-asks, scope breaks, skipped steps → ≤ 5 "agent file → change" items; row in `docs/retros/ledger.md`. Recommends only. Manual only |

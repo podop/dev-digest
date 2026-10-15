@@ -42,6 +42,7 @@ export function FindingCard({
   repoFullName,
   headSha,
   publish,
+  extraActions,
 }: {
   f: FindingRecord;
   focused?: boolean;
@@ -52,6 +53,8 @@ export function FindingCard({
   headSha?: string | null;
   /** "Post to PR" as an inline comment; omitted → no button. */
   publish?: FindingPublish;
+  /** Caller-owned buttons rendered at the end of the actions row (e.g. "Turn into eval case"). */
+  extraActions?: React.ReactNode;
 }) {
   const t = useTranslations("prReview");
   const [expanded, setExpanded] = React.useState(defaultExpanded ?? false);
@@ -163,6 +166,7 @@ export function FindingCard({
                 </Button>
               )
             )}
+            {extraActions}
           </div>
         </div>
       )}

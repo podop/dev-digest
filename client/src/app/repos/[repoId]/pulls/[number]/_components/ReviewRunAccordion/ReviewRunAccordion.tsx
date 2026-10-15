@@ -132,6 +132,7 @@ export function ReviewRunAccordion({
           <FindingsPanel
             findings={findings}
             prId={prId}
+            agentId={review.agent_id}
             repoFullName={repoFullName}
             headSha={headSha}
             active={active}

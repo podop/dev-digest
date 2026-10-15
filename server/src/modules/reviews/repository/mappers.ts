@@ -5,8 +5,8 @@ import type { StoredReview } from '../domain/review.js';
 
 type ReviewRow = typeof t.reviews.$inferSelect;
 
-/** findings row → the FindingRecord wire contract. */
-export function toFindingRecord(row: FindingRow): FindingRecord {
+/** findings row → the FindingRecord wire contract; `evalCaseId` = the eval case created from it (null = none). */
+export function toFindingRecord(row: FindingRow, evalCaseId: string | null = null): FindingRecord {
   return {
     id: row.id,
     severity: row.severity as Finding['severity'],
@@ -26,11 +26,16 @@ export function toFindingRecord(row: FindingRow): FindingRecord {
     review_id: row.reviewId,
     accepted_at: row.acceptedAt?.toISOString() ?? null,
     dismissed_at: row.dismissedAt?.toISOString() ?? null,
+    eval_case_id: evalCaseId,
   };
 }
 
 /** reviews row + its findings → a StoredReview (agent name / usage joined later). */
-export function toStoredReview(review: ReviewRow, findings: FindingRow[]): StoredReview {
+export function toStoredReview(
+  review: ReviewRow,
+  findings: FindingRow[],
+  evalCaseIds: ReadonlyMap<string, string> = new Map(),
+): StoredReview {
   return {
     id: review.id,
     pr_id: review.prId,
@@ -42,6 +47,6 @@ export function toStoredReview(review: ReviewRow, findings: FindingRow[]): Store
     score: review.score,
     model: review.model,
     created_at: review.createdAt.toISOString(),
-    findings: findings.map(toFindingRecord),
+    findings: findings.map((f) => toFindingRecord(f, evalCaseIds.get(f.id) ?? null)),
   };
 }

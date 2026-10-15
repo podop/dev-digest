@@ -16,6 +16,9 @@ export const FindingRecord = Finding.extend({
   review_id: z.string(),
   accepted_at: z.string().nullable(),
   dismissed_at: z.string().nullable(),
+  // Eval case created from this finding (eval-pipeline FR19); server always sets it.
+  // nullish so older producers/fixtures that omit it stay valid.
+  eval_case_id: z.string().nullish(),
 });
 export type FindingRecord = z.infer<typeof FindingRecord>;
 

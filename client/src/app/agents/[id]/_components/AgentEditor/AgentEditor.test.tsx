@@ -32,6 +32,18 @@ describe("A2 Agent Editor (smoke)", () => {
     expect(screen.getByText("Save agent")).toBeInTheDocument();
   });
 
+  it("renders the Evals tab (cases, run all) and not the Config form", async () => {
+    mockFetch({
+      "GET /agents/ag1/eval-cases": { cases: [] },
+      "GET /agents/ag1/eval/dashboard": { agent_id: "ag1", cases_total: 0, latest: null, previous: null, trend: [], alert: null },
+      "GET /agents/ag1/eval-runs": { runs: [] },
+    });
+    renderWithProviders(<AgentEditor agent={AGENT} tab="evals" onTab={() => {}} />);
+    expect(await screen.findByRole("button", { name: "Run all evals" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Evals" })).toBeInTheDocument();
+    expect(screen.queryByText("Configuration")).not.toBeInTheDocument();
+  });
+
   it("drops unsaved edits when switching to another agent", async () => {
     const { rerender, user } = renderWithProviders(<AgentEditor agent={AGENT} tab="config" onTab={() => {}} />);
     const name = screen.getByDisplayValue("Security Reviewer");

@@ -26,6 +26,18 @@ function loadMessages(): AbstractIntlMessages {
 /** All `messages/en/*.json` namespaces, keyed by namespace. */
 export const messages = loadMessages();
 
+/** Every string of `source` replaced by a marker built from its key path (ICU `{args}`
+ *  are dropped). A screen rendered with it shows only markers when all its copy comes from
+ *  the message files — any other visible text is a hard-coded string (NFR9). */
+export function pseudoMessages(source: AbstractIntlMessages = messages, prefix = ""): AbstractIntlMessages {
+  const out: Record<string, AbstractIntlMessages | string> = {};
+  for (const [key, value] of Object.entries(source)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    out[key] = typeof value === "string" ? `⟦${path}⟧` : pseudoMessages(value, path);
+  }
+  return out;
+}
+
 /** No retries (errors surface at once); gcTime Infinity keeps unobserved data for the whole test. */
 export function createTestQueryClient(): QueryClient {
   return new QueryClient({
@@ -36,10 +48,19 @@ export function createTestQueryClient(): QueryClient {
   });
 }
 
-export function TestProviders({ client, children }: { client: QueryClient; children: React.ReactNode }) {
+export function TestProviders({
+  client,
+  children,
+  messages: bundle = messages,
+}: {
+  client: QueryClient;
+  children: React.ReactNode;
+  /** Message bundle; defaults to every messages/en namespace (see `pseudoMessages`). */
+  messages?: AbstractIntlMessages;
+}) {
   return (
     <QueryClientProvider client={client}>
-      <NextIntlClientProvider locale="en" messages={messages}>
+      <NextIntlClientProvider locale="en" messages={bundle}>
         <ToastProvider>{children}</ToastProvider>
       </NextIntlClientProvider>
     </QueryClientProvider>
@@ -54,10 +75,16 @@ export interface ProvidersRenderResult extends RenderResult {
 /** Render `ui` inside the app providers. `rerender` keeps the same providers + QueryClient. */
 export function renderWithProviders(
   ui: React.ReactElement,
-  { queryClient = createTestQueryClient(), ...options }: { queryClient?: QueryClient } & Omit<RenderOptions, "wrapper"> = {},
+  {
+    queryClient = createTestQueryClient(),
+    messages: bundle,
+    ...options
+  }: { queryClient?: QueryClient; messages?: AbstractIntlMessages } & Omit<RenderOptions, "wrapper"> = {},
 ): ProvidersRenderResult {
   const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <TestProviders client={queryClient}>{children}</TestProviders>
+    <TestProviders client={queryClient} messages={bundle}>
+      {children}
+    </TestProviders>
   );
   const user = userEvent.setup();
   return { ...render(ui, { wrapper, ...options }), queryClient, user };
@@ -66,10 +93,12 @@ export function renderWithProviders(
 /** renderHook inside the same providers; returns the QueryClient for cache assertions. */
 export function renderHookWithProviders<Result, Props>(
   hook: (props: Props) => Result,
-  { queryClient = createTestQueryClient() }: { queryClient?: QueryClient } = {},
+  { queryClient = createTestQueryClient(), messages: bundle }: { queryClient?: QueryClient; messages?: AbstractIntlMessages } = {},
 ) {
   const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <TestProviders client={queryClient}>{children}</TestProviders>
+    <TestProviders client={queryClient} messages={bundle}>
+      {children}
+    </TestProviders>
   );
   return { ...renderHook(hook, { wrapper }), queryClient };
 }

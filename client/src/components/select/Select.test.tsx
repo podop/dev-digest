@@ -182,4 +182,24 @@ describe("Select", () => {
     rerender(<Select value="openai" options={OPTIONS} aria-label="Provider" mono={false} />);
     expect(screen.getByRole("combobox", { name: "Provider" })).not.toHaveClass("mono");
   });
+
+  it("icon renders a decorative glyph on the trigger and before every option; chevron picks the indicator", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Select value="openai" options={OPTIONS} aria-label="Provider" icon="Cpu" chevron="down" />);
+    const combobox = screen.getByRole("combobox", { name: "Provider" });
+    expect(screen.getByTestId("select-trigger-icon")).toHaveAttribute("aria-hidden", "true");
+    expect(combobox.querySelectorAll("svg")).toHaveLength(2); // glyph + single down chevron
+
+    await user.click(combobox);
+    const icons = screen.getAllByTestId("select-option-icon");
+    expect(icons).toHaveLength(OPTIONS.length);
+    expect(screen.getByRole("option", { name: "anthropic" })).toContainElement(icons[1]!);
+    await user.keyboard("{Escape}");
+
+    rerender(<Select value="openai" options={OPTIONS} aria-label="Provider" icon="Calendar" chevron="none" />);
+    expect(combobox.querySelectorAll("svg")).toHaveLength(1); // glyph only
+    rerender(<Select value="openai" options={OPTIONS} aria-label="Provider" />);
+    expect(screen.queryByTestId("select-trigger-icon")).not.toBeInTheDocument();
+    expect(combobox.querySelectorAll("svg")).toHaveLength(1); // default up/down pair
+  });
 });

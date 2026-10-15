@@ -6,6 +6,7 @@
  *  - contracts/brief      Intent, BlastRadius, Risks, PrHistory, SmartDiff, PrBrief
  *  - contracts/knowledge  Conformance, EvalRun/EvalCase, MemoryItem,
  *                         Skill/CommunitySkill, ConventionCandidate, Agent
+ *  - contracts/eval-pipeline  AgentEvalCase, EvalRunSummary, EvalCompare, eval dashboards
  *  - contracts/trace      RunTrace, RunEvent, RunLogLine (single-document trace)
  *  - contracts/platform   Settings, ConnTestResult, Repo, PrMeta/PrDetail, …
  *  - contracts/project-context  ContextDoc, ContextList, ContextAttachments, RunTrace.project_context
@@ -20,6 +21,8 @@
  *                         (re-exported by contracts/project-context)
  *  - constants/onboarding  zod-free Onboarding Tour limits + section ids
  *                         (re-exported by contracts/onboarding)
+ *  - constants/evals      zod-free eval case limits, period presets + trend cap
+ *                         (re-exported by contracts/eval-pipeline)
  *
  * Feature agents (A1–A6) and F2 import everything from here. The barrel is
  * stable — feature agents EXTEND with new files, they do not edit existing ones.
@@ -33,6 +36,7 @@ export * from './contracts/trace.js';
 export * from './contracts/platform.js';
 export * from './contracts/why.js';
 export * from './contracts/eval-ci.js';
+export * from './contracts/eval-pipeline.js';
 export * from './contracts/observability.js';
 export * from './contracts/productionize.js';
 export * from './contracts/project-context.js';

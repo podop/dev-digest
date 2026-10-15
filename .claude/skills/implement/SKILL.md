@@ -1,7 +1,7 @@
 ---
 name: implement
-description: "Workflow (manual): runs the implementation phase of Spec Driven Development for an approved plan — implementer (one pass or waves) → gates → plan-verifier ∥ architecture-reviewer → fix rounds with delta-reviewer until PASS → wrap-up. The spec (specreator) and the plan (implementation-planner) are made separately, before it. Use only when the user types /implement."
-disable-model-invocation: true
+description: "Workflow (manual): runs the implementation phase of Spec Driven Development for an approved plan — implementer (one pass or waves) → gates → plan-verifier ∥ architecture-reviewer → fix rounds with delta-reviewer until PASS → wrap-up. The spec (specreator) and the plan (implementation-planner) are made separately, before it. Use when the user types /implement, or when the user approved a plan in docs/plans/ and asks to implement it. Never start it for an unapproved
+     plan."
 argument-hint: "<docs/plans/<plan>.md> [--notes \"extra requirements\"] [--design <path>…] [--spec <path>] [--opus-review] [--max-rounds N]"
 metadata:
   version: "1.0.0"

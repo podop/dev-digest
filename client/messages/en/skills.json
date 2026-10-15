@@ -147,7 +147,8 @@
       "context": "Context",
       "preview": "Preview",
       "versions": "Versions",
-      "stats": "Stats"
+      "stats": "Stats",
+      "evals": "Evals"
     },
     "unsavedConfirm": "You have unsaved changes to this skill. Leave anyway?",
     "disabled": "disabled"

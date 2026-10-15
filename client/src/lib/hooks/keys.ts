@@ -106,3 +106,37 @@ export const runKeys = {
   all: ["runs"] as const,
   trace: (runId: Id) => [...runKeys.all, runId, "trace"] as const,
 };
+
+/** Eval pipeline (specs/eval-pipeline.md §7). Everything agent-scoped nests under
+ *  `agent(id)`, everything skill-scoped under `skill(id)`, so one prefix invalidation
+ *  refreshes an owner's cases, runs and dashboard. */
+export const evalKeys = {
+  all: ["evals"] as const,
+  agent: (agentId: Id) => [...evalKeys.all, "agent", agentId] as const,
+  /** GET /agents/:id/eval-cases */
+  cases: (agentId: Id) => [...evalKeys.agent(agentId), "cases"] as const,
+  /** GET /agents/:id/eval-runs?limit=&period= — the prefix omits `limit`; `period` follows it. */
+  runs: (agentId: Id, limit?: number, period?: string) =>
+    [
+      ...evalKeys.agent(agentId),
+      "runs",
+      ...(limit === undefined ? [] : [limit]),
+      ...(period === undefined ? [] : [period]),
+    ] as const,
+  /** GET /agents/:id/eval/dashboard?period= — the prefix omits `period`. */
+  dashboard: (agentId: Id, period?: string) =>
+    [...evalKeys.agent(agentId), "dashboard", ...(period === undefined ? [] : [period])] as const,
+  /** Everything skill-scoped: its cases and its runs (a skill's runs never share the agent prefix). */
+  skill: (skillId: Id) => [...evalKeys.all, "skill", skillId] as const,
+  /** GET /skills/:id/eval-cases */
+  skillCases: (skillId: Id) => [...evalKeys.skill(skillId), "cases"] as const,
+  /** GET /skills/:id/eval-runs?limit= — the prefix omits `limit`. */
+  skillRuns: (skillId: Id, limit?: number) =>
+    [...evalKeys.skill(skillId), "runs", ...(limit === undefined ? [] : [limit])] as const,
+  /** GET /eval-runs/:id (run + per-case results). */
+  run: (runId: Id) => [...evalKeys.all, "run", runId] as const,
+  /** GET /eval-runs/compare?a=&b= */
+  compare: (a: Id, b: Id) => [...evalKeys.all, "compare", a, b] as const,
+  /** GET /eval/dashboard (all agents). */
+  overview: () => [...evalKeys.all, "overview"] as const,
+};

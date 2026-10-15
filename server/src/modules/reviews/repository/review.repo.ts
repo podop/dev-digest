@@ -45,10 +45,20 @@ export async function insertFindings(
       })),
     )
     .returning();
-  return rows.map(toFindingRecord);
+  return rows.map((row) => toFindingRecord(row));
 }
 
-/** Reviews for a PR (newest first), each with its findings. */
+/** Eval case created from each given finding (finding id → case id); findings without one are absent. One IN-query. */
+async function evalCaseIdsByFinding(db: DbOrTx, findingIds: string[]): Promise<Map<string, string>> {
+  if (findingIds.length === 0) return new Map();
+  const rows = await db
+    .select({ findingId: t.evalCases.sourceFindingId, caseId: t.evalCases.id })
+    .from(t.evalCases)
+    .where(inArray(t.evalCases.sourceFindingId, findingIds));
+  return new Map(rows.flatMap((r) => (r.findingId ? [[r.findingId, r.caseId] as const] : [])));
+}
+
+/** Reviews for a PR (newest first), each with its findings (and the eval case made from each). */
 export async function reviewsForPull(db: DbOrTx, prId: string): Promise<StoredReview[]> {
   const reviews = await db
     .select()
@@ -58,10 +68,15 @@ export async function reviewsForPull(db: DbOrTx, prId: string): Promise<StoredRe
   if (reviews.length === 0) return [];
   const ids = reviews.map((r) => r.id);
   const findings = await db.select().from(t.findings).where(inArray(t.findings.reviewId, ids));
+  const evalCaseIds = await evalCaseIdsByFinding(
+    db,
+    findings.map((f) => f.id),
+  );
   return reviews.map((review) =>
     toStoredReview(
       review,
       findings.filter((f) => f.reviewId === review.id),
+      evalCaseIds,
     ),
   );
 }
@@ -103,7 +118,7 @@ export async function setFindingAccepted(
     .set({ acceptedAt: at, dismissedAt: null })
     .where(eq(t.findings.id, findingId))
     .returning();
-  return row && toFindingRecord(row);
+  return row && toFindingRecord(row, (await evalCaseIdsByFinding(db, [row.id])).get(row.id) ?? null);
 }
 
 export async function setFindingDismissed(
@@ -116,5 +131,5 @@ export async function setFindingDismissed(
     .set({ dismissedAt: at, acceptedAt: null })
     .where(eq(t.findings.id, findingId))
     .returning();
-  return row && toFindingRecord(row);
+  return row && toFindingRecord(row, (await evalCaseIdsByFinding(db, [row.id])).get(row.id) ?? null);
 }
