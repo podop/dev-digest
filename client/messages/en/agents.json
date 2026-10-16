@@ -2,7 +2,12 @@
   "card": {
     "noDescription": "No description",
     "skillCount": "{count, plural, one {# skill} other {# skills}}",
-    "delete": "Delete agent"
+    "delete": "Delete agent",
+    "runs": "{count, plural, one {# run} other {# runs}}",
+    "accept": "{percent}% accept",
+    "noAccept": "— accept",
+    "avgCost": "{cost} avg",
+    "statsTitle": "Last 30 days · costs are DevDigest estimates"
   },
   "list": {
     "breadcrumbLab": "Skills Lab",

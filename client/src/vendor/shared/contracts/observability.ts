@@ -189,6 +189,47 @@ export const CostSegment = z.object({
 });
 export type CostSegment = z.infer<typeof CostSegment>;
 
+/** A skill / memory that was part of an agent's counted runs; `runs` = counted runs it was in. */
+export const UsageCount = z.object({
+  key: z.string(),
+  label: z.string(),
+  runs: z.number().int(),
+});
+export type UsageCount = z.infer<typeof UsageCount>;
+
+/** Findings of the counted runs whose run started in one equal-width slice of the period. */
+export const SeverityBucket = z.object({
+  /** Slice start (ISO). */
+  from: z.string(),
+  critical: z.number().int(),
+  warning: z.number().int(),
+  suggestion: z.number().int(),
+});
+export type SeverityBucket = z.infer<typeof SeverityBucket>;
+
+export const CategoryCount = z.object({
+  category: z.string(),
+  count: z.number().int(),
+});
+export type CategoryCount = z.infer<typeof CategoryCount>;
+
+/** One counted run of the agent (Stats tab run history), newest first. */
+export const RunHistoryItem = z.object({
+  run_id: z.string(),
+  ran_at: z.string(),
+  status: z.enum(["done", "failed", "cancelled"]),
+  source: z.enum(["local", "ci"]),
+  /** The PR the run reviewed; null when the PR was deleted or the run had none. */
+  pr: z.object({ id: z.string(), repo_id: z.string(), number: z.number().int() }).nullable(),
+  /** tokens_in + tokens_out; null when no usage was recorded (CI runs). */
+  tokens: z.number().int().nullable(),
+  cost_usd: z.number().nullable(),
+  findings_count: z.number().int().nullable(),
+  /** Whether a persisted run trace exists (CI runs have none). */
+  has_trace: z.boolean(),
+});
+export type RunHistoryItem = z.infer<typeof RunHistoryItem>;
+
 /** Response of GET /agents/:id/stats. */
 export const AgentStats = z.object({
   agent_id: z.string(),
@@ -197,7 +238,20 @@ export const AgentStats = z.object({
   min_decisions: z.number().int(),
   cost_basis: z.literal("estimate"),
   metrics: AgentPeriodMetrics,
+  /** The same metrics over the equally long window right before the period (deltas, trend arrows). */
+  previous: AgentPeriodMetrics,
+  /** Counted runs per equal-width slice of the period, oldest first; `label` = slice start (ISO). */
+  runs_trend: z.array(StatPoint),
   cost_by_model: z.array(CostSegment),
+  /** Top skills by counted runs that had them in the prompt, most runs first. */
+  skills_used: z.array(UsageCount),
+  /** Top memories by counted runs that pulled them (run trace), most runs first. */
+  memory_pulled: z.array(UsageCount),
+  findings_by_severity: z.array(SeverityBucket),
+  /** Non-zero categories, most findings first. */
+  findings_by_category: z.array(CategoryCount),
+  /** The newest counted runs of the period (at most 20), newest first. */
+  run_history: z.array(RunHistoryItem),
 });
 export type AgentStats = z.infer<typeof AgentStats>;
 

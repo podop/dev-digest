@@ -34,13 +34,14 @@
   },
   "card": {
     "agents": "{count, plural, =0 {no agents} one {# agent} other {# agents}}",
-    "pull": "pull {value}",
-    "accept": "accept {value}",
+    "pull": "{value} pull",
+    "accept": "{value} accept",
     "noStat": "—",
     "enableLabel": "Enable {name}",
     "sourceTitle": "Imported from {ref}",
     "versionTitle": "Current version v{version}",
-    "deleteLabel": "Delete {name}"
+    "deleteLabel": "Delete {name}",
+    "statsTitle": "Last 30 days"
   },
   "menu": {
     "add": "Add Skill",
@@ -190,21 +191,24 @@
   },
   "stats": {
     "title": "Last {days} days",
-    "pullRate": "Pull rate",
+    "pullRate": "Pull frequency",
     "acceptRate": "Accept rate",
     "findings": "Findings",
     "pullRateHint": "{cited} of {attached} runs with this skill produced a finding citing it.",
     "acceptRateHint": "{accepted} accepted · {dismissed} dismissed",
     "byCategory": "Findings by category",
-    "bySeverity": "Findings by severity",
-    "usedBy": "Used by",
+    "usedBy": "Agents using this skill",
     "none": "None yet.",
     "notUsed": "No agent links this skill.",
     "loadError": "Could not load the stats.",
     "empty": {
       "title": "No stats yet",
       "body": "Stats accumulate from review runs. Link this skill to an agent and run a review."
-    }
+    },
+    "usedByCard": "Used by",
+    "agentsUnit": " {count, plural, one {agent} other {agents}}",
+    "findingsDays": "Findings ({days}d)",
+    "open": "Open"
   },
   "context": {
     "noRepoTitle": "No repository selected",

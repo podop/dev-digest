@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Severity } from './findings.js';
-import { AgentPeriodMetrics, CostSegment, PeriodInfo } from './observability.js';
+import { AgentPeriodMetrics, CostSegment, PeriodInfo, StatPoint } from './observability.js';
 
 /**
  * A6 — Productionize contracts (L08).
@@ -141,33 +141,45 @@ export const AgentPerfRow = z.object({
   agent_id: z.string().nullable(),
   agent_name: z.string(),
   metrics: AgentPeriodMetrics,
+  /** The same metrics over the equally long window right before the period. */
+  previous: AgentPeriodMetrics,
+  /** Counted runs per equal-width slice of the period, oldest first; `label` = slice start (ISO). */
+  runs_trend: z.array(StatPoint),
 });
 export type AgentPerfRow = z.infer<typeof AgentPerfRow>;
+
+/** Cross-agent totals of one window (FR6). */
+export const PerfSummary = z.object({
+  runs: z.number().int(),
+  priced_runs: z.number().int(),
+  unpriced_runs: z.number().int(),
+  accepted: z.number().int(),
+  dismissed: z.number().int(),
+  pending: z.number().int(),
+  decisions: z.number().int(),
+  total_cost_usd: z.number().nullable(),
+  /** pooled: Σaccepted / Σdecisions; null when Σdecisions = 0. */
+  avg_accept_rate: z.number().nullable(),
+  most_active: z
+    .object({
+      agent_id: z.string(),
+      agent_name: z.string(),
+      runs: z.number().int(),
+    })
+    .nullable(),
+});
+export type PerfSummary = z.infer<typeof PerfSummary>;
 
 /** Response of GET /agents/performance. */
 export const AgentPerf = z.object({
   period: PeriodInfo,
   min_decisions: z.number().int(),
   cost_basis: z.literal("estimate"),
-  summary: z.object({
-    runs: z.number().int(),
-    priced_runs: z.number().int(),
-    unpriced_runs: z.number().int(),
-    accepted: z.number().int(),
-    dismissed: z.number().int(),
-    pending: z.number().int(),
-    decisions: z.number().int(),
-    total_cost_usd: z.number().nullable(),
-    /** pooled: Σaccepted / Σdecisions; null when Σdecisions = 0. */
-    avg_accept_rate: z.number().nullable(),
-    most_active: z
-      .object({
-        agent_id: z.string(),
-        agent_name: z.string(),
-        runs: z.number().int(),
-      })
-      .nullable(),
-  }),
+  summary: PerfSummary,
+  /** The same totals over the equally long window right before the period. */
+  previous_summary: PerfSummary,
+  /** Counted runs of all agents per equal-width slice of the period, oldest first. */
+  runs_trend: z.array(StatPoint),
   agents: z.array(AgentPerfRow),
   cost_by_agent: z.array(CostSegment),
   cost_by_model: z.array(CostSegment),

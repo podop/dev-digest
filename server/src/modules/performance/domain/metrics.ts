@@ -5,6 +5,9 @@
  */
 import type { AgentPerf, AgentPerfRow, AgentPeriodMetrics, CostSegment } from '@devdigest/shared';
 import { DELETED_AGENTS_NAME, MIN_DECISIONS, MONEY_DECIMALS } from './constants.js';
+import { byName } from './order.js';
+import type { PeriodWindow } from './period.js';
+import { runsTrend } from './trends.js';
 
 /** One counted run (done/failed/cancelled, local/ci) inside the window. */
 export interface RunFact {
@@ -38,10 +41,7 @@ export function roundMoney(n: number): number {
   return Math.round(n * MONEY_FACTOR) / MONEY_FACTOR;
 }
 
-/** Name ascending in code-unit order (a DB collation would ignore dashes). */
-export function byName(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
-}
+export { byName };
 
 /** Key order for null-able keys: ascending, null last. */
 function byKey(a: string | null, b: string | null): number {
@@ -114,16 +114,28 @@ export function agentMetrics(
   };
 }
 
-/** The one row builder behind both endpoints; `agent` null = deleted agents. */
+/** One agent's facts in one window. */
+export interface WindowFacts {
+  runs: RunFact[];
+  findings: FindingCounts | undefined;
+}
+
+/**
+ * The one row builder behind both endpoints; `agent` null = deleted agents.
+ * `previous` = the same agent's facts in the window right before `win`.
+ */
 export function buildRow(
   agent: AgentRef | null,
-  runs: RunFact[],
-  findings: FindingCounts | undefined,
+  current: WindowFacts,
+  previous: WindowFacts,
+  win: PeriodWindow,
 ): AgentPerfRow {
   return {
     agent_id: agent?.id ?? null,
     agent_name: agent?.name ?? DELETED_AGENTS_NAME,
-    metrics: agentMetrics(runs, findings),
+    metrics: agentMetrics(current.runs, current.findings),
+    previous: agentMetrics(previous.runs, previous.findings),
+    runs_trend: runsTrend(current.runs, win),
   };
 }
 

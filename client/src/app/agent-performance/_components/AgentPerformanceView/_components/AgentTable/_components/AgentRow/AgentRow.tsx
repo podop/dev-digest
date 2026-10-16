@@ -1,13 +1,15 @@
 /* AgentRow — one agent of the table plus its expandable detail row (FR13, FR15, FR16). The agent
    name is a real <button aria-expanded> (the keyboard toggle); a click anywhere else on the row
-   toggles too, except on links and buttons. Null values render "—", never 0. */
+   toggles too, except on links and buttons. The accept rate carries ↑/↓ against the previous
+   window; the detail row adds the agent's runs sparkline (mockup N11). Null values render "—". */
 "use client";
 
 import React from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { AgentPerfRow } from "@devdigest/shared";
-import { AcceptRateText, RunBreakdown, formatDurationS } from "@/components/agent-metrics";
+import { Sparkline } from "@devdigest/ui";
+import { AcceptRateText, AgentGlyph, RunBreakdown, formatDurationS } from "@/components/agent-metrics";
 import { CostText } from "@/components/cost-text";
 import { agentStatsHref, type StatsPeriod } from "@/lib/stats-period";
 import { formatLastRun } from "../../../../helpers";
@@ -47,6 +49,7 @@ export function AgentRow({ row, period, minDecisions, open, onToggle }: AgentRow
             <span aria-hidden style={s.chevron}>
               {open ? "▾" : "▸"}
             </span>
+            <AgentGlyph muted={deleted} />
             <span style={s.name} title={name}>
               {name}
             </span>
@@ -62,7 +65,13 @@ export function AgentRow({ row, period, minDecisions, open, onToggle }: AgentRow
           {seconds == null ? dash : t("metrics.seconds", { value: seconds })}
         </td>
         <td style={cell}>
-          <AcceptRateText rate={m.accept_rate} decisions={m.decisions} smallSample={m.small_sample} minDecisions={minDecisions} />
+          <AcceptRateText
+            rate={m.accept_rate}
+            decisions={m.decisions}
+            smallSample={m.small_sample}
+            minDecisions={minDecisions}
+            previousRate={row.previous.accept_rate}
+          />
         </td>
         <td className="tnum" style={cell}>
           {lastRun ?? dash}
@@ -80,6 +89,12 @@ export function AgentRow({ row, period, minDecisions, open, onToggle }: AgentRow
       {open && (
         <tr>
           <td colSpan={COLUMNS} style={s.detail}>
+            {m.runs > 0 && (
+              <div style={s.trend} data-testid="row-runs-trend">
+                <Sparkline data={row.runs_trend.map((p) => p.value)} color="var(--accent)" w={160} h={34} />
+                <span style={s.trendCaption}>{t("dashboard.table.runsOverPeriod")}</span>
+              </div>
+            )}
             <RunBreakdown metrics={m} />
           </td>
         </tr>

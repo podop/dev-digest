@@ -55,15 +55,4 @@ export const s = {
     overflow: "hidden",
   } satisfies CSSProperties,
   meta: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } satisfies CSSProperties,
-  footer: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    paddingTop: 10,
-    borderTop: "1px solid var(--border)",
-    fontSize: 12,
-    color: "var(--text-muted)",
-  } satisfies CSSProperties,
-  footerItem: { display: "inline-flex", alignItems: "center", gap: 5 } satisfies CSSProperties,
-  stats: { marginLeft: "auto" } satisfies CSSProperties,
 } as const;
