@@ -1,32 +1,110 @@
 {
   "title": "Agent Performance",
-  "subtitle": "Accept-rate is the headline quality signal · cost shown as a breakdown",
+  "dashboard": {
+    "metaTitle": "Agent Performance",
+    "crumb": "Agent Performance",
+    "subtitle": "Which agents earn their keep — accept rate is the quality signal",
+    "loading": "Loading agent performance",
+    "periodPhrase": {
+      "1d": "the last 24 hours",
+      "30d": "the last 30 days"
+    },
+    "inPeriod": "in {period}",
+    "noAgentsTitle": "No agents yet",
+    "noAgentsBody": "Create an agent and run a review to see how it performs.",
+    "noAgentsCta": "Go to Agents",
+    "noRunsTitle": "No runs in {period}",
+    "noRunsBody": "Pick a longer period or run a review",
+    "costBreakdown": "Cost breakdown",
+    "cards": {
+      "totalRuns": "Total runs",
+      "totalCost": "Total cost",
+      "avgAccept": "Avg accept rate",
+      "mostActive": "Most active agent",
+      "runsCount": "{count, plural, one {# run} other {# runs}}"
+    },
+    "table": {
+      "label": "Agents",
+      "columns": {
+        "agent": "Agent",
+        "runs": "Runs",
+        "avg_cost": "Avg cost (est.)",
+        "avg_duration": "Avg duration",
+        "accept_rate": "Accept rate",
+        "last_run": "Last run"
+      },
+      "view": "View",
+      "viewAgent": "View stats of {name}"
+    }
+  },
   "loadError": "Could not load agent performance.",
-  "summary": {
-    "totalRuns": "Total runs",
-    "avgAcceptRate": "Avg accept-rate",
-    "totalCost": "Total cost",
-    "mostActive": "Most active"
+  "period": {
+    "label": "Period",
+    "last24h": "Last 24 hours",
+    "last30d": "Last 30 days",
+    "custom": "Custom range…",
+    "startDate": "Start date",
+    "endDate": "End date",
+    "apply": "Apply",
+    "errors": {
+      "invalid": "Enter a valid start and end date",
+      "endBeforeStart": "End date must be on or after start date",
+      "tooLong": "Range can be at most 366 days",
+      "startInFuture": "Start date cannot be in the future"
+    }
   },
-  "costByAgent": "Cost by agent",
-  "costByModel": "Cost by model",
-  "noCost": "No cost recorded yet.",
-  "sort": {
-    "acceptRate": "accept-rate",
-    "runs": "runs",
-    "cost": "cost"
-  },
-  "table": {
-    "agent": "Agent",
-    "accept": "Accept",
+  "metrics": {
     "runs": "Runs",
-    "findings": "Findings",
-    "cost": "Cost",
-    "trend": "Trend"
+    "totalCost": "Total cost (est.)",
+    "avgCost": "Avg cost (est.)",
+    "avgDuration": "Avg duration",
+    "acceptRate": "Accept rate",
+    "noValue": "—",
+    "seconds": "{value} s",
+    "percent": "{value}%",
+    "acceptOf": "{percent}% of {decisions}",
+    "noDecisions": "0 decisions",
+    "smallSample": "small sample",
+    "smallSampleHint": "fewer than {min} decisions",
+    "failedOrCancelled": "{count} failed or cancelled",
+    "unpriced": "{count, plural, one {# run without a cost estimate} other {# runs without a cost estimate}}",
+    "estimateLabel": "DevDigest estimate",
+    "acceptedOfDecisions": "{accepted} accepted of {decisions} decisions · {pending} pending"
   },
-  "empty": {
-    "title": "No agent runs yet",
-    "body": "Run a review (manually) to populate per-agent performance."
+  "breakdown": {
+    "byStatus": "By status",
+    "done": "Done",
+    "failed": "Failed",
+    "cancelled": "Cancelled",
+    "bySource": "By source",
+    "local": "Local",
+    "ci": "CI",
+    "decisions": "Decisions",
+    "accepted": "Accepted",
+    "dismissed": "Dismissed",
+    "pending": "Pending",
+    "costEstimates": "Cost estimates",
+    "priced": "Priced runs",
+    "unpriced": "Unpriced runs",
+    "noRuns": "No runs in this period",
+    "byAgent": "By agent",
+    "byModel": "By model",
+    "deletedAgents": "Deleted agents",
+    "unknownModel": "Unknown model",
+    "noCost": "No cost estimate recorded in this period",
+    "share": "{percent}%",
+    "estimateNote": "All costs are DevDigest estimates recorded per run (provider-reported or price-book). Reconciled billing data is not stored."
   },
-  "perAgent": "Per-agent"
+  "statsTab": {
+    "loading": "Loading agent stats",
+    "loadError": "Could not load stats.",
+    "periodPhrase": {
+      "1d": "the last 24 hours",
+      "30d": "the last 30 days"
+    },
+    "noRunsTitle": "No runs in {period}",
+    "noRunsBody": "Pick a longer period or run a review",
+    "cardsLabel": "Agent stats",
+    "runBreakdown": "Run breakdown"
+  }
 }

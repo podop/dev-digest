@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Severity } from './findings.js';
+import { AgentPeriodMetrics, CostSegment, PeriodInfo } from './observability.js';
 
 /**
  * A6 — Productionize contracts (L08).
@@ -135,53 +136,41 @@ export type PluginImportResult = z.infer<typeof PluginImportResult>;
 // Agent Performance  (GET /agents/performance)
 // ---------------------------------------------------------------------------
 
-/** Per-agent performance row (aggregate across agent_runs + findings). */
+/** One dashboard row; `agent_id` null = the "Deleted agents" row. */
 export const AgentPerfRow = z.object({
-  agent_id: z.string(),
+  agent_id: z.string().nullable(),
   agent_name: z.string(),
-  provider: z.string().nullable(),
-  model: z.string().nullable(),
-  runs: z.number().int(),
-  findings_total: z.number().int(),
-  accepted: z.number().int(),
-  dismissed: z.number().int(),
-  /** headline quality signal: accepted / (accepted + dismissed), 0..1 or null. */
-  accept_rate: z.number().nullable(),
-  dismiss_rate: z.number().nullable(),
-  avg_findings_per_run: z.number().nullable(),
-  total_cost_usd: z.number().nullable(),
-  avg_cost_usd: z.number().nullable(),
-  avg_latency_ms: z.number().nullable(),
-  last_run_at: z.string().nullable(),
-  findings_by_severity: z.object({
-    CRITICAL: z.number().int(),
-    WARNING: z.number().int(),
-    SUGGESTION: z.number().int(),
-  }),
-  /** recent findings-per-run trend (oldest→newest) for the sparkline. */
-  trend: z.array(z.number()),
+  metrics: AgentPeriodMetrics,
 });
 export type AgentPerfRow = z.infer<typeof AgentPerfRow>;
 
-/** A donut segment {label,value,color}. */
-export const PerfCostSegment = z.object({
-  label: z.string(),
-  value: z.number(),
-});
-export type PerfCostSegment = z.infer<typeof PerfCostSegment>;
-
 /** Response of GET /agents/performance. */
 export const AgentPerf = z.object({
+  period: PeriodInfo,
+  min_decisions: z.number().int(),
+  cost_basis: z.literal("estimate"),
   summary: z.object({
     runs: z.number().int(),
+    priced_runs: z.number().int(),
+    unpriced_runs: z.number().int(),
+    accepted: z.number().int(),
+    dismissed: z.number().int(),
+    pending: z.number().int(),
+    decisions: z.number().int(),
     total_cost_usd: z.number().nullable(),
+    /** pooled: Σaccepted / Σdecisions; null when Σdecisions = 0. */
     avg_accept_rate: z.number().nullable(),
-    most_active_agent: z.string().nullable(),
+    most_active: z
+      .object({
+        agent_id: z.string(),
+        agent_name: z.string(),
+        runs: z.number().int(),
+      })
+      .nullable(),
   }),
   agents: z.array(AgentPerfRow),
-  /** cost split by agent and by model (for the two cost-breakdown donuts). */
-  cost_by_agent: z.array(PerfCostSegment),
-  cost_by_model: z.array(PerfCostSegment),
+  cost_by_agent: z.array(CostSegment),
+  cost_by_model: z.array(CostSegment),
 });
 export type AgentPerf = z.infer<typeof AgentPerf>;
 

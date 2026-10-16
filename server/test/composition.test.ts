@@ -27,6 +27,7 @@ describe('Container composition root', () => {
       'evals',
       'intent',
       'onboarding',
+      'performance',
       'polling',
       'projectContext',
       'pulls',

@@ -54,6 +54,7 @@ Reviewed monthly: stale entries are removed in a dedicated commit.
 
 ## Tool & Library Notes
 <!-- dependency quirks, versions, flags -->
+- 2026-10-16 — src/vendor/ui/kit/FormField.tsx:19: FormField renders its label as a sibling <label> with no htmlFor and does not wrap children, so the control inside gets NO accessible name (getByLabelText finds nothing) → wrap the control in your own <label> or pass aria-label (TextInput spreads ...rest onto <input>, so type='date' and aria-* go through)
 - 2026-10-15 — Biome a11y (lint --error-on-warnings) on CiTab ExportWizard: a <label> wrapping the vendored @devdigest/ui Textarea fails noLabelWithoutControl, and tabIndex on a <pre> fails noNoninteractiveTabindex → for a labelled or focusable, scrollable read-only text block use a native <textarea readOnly aria-label=…> ⚠ conflicts with 2026-10-15 entry (Textarea: name it with a wrapping <label>)
 - 2026-10-15 — @devdigest/ui Textarea accepts only value/onChange/placeholder/rows/mono (no id, aria-*, maxLength), while TextInput spreads ...rest → name a Textarea with a wrapping <label> (and query it by that label in tests); don't try to pass aria-label/id through it
 - 2026-10-15 — src/components/select (useSelectListbox): an open Select consumes Escape with preventDefault → a dialog's own document keydown Escape handler (needed per the Modal-has-no-Escape entry) must return early on e.defaultPrevented, or one Escape closes both the list and the whole dialog (EvalCaseEditor test 'does not close the editor when Escape only closes an open Select')

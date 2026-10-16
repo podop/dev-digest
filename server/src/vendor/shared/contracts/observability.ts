@@ -135,28 +135,69 @@ export type AgentRunEstimate = z.infer<typeof AgentRunEstimate>;
 export const StatPoint = z.object({ label: z.string(), value: z.number() });
 export type StatPoint = z.infer<typeof StatPoint>;
 
-export const AgentStats = z.object({
-  agent_id: z.string(),
-  agent_name: z.string(),
+/** The resolved reporting window echoed by the stats/performance endpoints. */
+export const PeriodInfo = z.object({
+  key: z.enum(["1d", "30d", "custom"]),
+  from: z.string(),
+  to: z.string(),
+});
+export type PeriodInfo = z.infer<typeof PeriodInfo>;
+
+/**
+ * Per-agent metrics over the counted runs of a period (done/failed/cancelled,
+ * source local/ci). Returned identically by GET /agents/:id/stats and as a row
+ * of GET /agents/performance. Costs are DevDigest estimates, rounded to 6 dp.
+ * Invariants: runs = runs_done + runs_failed + runs_cancelled = runs_local +
+ * runs_ci = priced_runs + unpriced_runs; findings_total = accepted + dismissed
+ * + pending.
+ */
+export const AgentPeriodMetrics = z.object({
   runs: z.number().int(),
+  runs_done: z.number().int(),
+  runs_failed: z.number().int(),
+  runs_cancelled: z.number().int(),
+  runs_local: z.number().int(),
+  runs_ci: z.number().int(),
+  priced_runs: z.number().int(),
+  unpriced_runs: z.number().int(),
+  total_cost_usd: z.number().nullable(),
+  avg_cost_usd: z.number().nullable(),
+  avg_duration_ms: z.number().int().nullable(),
+  last_run_at: z.string().nullable(),
   findings_total: z.number().int(),
-  /** accept-rate is the headline quality signal. 0..1 over acted findings. */
   accepted: z.number().int(),
   dismissed: z.number().int(),
   pending: z.number().int(),
-  accept_rate: z.number().nullable(),
-  dismiss_rate: z.number().nullable(),
-  avg_findings_per_run: z.number().nullable(),
-  total_cost_usd: z.number().nullable(),
-  avg_cost_usd: z.number().nullable(),
-  avg_latency_ms: z.number().nullable(),
-  findings_by_severity: z.object({
-    CRITICAL: z.number().int(),
-    WARNING: z.number().int(),
-    SUGGESTION: z.number().int(),
-  }),
-  /** recent runs for a small trend chart (oldest→newest). */
-  trend: z.array(StatPoint),
+  decisions: z.number().int(),
+  /** accepted / decisions, 0..1; null when decisions = 0. */
+  accept_rate: z.number().min(0).max(1).nullable(),
+  /** true when 0 < decisions < min_decisions. */
+  small_sample: z.boolean(),
+});
+export type AgentPeriodMetrics = z.infer<typeof AgentPeriodMetrics>;
+
+/**
+ * A cost-breakdown segment. `key` is the agent id / model id (null = deleted
+ * agents / unknown model); `label` is the agent name / model id (null likewise,
+ * the client supplies the wording). `runs` = priced runs in the segment.
+ */
+export const CostSegment = z.object({
+  key: z.string().nullable(),
+  label: z.string().nullable(),
+  value: z.number().positive(),
+  runs: z.number().int(),
+});
+export type CostSegment = z.infer<typeof CostSegment>;
+
+/** Response of GET /agents/:id/stats. */
+export const AgentStats = z.object({
+  agent_id: z.string(),
+  agent_name: z.string(),
+  period: PeriodInfo,
+  min_decisions: z.number().int(),
+  cost_basis: z.literal("estimate"),
+  metrics: AgentPeriodMetrics,
+  cost_by_model: z.array(CostSegment),
 });
 export type AgentStats = z.infer<typeof AgentStats>;
 

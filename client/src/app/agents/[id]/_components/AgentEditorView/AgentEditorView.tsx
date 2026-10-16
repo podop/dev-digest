@@ -1,5 +1,5 @@
 /* AgentEditorView — /agents/:id screen: left agent list + the editor for the
-   selected agent. The active tab comes from ?tab= (resolved by the route). */
+   selected agent. The active tab and the Stats tab period come from the URL (resolved by the route). */
 "use client";
 
 import React from "react";
@@ -9,12 +9,13 @@ import { Button, Dropdown, ErrorState, Skeleton, Icon, Badge } from "@devdigest/
 import { AppShell } from "@/components/app-shell";
 import { useAgents, useAgent, useUpdateAgent } from "@/lib/hooks";
 import { ApiError } from "@/lib/api";
+import type { StatsPeriod } from "@/lib/stats-period";
 import { AgentCard } from "../../../_components/AgentCard";
 import { AgentEditor } from "../AgentEditor";
 import { agentHref } from "./helpers";
 import { s } from "./styles";
 
-export function AgentEditorView({ id, tab }: { id: string; tab: string }) {
+export function AgentEditorView({ id, tab, period }: { id: string; tab: string; period: StatsPeriod }) {
   const t = useTranslations("agents");
   const tc = useTranslations("common");
   const router = useRouter();
@@ -96,7 +97,7 @@ export function AgentEditorView({ id, tab }: { id: string; tab: string }) {
               </div>
             </div>
             <div style={s.editorScroll}>
-              <AgentEditor agent={agent} tab={tab} onTab={setTab} />
+              <AgentEditor agent={agent} tab={tab} onTab={setTab} period={period} />
             </div>
           </div>
         )}

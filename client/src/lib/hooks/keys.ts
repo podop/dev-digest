@@ -167,3 +167,13 @@ export const ciKeys = {
   exportFiles: (agentId: Id, repo: Id, triggers: readonly string[], postAs: Id) =>
     [...ciKeys.all, "export-files", agentId, repo, [...triggers].sort().join(","), postAs] as const,
 };
+
+/** Agent performance (specs/2026-10-16-agent-performance.md §7). `period` is the URL period
+ *  (`periodSearch(...)`), so each period is its own cache entry. */
+export const performanceKeys = {
+  all: ["performance"] as const,
+  /** GET /agents/performance?period=… */
+  dashboard: (period: string) => [...performanceKeys.all, "dashboard", period] as const,
+  /** GET /agents/:id/stats?period=… */
+  agentStats: (agentId: Id, period: string) => [...performanceKeys.all, "agent", agentId, period] as const,
+};
