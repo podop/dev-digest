@@ -93,6 +93,7 @@ flowchart TB
   end
   subgraph Agents["Agents & skills"]
     agents["agents<br/>/agents · /agents/:id · /agents/:id/skills"]
+    performance["performance<br/>/agents/performance · /agents/:id/stats"]
     skills["skills<br/>/skills · /skills/:id · /skills/stats · /skills/community<br/>/skills/import/preview · /skills/:id/(versions|agents|stats)"]
     conventions["conventions<br/>/repos/:id/conventions · /extract · /skill<br/>/conventions/:id"]
   end
@@ -155,6 +156,15 @@ The model (Settings → Feature models → `conventions`) only proposes rules. C
 the sample (configs + repo-intel top 12, or a walk of the clone) and checks every
 cited line against the clone. A rule without verified evidence is dropped and listed in
 `scan.dropped`. `LLM_PROVIDER_OVERRIDE=mock` gives a key-free scan.
+
+### Agent performance (`modules/performance`, spec [`../specs/2026-10-16-agent-performance.md`](../specs/2026-10-16-agent-performance.md))
+| Method | Path | Result |
+|---|---|---|
+| GET | `/agents/performance?period=&from=&to=` | `AgentPerf`: a row per agent (0 runs too) + a "deleted agents" row, pooled summary, `cost_by_agent` / `cost_by_model`. `period` = `1d` (last 24 h) · `30d` (default, last 720 h) · `custom` (`from`/`to` ISO instants with offset, `[from, to)`, ≤ 366 days); anything else 422 `validation_error` |
+| GET | `/agents/:id/stats?period=&from=&to=` | `AgentStats`: the same `metrics` as that agent's dashboard row + `cost_by_model`; 404 for an unknown or other workspace's agent |
+
+Read-only: no LLM call, job or write. Counted runs = `agent_runs` in the window with status
+`done`/`failed`/`cancelled` (local and CI); costs are DevDigest estimates.
 
 ### Export to CI (`modules/ci`, spec [`../specs/export-to-ci.md`](../specs/export-to-ci.md), module notes [`src/modules/ci/README.md`](src/modules/ci/README.md), flow [`../docs/export-to-ci.md`](../docs/export-to-ci.md))
 

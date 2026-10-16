@@ -6,6 +6,7 @@ import { buildConventionsModule } from './conventions/composition.js';
 import { buildEvalsModule } from './evals/composition.js';
 import { buildIntentModule } from './intent/composition.js';
 import { buildOnboardingModule } from './onboarding/composition.js';
+import { buildPerformanceModule } from './performance/composition.js';
 import { buildPollingModule } from './polling/composition.js';
 import { buildProjectContextModule } from './project-context/composition.js';
 import { buildPullsModule } from './pulls/composition.js';
@@ -46,4 +47,5 @@ export const moduleFactories = {
   brief: buildBriefModule,
   evals: buildEvalsModule,
   ci: buildCiModule,
+  performance: buildPerformanceModule,
 };

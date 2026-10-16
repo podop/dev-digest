@@ -28,8 +28,9 @@ flowchart TD
   ONB["/onboarding<br/>add repo"] -->|"POST /repos"| API[("Fastify API")]
   PULLS --> PR["/pulls/:number<br/>review detail<br/>(overview · diff · findings)"]
 
-  AGENTS["/agents"] --> AGENT["/agents/:id<br/>editor (config · skills · evals · CI)"]
+  AGENTS["/agents"] --> AGENT["/agents/:id<br/>editor (config · skills · context · evals · stats · CI)"]
   CIRUNS["/ci-runs<br/>CI runs + Refresh"]
+  PERF["/agent-performance<br/>agents compared for a period · ?period= · ?sort="]
   SKILLS["/skills<br/>grid"] --> SKILL["/skills/:id<br/>list sidebar + editor (config · preview · versions · stats · evals)"]
   CONV["/repos/:repoId/conventions<br/>rules + create-skill modal"]
   CTX["/repos/:repoId/context<br/>spec / doc / insight markdown, view-only"]
@@ -48,8 +49,9 @@ flowchart TD
   CTX -->|"/repos/:id/context · /repos/:id/context/doc?path="| API
   TOUR -->|"GET · POST /repos/:id/onboarding · /repos/:id/index-state"| API
   EVAL -->|"GET /eval/dashboard · /agents/:id/eval/dashboard · /agents/:id/eval-runs · /eval-runs/:id · /eval-runs/compare<br/>POST /agents/:id/eval-runs · /eval-runs/run-all"| API
-  AGENT -->|"CI tab: /agents/:id/ci-installations · /ci/runs · POST /ci/refresh · POST /agents/:id/export-ci"| API
+  AGENT -->|"CI tab: /agents/:id/ci-installations · /ci/runs · POST /ci/refresh · POST /agents/:id/export-ci<br/>Stats tab: GET /agents/:id/stats?period="| API
   CIRUNS -->|"GET /ci/runs · POST /ci/refresh"| API
+  PERF -->|"GET /agents/performance?period="| API
   MA -->|"GET /repos/:id/multi-agent-runs"| API
   MANEW -->|"GET /runs/estimates<br/>POST /pulls/:id/review {agentIds}"| API
   MARUN -->|"GET /multi-agent-runs/:id<br/>POST /findings/:id/(accept|dismiss|learn)"| API
