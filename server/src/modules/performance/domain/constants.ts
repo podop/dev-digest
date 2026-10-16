@@ -21,3 +21,15 @@ export const DELETED_AGENTS_NAME = 'Deleted agents';
 /** Run statuses that are counted (a `running` run has no final cost or duration). */
 export const COUNTED_STATUSES = ['done', 'failed', 'cancelled'] as const;
 export const COUNTED_SOURCES = ['local', 'ci'] as const;
+
+/** Slices of the findings-by-severity chart (equal width over the period). */
+export const SEVERITY_SLICES = 6;
+
+/** Rows of the most-used skills / most-pulled memory lists. */
+export const TOP_USAGE = 5;
+
+/** Periods up to this long trend per hour, longer ones per day. */
+export const HOURLY_TREND_MAX_HOURS = 48;
+
+/** Rows of the Stats tab run history (newest counted runs of the period). */
+export const RUN_HISTORY_LIMIT = 20;

@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button, Dropdown, EmptyState, ErrorState, Skeleton, Icon } from "@devdigest/ui";
 import { AppShell } from "@/components/app-shell";
-import { useAgents, useUpdateAgent } from "@/lib/hooks";
+import { useAgentCardMetrics, useAgents, useUpdateAgent } from "@/lib/hooks";
 import { AgentCard } from "../AgentCard";
 import { CreateAgentModal } from "./_components/CreateAgentModal";
 import { TEMPLATES } from "./constants";
@@ -19,6 +19,7 @@ export function AgentsListView() {
   const tc = useTranslations("common");
   const router = useRouter();
   const { data: agents, isLoading, isError, refetch } = useAgents();
+  const metrics = useAgentCardMetrics();
   const update = useUpdateAgent();
   const [creating, setCreating] = React.useState(false);
   const [search, setSearch] = React.useState("");
@@ -94,6 +95,7 @@ export function AgentsListView() {
               <AgentCard
                 key={a.id}
                 ag={a}
+                metrics={metrics.get(a.id)}
                 onClick={() => router.push(`/agents/${a.id}?tab=config`)}
                 onToggle={(enabled) => update.mutate({ id: a.id, patch: { enabled } })}
               />

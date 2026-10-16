@@ -1,12 +1,17 @@
 /* AgentCard — model chip, linked-skills count, enabled toggle. The count comes
    from the agent's own links query (useAgentSkillLinks), shared with the
-   Skills tab cache. Delete opens DeleteAgentModal. Stats are an A5 mount. */
+   Skills tab cache. Delete opens DeleteAgentModal. The footer shows the agent's
+   last-30-days runs · accept rate · avg cost (its Agent Performance row, passed
+   in by the list) once those are loaded. */
 "use client";
 
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Icon, Badge, IconBtn, Toggle } from "@devdigest/ui";
-import type { Agent } from "@devdigest/shared";
+import type { Agent, AgentPeriodMetrics } from "@devdigest/shared";
+import { acceptRateColor, formatPercent } from "@/components/agent-metrics";
+import { CardStats } from "@/components/card-stats";
+import { formatUsd } from "@/lib/format-usage";
 import { useAgentSkillLinks } from "@/lib/hooks";
 import { DeleteAgentModal } from "../DeleteAgentModal";
 import { modelColor } from "./helpers";
@@ -17,8 +22,11 @@ export function AgentCard({
   active,
   onClick,
   onToggle,
+  metrics,
 }: {
   ag: Agent;
+  /** The agent's last-30-days metrics; omitted while loading (no footer). */
+  metrics?: AgentPeriodMetrics;
   active?: boolean;
   onClick?: () => void;
   onToggle?: (enabled: boolean) => void;
@@ -27,6 +35,7 @@ export function AgentCard({
   const [deleting, setDeleting] = React.useState(false);
   const skillCount = useAgentSkillLinks(ag.id).data?.length;
   const color = modelColor(ag.model);
+  const percent = formatPercent(metrics?.accept_rate);
   return (
     <>
       <div onClick={onClick} style={s.card(!!active, ag.enabled)}>
@@ -56,6 +65,22 @@ export function AgentCard({
             </Badge>
           )}
         </div>
+        {metrics && (
+          <CardStats
+            title={t("card.statsTitle")}
+            items={[
+              { key: "runs", text: t("card.runs", { count: metrics.runs }) },
+              {
+                key: "accept",
+                text: percent == null ? t("card.noAccept") : t("card.accept", { percent }),
+                color: acceptRateColor(metrics.accept_rate),
+              },
+              ...(metrics.avg_cost_usd == null
+                ? []
+                : [{ key: "cost", text: t("card.avgCost", { cost: formatUsd(metrics.avg_cost_usd) }), mono: true }]),
+            ]}
+          />
+        )}
       </div>
       {deleting && <DeleteAgentModal agent={ag} onClose={() => setDeleting(false)} onDeleted={() => setDeleting(false)} />}
     </>

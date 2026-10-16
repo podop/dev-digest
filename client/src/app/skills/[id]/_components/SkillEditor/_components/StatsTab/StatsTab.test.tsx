@@ -1,4 +1,4 @@
-/* StatsTab — metrics once the skill ran, and "Used by" in both states: before
+/* StatsTab — metrics once the skill ran, and the agents using it in both states: before
    the first run it is the only place the editor lists the linking agents. */
 import { describe, it, expect, afterEach } from "vitest";
 import { renderWithProviders, screen, cleanup } from "@/test/render";
@@ -23,7 +23,8 @@ describe("StatsTab", () => {
       "GET /skills/sk1/stats": makeStats({ runs_attached: 4, runs_cited: 2, pull_rate: 0.5, findings: 3, used_by: USED_BY }),
     });
     renderWithProviders(<StatsTab skillId="sk1" />);
-    expect(await screen.findByText("50%")).toBeInTheDocument();
+    expect(await screen.findByRole("group", { name: "Pull frequency" })).toHaveTextContent("50%");
+    expect(screen.getByRole("group", { name: "Used by" })).toHaveTextContent("1 agent");
     expect(screen.queryByText("No stats yet")).toBeNull();
     expect(screen.getByRole("link", { name: "Security Reviewer" })).toBeInTheDocument();
   });
@@ -32,7 +33,7 @@ describe("StatsTab", () => {
     mockFetch({ "GET /skills/sk1/stats": makeStats() });
     renderWithProviders(<StatsTab skillId="sk1" />);
     expect(await screen.findByText("No stats yet")).toBeInTheDocument();
-    expect(screen.getByText("Used by")).toBeInTheDocument();
+    expect(screen.getByText("Agents using this skill")).toBeInTheDocument();
     expect(screen.queryByRole("link")).toBeNull();
   });
 });

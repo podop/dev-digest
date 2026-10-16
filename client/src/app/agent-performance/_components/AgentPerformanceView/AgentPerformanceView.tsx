@@ -85,7 +85,7 @@ function Loaded({ data, period, periodLabel, sort, onSort }: LoadedProps) {
   }
   return (
     <>
-      <SummaryCards summary={data.summary} agents={data.agents} minDecisions={data.min_decisions} periodLabel={periodLabel} />
+      <SummaryCards data={data} periodLabel={periodLabel} />
       <AgentTable
         rows={sortRows(data.agents, sort)}
         sort={sort}

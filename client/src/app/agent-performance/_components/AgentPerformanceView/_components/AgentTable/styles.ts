@@ -1,13 +1,15 @@
 import type { CSSProperties } from "react";
 
 export const s = {
-  scroll: { overflowX: "auto", border: "1px solid var(--border)", borderRadius: 9, background: "var(--bg-surface)" } satisfies CSSProperties,
+  scroll: { overflowX: "auto", border: "1px solid var(--border)", borderRadius: 10, background: "var(--bg-elevated)" } satisfies CSSProperties,
   table: { width: "100%", borderCollapse: "collapse", fontSize: 13 } satisfies CSSProperties,
   th: {
-    padding: "10px 12px",
+    padding: "10px 14px",
     textAlign: "left",
-    fontSize: 11.5,
-    fontWeight: 600,
+    fontSize: 10.5,
+    fontWeight: 700,
+    textTransform: "uppercase",
+    background: "var(--bg-surface)",
     letterSpacing: "0.04em",
     color: "var(--text-muted)",
     borderBottom: "1px solid var(--border)",

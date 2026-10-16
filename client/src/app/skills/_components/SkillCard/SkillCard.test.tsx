@@ -24,7 +24,8 @@ describe("SkillCard", () => {
     expect(screen.getByText("rubric")).toBeInTheDocument();
     expect(screen.getByText("Imported")).toBeInTheDocument();
     expect(screen.getByText("2 agents")).toBeInTheDocument();
-    expect(screen.getByText("pull 42% · accept —")).toBeInTheDocument();
+    expect(screen.getByText("42% pull")).toBeInTheDocument();
+    expect(screen.getByText("— accept")).toBeInTheDocument();
   });
 
   it("Delete opens the confirm modal (does not open the editor) and deletes on confirm", async () => {

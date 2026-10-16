@@ -38,3 +38,9 @@ export function resolveWindow(q: PeriodQuery, now: Date): PeriodWindow {
 export function toPeriodInfo(w: PeriodWindow): PeriodInfo {
   return { key: w.key, from: w.from.toISOString(), to: w.to.toISOString() };
 }
+
+/** The equally long window right before `w` (deltas and trend arrows); never overlaps it. */
+export function previousWindow(w: PeriodWindow): PeriodWindow {
+  const span = w.to.getTime() - w.from.getTime();
+  return { key: w.key, from: new Date(w.from.getTime() - span), to: w.from, toInclusive: false };
+}

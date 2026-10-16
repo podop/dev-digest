@@ -6,7 +6,7 @@
 
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useSkills } from "@/lib/hooks";
+import { useSkills, useSkillStatsSummary } from "@/lib/hooks";
 import { skillsHref } from "@/app/skills/helpers";
 import { AddSkillMenu } from "@/app/skills/_components/AddSkillMenu";
 import { SkillListItem } from "./_components/SkillListItem";
@@ -16,6 +16,8 @@ export function SkillSidebar({ activeId, onOpen }: { activeId: string; onOpen: (
   const t = useTranslations("skills");
   const router = useRouter();
   const { data: skills } = useSkills();
+  const { data: stats } = useSkillStatsSummary();
+  const statsById = new Map((stats ?? []).map((row) => [row.skill_id, row]));
 
   return (
     <aside style={s.sidebar} aria-label={t("editor.listTitle")}>
@@ -28,6 +30,7 @@ export function SkillSidebar({ activeId, onOpen }: { activeId: string; onOpen: (
           <SkillListItem
             key={sk.id}
             skill={sk}
+            stats={statsById.get(sk.id)}
             active={sk.id === activeId}
             onOpen={onOpen}
             onDeleted={() => sk.id === activeId && router.push(skillsHref())}

@@ -51,12 +51,4 @@ export const s = {
     textOverflow: "ellipsis",
   } satisfies CSSProperties,
   meta: { display: "flex", alignItems: "center", gap: 8 } satisfies CSSProperties,
-  agents: {
-    marginLeft: "auto",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 5,
-    fontSize: 12,
-    color: "var(--text-muted)",
-  } satisfies CSSProperties,
 } as const;

@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button, Dropdown, ErrorState, Skeleton, Icon, Badge } from "@devdigest/ui";
 import { AppShell } from "@/components/app-shell";
-import { useAgents, useAgent, useUpdateAgent } from "@/lib/hooks";
+import { useAgent, useAgentCardMetrics, useAgents, useUpdateAgent } from "@/lib/hooks";
 import { ApiError } from "@/lib/api";
 import type { StatsPeriod } from "@/lib/stats-period";
 import { AgentCard } from "../../../_components/AgentCard";
@@ -20,6 +20,7 @@ export function AgentEditorView({ id, tab, period }: { id: string; tab: string; 
   const tc = useTranslations("common");
   const router = useRouter();
   const { data: agents } = useAgents();
+  const metrics = useAgentCardMetrics();
   const { data: agent, isLoading, isError, error, refetch } = useAgent(id);
   const update = useUpdateAgent();
 
@@ -68,6 +69,7 @@ export function AgentEditorView({ id, tab, period }: { id: string; tab: string; 
               <AgentCard
                 key={a.id}
                 ag={a}
+                metrics={metrics.get(a.id)}
                 active={a.id === id}
                 onClick={() => router.push(agentHref(a.id, tab))}
                 onToggle={(enabled) => update.mutate({ id: a.id, patch: { enabled } })}

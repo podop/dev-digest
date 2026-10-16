@@ -1,6 +1,6 @@
 /* SkillCard — one skill in the /skills grid: type icon + badge, name, current
    version, description, source, enabled switch (optimistic), linked agents and
-   the pull % · accept % from GET /skills/stats. Click opens the skill editor;
+   the pull % · accept % from GET /skills/stats (SkillCardStats footer). Click opens the skill editor;
    the switch and trash are the shared SkillControls (trash → DeleteSkillModal). */
 "use client";
 
@@ -9,8 +9,8 @@ import { useTranslations } from "next-intl";
 import { Badge, Icon } from "@devdigest/ui";
 import type { Skill, SkillStatsSummary } from "@devdigest/shared";
 import { SKILL_TYPE_STYLE, SkillTypeBadge } from "@/components/skill-type-badge";
-import { formatRate } from "../../helpers";
 import { DeleteSkillModal } from "../DeleteSkillModal";
+import { SkillCardStats } from "../SkillCardStats";
 import { SkillControls } from "../SkillControls";
 import { s } from "./styles";
 
@@ -28,8 +28,6 @@ export function SkillCard({
   const { icon, color } = SKILL_TYPE_STYLE[skill.type];
   const TypeIcon = Icon[icon];
   const imported = skill.source !== "manual";
-  const pull = formatRate(stats?.pull_rate) ?? t("card.noStat");
-  const accept = formatRate(stats?.accept_rate) ?? t("card.noStat");
 
   return (
     <>
@@ -68,15 +66,7 @@ export function SkillCard({
             </Badge>
           </span>
         </div>
-        <div style={s.footer}>
-          <span style={s.footerItem}>
-            <Icon.Cpu size={12} />
-            {t("card.agents", { count: skill.used_by ?? 0 })}
-          </span>
-          <span className="tnum" style={s.stats}>
-            {t("card.pull", { value: pull })} · {t("card.accept", { value: accept })}
-          </span>
-        </div>
+        <SkillCardStats skill={skill} stats={stats} />
       </div>
       {deleting && (
         <DeleteSkillModal skill={skill} onClose={() => setDeleting(false)} onDeleted={() => setDeleting(false)} />

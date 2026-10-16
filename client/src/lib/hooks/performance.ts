@@ -4,8 +4,9 @@
    (no placeholder data — the old period's numbers are never shown) and nothing polls. */
 "use client";
 
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { AgentPerf, AgentStats } from "@devdigest/shared";
+import type { AgentPerf, AgentPeriodMetrics, AgentStats } from "@devdigest/shared";
 import { api } from "../api";
 import { periodApiQuery, periodSearch, type StatsPeriod } from "../stats-period";
 import { performanceKeys } from "./keys";
@@ -25,4 +26,17 @@ export function useAgentStats(agentId: string | null | undefined, period: StatsP
     queryFn: () => api.get<AgentStats>(`/agents/${encodeURIComponent(agentId ?? "")}/stats?${periodApiQuery(period)}`),
     enabled: !!agentId,
   });
+}
+
+/** The list cards always show the last 30 days. */
+const CARD_PERIOD: StatsPeriod = { key: "30d" };
+
+/** Last-30-days metrics per agent id for the agent list cards (same query as the 30d dashboard); empty while loading. */
+export function useAgentCardMetrics(): ReadonlyMap<string, AgentPeriodMetrics> {
+  const { data } = useAgentPerformance(CARD_PERIOD);
+  return useMemo(() => {
+    const byId = new Map<string, AgentPeriodMetrics>();
+    for (const row of data?.agents ?? []) if (row.agent_id !== null) byId.set(row.agent_id, row.metrics);
+    return byId;
+  }, [data]);
 }

@@ -52,8 +52,6 @@ One shared, period-aware aggregation. Two read-only endpoints. The global Agent 
 - No database migration and no new persisted entity.
 - Billing reconciliation is not built: no provider billing import, no "reconciled" cost field, no estimate-vs-billed comparison.
 - The cost source (provider-reported vs price-book) is not stored or shown per run.
-- No trend charts, sparklines or period-over-period deltas (e.g. the mockup's "-$1.20") on either screen.
-- No run history table, skills or memory usage bars, or findings-by-severity/category charts on the Stats tab.
 - No token totals on either screen.
 - No presets other than `1d`, `30d` and `custom`.
 - No pagination or server-side sorting of the agent table.
@@ -61,7 +59,6 @@ One shared, period-aware aggregation. Two read-only endpoints. The global Agent 
 - No CSV or other export.
 - Eval runs (`eval_suite_runs`/`eval_runs`) are not counted.
 - `running` runs are not counted.
-- The agents list cards (`AgentCard`) do not show stats.
 - No MCP tool is added or changed.
 - No automatic refresh or polling: data loads on open, on a period change and on Retry.
 
@@ -375,7 +372,7 @@ The period, the metrics, the summary and the breakdowns are computed for each re
 | G6 | The mockup's donut legends disagree (by agent $10.75 vs by model $8.74) | mockup | server | accepted, invariant (§7) |
 | G7 | The reference keys cost by model on the agent's current model, which misattributes past cost | reference | server | rejected; the run's stored model is used (FR7) |
 | G8 | The reference counts runs of all statuses but cost of done runs only (mismatched populations) | reference | server | rejected (FR1, D3) |
-| G9 | Trend sparklines, deltas, run history and severity charts in the mockup | mockup | client | out of scope (D2) |
+| G9 | Trend sparklines, deltas, run history and severity charts in the mockup | mockup | client | charts in scope (D5); run history out of scope |
 | G10 | Relative "4m ago" vs absolute last run | mockup | client | absolute local date-time (convention) |
 | G11 | The reference Stats tab renders a fetch error as "No runs yet" | reference | client | rejected (AC26) |
 
@@ -384,6 +381,8 @@ The period, the metrics, the summary and the breakdowns are computed for each re
 - D2 — Keep the first implementation simple; the cuts are listed under Out of scope; no migration → yes (user, 2026-10-16).
 - D3 — Counted runs → terminal statuses (done, failed, cancelled) from both sources. Running runs are excluded, because their cost and duration are not final. Failed and cancelled spend is real, so it is part of the total (caller default, 2026-10-16).
 - D4 — Cost labelling → all costs are a "DevDigest estimate"; no billing data exists; reconciliation is out of scope (user, 2026-10-16).
+- D5 — Follow the mockup's charts after all (reverses the chart cuts of D2): runs sparkline per period slice (hourly ≤ 48 h, else daily), cost / avg-cost delta and accept ↑/↓ against the equally long previous window, accept rings, cost donuts, and on the Stats tab most-used skills (`agent_run_skills`), most-pulled memory (`run_traces.memory_pulled`), findings by severity in 6 equal slices and by category; still no migration → yes (user, 2026-10-16).
+- D6 — Also per the mockup: the Stats tab run history (newest ≤ 20 counted runs: time, PR, tokens, cost, findings, source, View trace when a trace exists), last-30-days stats on the agent cards (runs · accept · avg cost, from GET /agents/performance) and on the skill cards (agents · pull · accept, from GET /skills/stats), and the skill Stats tab redesign (four cards, agents using the skill, category donut) → yes (user, 2026-10-16).
 - D5 — Avg accept rate → pooled across decisions, not a mean of the agents (caller default, 2026-10-16).
 - D6 — Avg duration → `done` runs only. Failed runs end early or record 0 ms (caller default, 2026-10-16).
 - D7 — Findings anchor → the run's `ran_at`; the current decision state counts (caller default, 2026-10-16).

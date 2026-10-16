@@ -1,36 +1,24 @@
-/* StatsTab — last-30-days usage of one skill (GET /skills/:id/stats): pull
-   rate · accept rate · findings, findings by category and severity, and the
-   agents that link it. Until the skill was part of a run: an empty state, but
-   still the agents that link it (the only place the editor lists them). */
+/* StatsTab — last-30-days usage of one skill (GET /skills/:id/stats), mockup Skill Editor · Stats:
+   four cards (agents using it, pull frequency, accept rate as a ring, findings), the agents using
+   the skill (each opens its Skills tab) and findings by category as a donut. Until the skill was
+   part of a run: an empty state, but still the agents that link it (the only place the editor
+   lists them). */
 "use client";
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { BarRow, EmptyState, ErrorState, Icon, MetricCard, SEV, SectionLabel, Skeleton, type Severity } from "@devdigest/ui";
-import type { CountBy, SkillAgentRef } from "@devdigest/shared";
+import { Card, EmptyState, ErrorState, SectionLabel, Skeleton } from "@devdigest/ui";
+import type { SkillAgentRef } from "@devdigest/shared";
+import { AgentGlyph, DonutChart, StatCard, categoryColor, formatPercent } from "@/components/agent-metrics";
 import { useSkillStats } from "@/lib/hooks";
-import { formatRate } from "@/app/skills/helpers";
-import { maxCount, neverAttached } from "./helpers";
+import { neverAttached } from "./helpers";
 import { s } from "./styles";
 
-function Breakdown({ rows, colorOf }: { rows: CountBy[]; colorOf?: (key: string) => string | undefined }) {
-  const t = useTranslations("skills");
-  if (rows.length === 0) return <p style={s.muted}>{t("stats.none")}</p>;
-  const max = maxCount(rows);
-  return (
-    <div>
-      {rows.map((r) => (
-        <BarRow key={r.key} label={r.key} value={r.count} max={max} suffix={String(r.count)} color={colorOf?.(r.key)} />
-      ))}
-    </div>
-  );
-}
-
-/** The agents that link this skill (links to their Skills tab). */
+/** The agents that link this skill (each opens its Skills tab). */
 function UsedBy({ agents }: { agents: SkillAgentRef[] }) {
   const t = useTranslations("skills");
   return (
-    <section style={s.section}>
+    <Card>
       <SectionLabel icon="Cpu">{t("stats.usedBy")}</SectionLabel>
       {agents.length === 0 ? (
         <p style={s.muted}>{t("stats.notUsed")}</p>
@@ -38,20 +26,24 @@ function UsedBy({ agents }: { agents: SkillAgentRef[] }) {
         <ul style={s.agents}>
           {agents.map((a) => (
             <li key={a.id}>
-              <Link href={`/agents/${encodeURIComponent(a.id)}?tab=skills`} style={s.agent(a.enabled)}>
-                <Icon.Cpu size={13} />
-                {a.name}
+              <Link href={`/agents/${encodeURIComponent(a.id)}?tab=skills`} aria-label={a.name} style={s.agent(a.enabled)}>
+                <AgentGlyph muted={!a.enabled} />
+                <span style={s.agentName}>{a.name}</span>
+                <span className="mono" style={s.open}>
+                  {t("stats.open")}
+                </span>
               </Link>
             </li>
           ))}
         </ul>
       )}
-    </section>
+    </Card>
   );
 }
 
 export function StatsTab({ skillId }: { skillId: string }) {
   const t = useTranslations("skills");
+  const tm = useTranslations("agentPerformance.metrics");
   const { data: stats, isLoading, isError, refetch } = useSkillStats(skillId);
 
   if (isLoading) return <Skeleton height={200} />;
@@ -65,32 +57,40 @@ export function StatsTab({ skillId }: { skillId: string }) {
     );
   }
 
+  const pull = formatPercent(stats.pull_rate);
+  const accept = formatPercent(stats.accept_rate);
+  const categories = stats.by_category.map((c) => ({ key: c.key, label: c.key, value: c.count, color: categoryColor(c.key) }));
+
   return (
     <div style={s.wrap}>
-      <h2 style={s.h2}>{t("stats.title", { days: stats.window_days })}</h2>
-      <div style={s.cards}>
-        <div style={s.card}>
-          <MetricCard label={t("stats.pullRate")} value={formatRate(stats.pull_rate) ?? "—"} />
-          <p style={s.hint}>{t("stats.pullRateHint", { cited: stats.runs_cited, attached: stats.runs_attached })}</p>
-        </div>
-        <div style={s.card}>
-          <MetricCard label={t("stats.acceptRate")} value={formatRate(stats.accept_rate) ?? "—"} />
-          <p style={s.hint}>{t("stats.acceptRateHint", { accepted: stats.accepted, dismissed: stats.dismissed })}</p>
-        </div>
-        <div style={s.card}>
-          <MetricCard label={t("stats.findings")} value={stats.findings} />
-        </div>
+      <div role="group" aria-label={t("stats.title", { days: stats.window_days })} style={s.cards}>
+        <StatCard
+          label={t("stats.usedByCard")}
+          value={stats.used_by.length}
+          unit={t("stats.agentsUnit", { count: stats.used_by.length })}
+        />
+        <StatCard label={t("stats.pullRate")} value={pull} unit={tm("percentUnit")}>
+          {t("stats.pullRateHint", { cited: stats.runs_cited, attached: stats.runs_attached })}
+        </StatCard>
+        <StatCard label={t("stats.acceptRate")} value={accept} unit={tm("percentUnit")} ring={accept}>
+          {t("stats.acceptRateHint", { accepted: stats.accepted, dismissed: stats.dismissed })}
+        </StatCard>
+        <StatCard label={t("stats.findingsDays", { days: stats.window_days })} value={stats.findings} />
       </div>
 
-      <section style={s.section}>
-        <SectionLabel icon="Tag">{t("stats.byCategory")}</SectionLabel>
-        <Breakdown rows={stats.by_category} />
-      </section>
-      <section style={s.section}>
-        <SectionLabel icon="AlertTriangle">{t("stats.bySeverity")}</SectionLabel>
-        <Breakdown rows={stats.by_severity} colorOf={(key) => SEV[key as Severity]?.c} />
-      </section>
-      <UsedBy agents={stats.used_by} />
+      <div style={s.grid}>
+        <UsedBy agents={stats.used_by} />
+        <Card>
+          <SectionLabel icon="Tag">{t("stats.byCategory")}</SectionLabel>
+          {categories.length === 0 ? (
+            <p style={s.muted}>{t("stats.none")}</p>
+          ) : (
+            <div style={s.donut}>
+              <DonutChart data={categories} label={t("stats.byCategory")} formatValue={(v) => v} />
+            </div>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }
