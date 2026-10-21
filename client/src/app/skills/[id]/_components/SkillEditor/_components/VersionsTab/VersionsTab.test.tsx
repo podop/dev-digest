@@ -51,7 +51,8 @@ afterEach(() => {
 describe("skill VersionsTab", () => {
   it("lists versions newest first and marks the current one", async () => {
     renderWithProviders(<Harness initialTab="versions" />);
-    expect(await screen.findByText("Version history · 3 versions")).toBeInTheDocument();
+    expect(await screen.findByText("Version history")).toBeInTheDocument();
+    expect(screen.getByText("3 versions")).toBeInTheDocument();
     const current = screen.getByTestId("version-v5");
     expect(within(current).getByText("Current")).toBeInTheDocument();
     expect(within(current).queryByRole("button", { name: "Restore" })).toBeNull();
@@ -74,10 +75,9 @@ describe("skill VersionsTab", () => {
   it("the current version offers no Diff (nothing to compare against)", async () => {
     renderWithProviders(<Harness initialTab="versions" />);
     const v5 = await screen.findByTestId("version-v5");
-    // Hidden from the a11y tree AND disabled — there is no current-vs-current diff.
+    // The current card shows only the "Current" pill — no Diff (current vs current) and no Restore.
     expect(within(v5).queryByRole("button", { name: "Diff" })).toBeNull();
-    const hiddenDiff = Array.from(v5.querySelectorAll("button")).find((b) => b.textContent?.includes("Diff"));
-    expect(hiddenDiff).toBeDisabled();
+    expect(within(v5).queryAllByRole("button")).toHaveLength(0);
   });
 
   it("Restore confirms, then POSTs the version", async () => {

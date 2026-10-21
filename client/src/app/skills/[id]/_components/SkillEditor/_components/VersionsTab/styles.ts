@@ -10,26 +10,54 @@ const DIFF_COLORS: Record<DiffLine["kind"], { bg: string; color: string }> = {
 /** Co-located styles for VersionsTab. */
 export const s = {
   wrap: { maxWidth: 860 } satisfies CSSProperties,
-  h2: { fontSize: 18, fontWeight: 700 } satisfies CSSProperties,
+  titleRow: { display: "flex", alignItems: "center", gap: 10 } satisfies CSSProperties,
+  h2: { fontSize: 18, fontWeight: 700, margin: 0 } satisfies CSSProperties,
+  count: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: "var(--text-secondary)",
+    background: "var(--bg-hover)",
+    borderRadius: 5,
+    padding: "2px 8px",
+  } satisfies CSSProperties,
   caption: { fontSize: 13, color: "var(--text-muted)", margin: "6px 0 16px" } satisfies CSSProperties,
-  list: { listStyle: "none", padding: 0, display: "flex", flexDirection: "column", gap: 8 } satisfies CSSProperties,
+  list: { listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 10 } satisfies CSSProperties,
   row: (current: boolean): CSSProperties => ({
     border: `1px solid ${current ? "var(--border-strong)" : "var(--border)"}`,
     borderRadius: 8,
     background: "var(--bg-elevated)",
     overflow: "hidden",
   }),
-  rowHead: { display: "flex", alignItems: "center", gap: 12, padding: "10px 14px" } satisfies CSSProperties,
-  /** The "Diff" toggle; the current version has nothing to diff against. */
-  expand: (current: boolean): CSSProperties => ({
-    gap: 4,
-    padding: "3px 8px",
-    color: "var(--text-muted)",
-    visibility: current ? "hidden" : "visible",
+  rowHead: { display: "flex", alignItems: "center", gap: 14, padding: "14px 16px" } satisfies CSSProperties,
+  /** The version tile: accent for the current version, muted for older ones. */
+  version: (current: boolean): CSSProperties => ({
+    flex: "none",
+    minWidth: 36,
+    textAlign: "center",
+    fontSize: 13,
+    fontWeight: 700,
+    padding: "6px 8px",
+    borderRadius: 6,
+    color: current ? "var(--accent-text)" : "var(--text-muted)",
+    background: current ? "var(--accent-bg)" : "var(--bg-hover)",
   }),
-  version: { fontSize: 13, fontWeight: 700, minWidth: 34 } satisfies CSSProperties,
-  message: { flex: 1, fontSize: 13, color: "var(--text-primary)" } satisfies CSSProperties,
+  text: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 } satisfies CSSProperties,
+  message: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: "var(--text-primary)",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  } satisfies CSSProperties,
   date: { fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" } satisfies CSSProperties,
+  actions: { display: "flex", alignItems: "center", gap: 8, flex: "none" } satisfies CSSProperties,
+  /** "Diff": outlined and muted like the mockup; highlighted while its diff is open. */
+  diffButton: (open: boolean): CSSProperties => ({
+    border: "1px solid var(--border)",
+    color: open ? "var(--text-primary)" : "var(--text-muted)",
+    background: open ? "var(--bg-hover)" : "transparent",
+  }),
   diff: {
     borderTop: "1px solid var(--border)",
     background: "var(--bg-surface)",

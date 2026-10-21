@@ -29,6 +29,14 @@ export function hasChanges(lines: readonly DiffLine[]): boolean {
 }
 
 /** A version's timestamp in the viewer's locale (the raw value if unparsable). */
+/** A version's save day as YYYY-MM-DD in the browser's time zone (mockup); the raw string if unparsable. */
+export function formatDay(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export function formatWhen(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();

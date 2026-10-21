@@ -174,8 +174,8 @@
     "caption": "Rendered as the reviewing agent receives it"
   },
   "versions": {
-    "title": "Version history · {count, plural, one {# version} other {# versions}}",
-    "caption": "A new version is saved whenever the body or the description changes. Restore writes an old version as a new one.",
+    "title": "Version history",
+    "caption": "Every save snapshots the body so eval runs stay reproducible against the exact text they scored. Restore writes an old version as a new one.",
     "current": "Current",
     "restore": "Restore",
     "restoring": "Restoring…",
@@ -187,7 +187,8 @@
     "noMessage": "—",
     "loadError": "Could not load the versions.",
     "empty": "No versions yet.",
-    "diff": "Diff"
+    "diff": "Diff",
+    "count": "{count, plural, one {# version} other {# versions}}"
   },
   "stats": {
     "title": "Last {days} days",
